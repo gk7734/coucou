@@ -1,4 +1,5 @@
 import SwiftUI
+import QuartzCore
 
 /// SwiftUI wrapper: TimelineView drives a Canvas that calls BotEngine.draw().
 /// Uses a shared engine per-task; the main bot uses AppState's shared engine.
@@ -8,16 +9,26 @@ struct BotCanvasView: View {
     /// When set, overrides island-based eye-tracking (used by desktop Mochi).
     /// CGPoint in the same coord space as state.mousePosition (DesktopSpace, y-down).
     var lookOriginOverride: CGPoint? = nil
+    /// False while this Mochi is mounted but not seen (the island's own Mochi while it is
+    /// dragged or lives on the desktop): no frames are drawn for nobody.
+    var isShown: Bool = true
 
     // One engine per view instance (main bot)
     @StateObject private var engine = BotEngine()
+    @StateObject private var cadence = MochiCadence()
 
     var body: some View {
-        TimelineView(.animation(paused: state.mode == .hidden)) { timeline in
+        // 30 fps while calm outside the expanded island, the display's rate otherwise
+        // (MochiFrameRate).
+        TimelineView(.animation(
+            minimumInterval: MochiFrameRate.minimumInterval(
+                fast: cadence.fast, alwaysFull: state.mode == .expanded || state.isDraggingBot),
+            paused: state.mode == .hidden || !isShown
+        )) { timeline in
             Canvas { context, size in
-                let now = timeline.date.timeIntervalSinceReferenceDate
-                let dtRaw = min(0.05, now - engine.lastTime)
-                let dt = dtRaw
+                _ = timeline.date
+                // Same clock as the engine's tweens (the frame's own date counts from 2001).
+                let dt = min(0.05, max(0, CACurrentMediaTime() - engine.lastTime))
                 engine.lookX = lookX(state: state, size: size)
                 engine.lookY = lookY(state: state, size: size)
                 engine.particleOverhang = particleOverhang
@@ -73,6 +84,7 @@ struct BotCanvasView: View {
                                  animated: state.view != .wardrobe)
 
                 engine.update(dt: dt)
+                cadence.track(engine)
                 var ctx = context
                 engine.applyDance(&ctx, size: size)
                 // Rigid-roll: when Mochi wears an outfit (presence > 0.05) and is rolling,
@@ -100,31 +112,35 @@ struct BotCanvasView: View {
         }
         .onChange(of: state.effectiveState) { _, newState in
             engine.setState(newState)
+            cadence.kick()
         }
         .onChange(of: state.view) { _, newView in
             // Morph up when upload view is active
             if state.mode == .expanded && newView == .upload {
-                engine.anim("morph", keys: [TweenKey(target: 1, duration: 550, ease: Ease.inOut)])
+                engine.anim(.morph, keys: [TweenKey(target: 1, duration: 550, ease: Ease.inOut)])
+                cadence.kick()
             } else if newView != .upload && newView != .uploading && engine.morph > 0.01 {
                 // Any other view (not mid-gulp): morph back
-                engine.anim("morph", keys: [TweenKey(target: 0, duration: 550, ease: Ease.inOut)])
+                engine.anim(.morph, keys: [TweenKey(target: 0, duration: 550, ease: Ease.inOut)])
+                cadence.kick()
             }
         }
         .onChange(of: state.mode) { _, newMode in
             // Hard-reset morph when island collapses
             if newMode != .expanded {
-                engine.tweens.removeValue(forKey: "morph")
-                engine.locks.remove("morph")
+                engine.cancelTween(.morph)
                 engine.morph = 0
             }
         }
         .onReceive(NotificationCenter.default.publisher(for: .triggerEmote)) { notif in
             if let emote = notif.object as? BotEmote {
                 engine.triggerEmote(emote)
+                cadence.kick()
             }
         }
         .onReceive(NotificationCenter.default.publisher(for: .triggerSlap)) { _ in
             engine.slap()
+            cadence.kick()
         }
         .onReceive(NotificationCenter.default.publisher(for: .botBlink)) { _ in
             engine.blink()
@@ -136,15 +152,18 @@ struct BotCanvasView: View {
         }
         .onReceive(NotificationCenter.default.publisher(for: .botGulp)) { _ in
             engine.gulp()
+            cadence.kick()
         }
         .onReceive(NotificationCenter.default.publisher(for: .botMorphTo)) { notif in
             if let target = notif.object as? CGFloat {
                 let dur: CGFloat = target > 0.5 ? 550 : 650
-                engine.anim("morph", keys: [TweenKey(target: target, duration: dur, ease: Ease.inOut)])
+                engine.anim(.morph, keys: [TweenKey(target: target, duration: dur, ease: Ease.inOut)])
+                cadence.kick()
             }
         }
         .onReceive(NotificationCenter.default.publisher(for: .botGreet)) { _ in
             engine.greet()
+            cadence.kick()
         }
         .onAppear {
             engine.setState(state.effectiveState, force: true)
@@ -193,6 +212,7 @@ struct MiniBotCanvasView: View {
     let task: AgentTask
     var isDancing: Bool = false
     @StateObject private var engine: BotEngine
+    @StateObject private var cadence = MochiCadence()
     /// False in an island view that is mounted but not showing: no frames drawn for nobody.
     @Environment(\.islandViewActive) private var isActive
 
@@ -208,12 +228,17 @@ struct MiniBotCanvasView: View {
     }
 
     var body: some View {
-        TimelineView(.animation(paused: !isActive)) { timeline in
+        // 30 fps while calm, the display's rate during a hop or a head shake (MochiFrameRate).
+        TimelineView(.animation(
+            minimumInterval: MochiFrameRate.minimumInterval(fast: cadence.fast, alwaysFull: false),
+            paused: !isActive
+        )) { timeline in
             Canvas { context, size in
-                let now = timeline.date.timeIntervalSinceReferenceDate
-                let dt = min(0.05, now - engine.lastTime)
+                _ = timeline.date
+                let dt = min(0.05, max(0, CACurrentMediaTime() - engine.lastTime))
                 engine.setDancing(isDancing)
                 engine.update(dt: dt)
+                cadence.track(engine)
                 var ctx = context
                 engine.applyDance(&ctx, size: size)
                 engine.draw(context: ctx, size: size)
@@ -238,6 +263,31 @@ struct MiniBotCanvasView: View {
                 engine.eyeOverride = eye
                 engine.eyeOverrideUntil = .greatestFiniteMagnitude
             }
+        }
+    }
+}
+
+/// Publishes MochiFrameRate's switches, so the TimelineView picks up its new cadence.
+@MainActor
+final class MochiCadence: ObservableObject {
+    @Published private(set) var fast = false
+    private var rate = MochiFrameRate()
+
+    /// Called by the Canvas after each update. The switch is published once the frame is
+    /// drawn: a view must not change state while it renders.
+    func track(_ engine: BotEngine) {
+        if rate.update(now: CACurrentMediaTime(), fastMotion: engine.hasFastMotion) { publish() }
+    }
+
+    /// Something is about to move Mochi fast: full rate from the next frame.
+    func kick() {
+        if rate.kick(now: CACurrentMediaTime()) { publish() }
+    }
+
+    private func publish() {
+        DispatchQueue.main.async { [weak self] in
+            guard let self, self.fast != self.rate.fast else { return }
+            self.fast = self.rate.fast
         }
     }
 }

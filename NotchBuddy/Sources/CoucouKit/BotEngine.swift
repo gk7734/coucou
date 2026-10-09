@@ -20,8 +20,22 @@ struct TweenKey {
     let ease: (CGFloat) -> CGFloat
 }
 
+/// The animatable properties of BotEngine (tweens are stored per property, in an array).
+enum TweenProp: Int, CaseIterable {
+    case yaw, pitch, roll, tilt, open, sx, sy, oy, ox, tint, morph, hands, blush, es, badgeS, outfitPresence
+
+    /// Tweens that move Mochi quickly enough to want the display's full frame rate.
+    /// Left out: blinks (open), and the slow fades of tint, blush and the badge.
+    var isFast: Bool {
+        switch self {
+        case .open, .tint, .blush, .badgeS: return false
+        default: return true
+        }
+    }
+}
+
 struct Tween {
-    let property: String
+    let property: TweenProp
     var keys: [TweenKey]
     var keyIndex: Int = 0
     var from: CGFloat
@@ -240,9 +254,14 @@ final class BotEngine: ObservableObject {
     var badgeKey: String = "none"
     var badgeToken: Int = 0
 
-    // Tweens (keyed by property name)
-    var tweens: [String: Tween] = [:]
-    var locks:  Set<String> = []
+    // Tweens, one slot per property (TweenProp.rawValue). A property with a tween is
+    // "locked": update() leaves its smoothing alone.
+    private(set) var tweens = [Tween?](repeating: nil, count: TweenProp.allCases.count)
+
+    func isAnimating(_ p: TweenProp) -> Bool { tweens[p.rawValue] != nil }
+
+    /// Drops a property's tween where it is (no completion handler).
+    func cancelTween(_ p: TweenProp) { tweens[p.rawValue] = nil }
 
     // Particles
     var particles: [Particle] = []
@@ -279,8 +298,8 @@ final class BotEngine: ObservableObject {
         state = newState
         cfg = BotStates[newState]!
         colT = cgColorToTuple(cfg.color)
-        setTarget(key: "tint", value: cfg.tint)
-        setTarget(key: "tilt", value: cfg.tilt)
+        if !isAnimating(.tint) { tint += (cfg.tint - tint) }   // immediate target
+        if !isAnimating(.tilt) { tgTilt = cfg.tilt }
         setBadge(cfg.badge)
 
         switch newState {
@@ -290,14 +309,14 @@ final class BotEngine: ObservableObject {
                 self?.emit(.spark, count: 5)
             }
         case .error:
-            anim("ox", keys: [
+            anim(.ox, keys: [
                 TweenKey(target: 0.08,  duration: 50,  ease: Ease.out),
                 TweenKey(target: -0.08, duration: 70,  ease: Ease.inOut),
                 TweenKey(target: 0.05,  duration: 70,  ease: Ease.inOut),
                 TweenKey(target: 0,     duration: 90,  ease: Ease.out),
             ])
         case .approval:
-            anim("oy", keys: [
+            anim(.oy, keys: [
                 TweenKey(target: -0.2, duration: 150, ease: Ease.out),
                 TweenKey(target: 0,    duration: 300, ease: Ease.back),
             ])
@@ -318,19 +337,19 @@ final class BotEngine: ObservableObject {
         badgeKey = key
         let tok = badgeToken + 1
         badgeToken = tok
-        anim("badgeS", keys: [TweenKey(target: 0, duration: 90, ease: Ease.inOut)])
+        anim(.badgeS, keys: [TweenKey(target: 0, duration: 90, ease: Ease.inOut)])
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { [weak self] in
             guard let self, tok == self.badgeToken else { return }
             self.badge = b
             if b != nil {
-                self.anim("badgeS", keys: [TweenKey(target: 1, duration: 280, ease: Ease.back)])
+                self.anim(.badgeS, keys: [TweenKey(target: 1, duration: 280, ease: Ease.back)])
             }
         }
     }
 
     func blink() {
-        guard !locks.contains("open") else { return }
-        anim("open", keys: [
+        guard !isAnimating(.open) else { return }
+        anim(.open, keys: [
             TweenKey(target: 0.06, duration: 70,  ease: Ease.inOut),
             TweenKey(target: 1,    duration: 130, ease: Ease.out),
         ])
@@ -338,12 +357,12 @@ final class BotEngine: ObservableObject {
 
     func squash() {
         physVy += 0.6
-        anim("sy", keys: [
+        anim(.sy, keys: [
             TweenKey(target: 0.78, duration: 70,  ease: Ease.out),
             TweenKey(target: 1.1,  duration: 130, ease: Ease.out),
             TweenKey(target: 1,    duration: 170, ease: Ease.inOut),
         ])
-        anim("sx", keys: [
+        anim(.sx, keys: [
             TweenKey(target: 1.16, duration: 70,  ease: Ease.out),
             TweenKey(target: 0.95, duration: 130, ease: Ease.out),
             TweenKey(target: 1,    duration: 170, ease: Ease.inOut),
@@ -362,12 +381,12 @@ final class BotEngine: ObservableObject {
                 self?.isChewing = false
             }
         }
-        anim("sy", keys: [
+        anim(.sy, keys: [
             TweenKey(target: 0.78, duration: 80,  ease: Ease.out),
             TweenKey(target: 1.18, duration: 130, ease: Ease.out),
             TweenKey(target: 1,    duration: 220, ease: Ease.back),
         ])
-        anim("sx", keys: [
+        anim(.sx, keys: [
             TweenKey(target: 1.28, duration: 80,  ease: Ease.out),
             TweenKey(target: 0.92, duration: 130, ease: Ease.out),
             TweenKey(target: 1,    duration: 220, ease: Ease.back),
@@ -414,22 +433,22 @@ final class BotEngine: ObservableObject {
 
         case .happy:
             // Little jump + squash
-            guard !locks.contains("oy") else {
+            guard !isAnimating(.oy) else {
                 miniNextBehavior = CACurrentMediaTime() + 0.4
                 return
             }
-            anim("oy", keys: [
+            anim(.oy, keys: [
                 TweenKey(target: -0.30, duration: 120, ease: Ease.out),
                 TweenKey(target:  0.03, duration: 200, ease: Ease.inOut),
                 TweenKey(target:  0,    duration: 160, ease: Ease.back),
             ])
-            anim("sy", keys: [
+            anim(.sy, keys: [
                 TweenKey(target: 0.82, duration: 80,  ease: Ease.out),
                 TweenKey(target: 1.18, duration: 130, ease: Ease.out),
                 TweenKey(target: 0.88, duration: 160, ease: Ease.inOut),
                 TweenKey(target: 1,    duration: 200, ease: Ease.back),
             ])
-            anim("sx", keys: [
+            anim(.sx, keys: [
                 TweenKey(target: 1.15, duration: 80,  ease: Ease.out),
                 TweenKey(target: 0.88, duration: 130, ease: Ease.out),
                 TweenKey(target: 1.06, duration: 160, ease: Ease.inOut),
@@ -439,11 +458,11 @@ final class BotEngine: ObservableObject {
 
         case .annoyed:
             // Rapid head shake
-            guard !locks.contains("yaw") else {
+            guard !isAnimating(.yaw) else {
                 miniNextBehavior = CACurrentMediaTime() + 0.5
                 return
             }
-            anim("yaw", keys: [
+            anim(.yaw, keys: [
                 TweenKey(target: -0.65, duration: 50,  ease: Ease.out),
                 TweenKey(target:  0.65, duration: 90,  ease: Ease.inOut),
                 TweenKey(target: -0.5,  duration: 80,  ease: Ease.inOut),
@@ -458,7 +477,7 @@ final class BotEngine: ObservableObject {
             let now2 = CACurrentMediaTime()
             eyeOverride = .wink
             eyeOverrideUntil = now2 + 0.55
-            anim("tilt", keys: [
+            anim(.tilt, keys: [
                 TweenKey(target:  0.13, duration: 100, ease: Ease.out),
                 TweenKey(target:  0.13, duration: 320, ease: Ease.lin),
                 TweenKey(target:  0,    duration: 200, ease: Ease.inOut),
@@ -468,7 +487,7 @@ final class BotEngine: ObservableObject {
         case .love:
             // Emit hearts + gentle sway
             emit(.heart, count: 2)
-            anim("tilt", keys: [
+            anim(.tilt, keys: [
                 TweenKey(target: -0.1, duration: 180, ease: Ease.out),
                 TweenKey(target:  0.1, duration: 340, ease: Ease.inOut),
                 TweenKey(target:  0,   duration: 220, ease: Ease.inOut),
@@ -483,7 +502,7 @@ final class BotEngine: ObservableObject {
     func doRoll(duration: CGFloat, turns: CGFloat) {
         roll = 0
         rollTurns = turns
-        anim("roll", keys: [TweenKey(target: .pi * 2 * turns, duration: duration, ease: Ease.inOut)]) { [weak self] in
+        anim(.roll, keys: [TweenKey(target: .pi * 2 * turns, duration: duration, ease: Ease.inOut)]) { [weak self] in
             self?.roll = 0
             self?.squash()
         }
@@ -492,29 +511,28 @@ final class BotEngine: ObservableObject {
     func setOutfit(_ newOutfit: Outfit, animated: Bool = true) {
         guard newOutfit != outfitTarget else { return }
         outfitTarget = newOutfit
-        tweens.removeValue(forKey: "outfitPresence")
-        locks.remove("outfitPresence")
+        cancelTween(.outfitPresence)
         if !animated {
             outfit = newOutfit
             outfitPresence = newOutfit != .none ? 1 : 0
         } else if newOutfit == .none {
             // Exit: fade out then clear outfit
-            anim("outfitPresence", keys: [TweenKey(target: 0, duration: 180, ease: Ease.inOut)]) { [weak self] in
+            anim(.outfitPresence, keys: [TweenKey(target: 0, duration: 180, ease: Ease.inOut)]) { [weak self] in
                 self?.outfit = .none
             }
         } else if outfit == .none {
             // Enter: set outfit then animate in (Ease.back applied to position offsets in drawing code)
             outfit = newOutfit
             outfitPresence = 0
-            anim("outfitPresence", keys: [TweenKey(target: 1, duration: 350, ease: Ease.inOut)]) { [weak self] in
+            anim(.outfitPresence, keys: [TweenKey(target: 1, duration: 350, ease: Ease.inOut)]) { [weak self] in
                 self?.squash()
             }
         } else {
             // Change: exit old, set new, enter
-            anim("outfitPresence", keys: [TweenKey(target: 0, duration: 180, ease: Ease.inOut)]) { [weak self] in
+            anim(.outfitPresence, keys: [TweenKey(target: 0, duration: 180, ease: Ease.inOut)]) { [weak self] in
                 guard let self else { return }
                 self.outfit = newOutfit
-                self.anim("outfitPresence", keys: [TweenKey(target: 1, duration: 350, ease: Ease.inOut)]) { [weak self] in
+                self.anim(.outfitPresence, keys: [TweenKey(target: 1, duration: 350, ease: Ease.inOut)]) { [weak self] in
                     self?.squash()
                 }
             }
@@ -532,7 +550,7 @@ final class BotEngine: ObservableObject {
         // 0s: happy eyes for full greeting (2s — no gap, no flicker)
         eyeOverride = .happy
         eyeOverrideUntil = now + 2.0
-        anim("oy", keys: [
+        anim(.oy, keys: [
             TweenKey(target: -0.06, duration: 220, ease: Ease.out),
             TweenKey(target:  0.0,  duration: 220, ease: Ease.back),
         ])
@@ -540,12 +558,12 @@ final class BotEngine: ObservableObject {
         // 0.25s: hands out + body squash + sound
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) { [weak self] in
             guard let self, self.greetToken == tok else { return }
-            self.anim("hands", keys: [TweenKey(target: 1, duration: 280, ease: Ease.out)])
-            self.anim("sy", keys: [
+            self.anim(.hands, keys: [TweenKey(target: 1, duration: 280, ease: Ease.out)])
+            self.anim(.sy, keys: [
                 TweenKey(target: 0.95, duration: 100, ease: Ease.out),
                 TweenKey(target: 1.0,  duration: 260, ease: Ease.back),
             ])
-            self.anim("sx", keys: [
+            self.anim(.sx, keys: [
                 TweenKey(target: 1.04, duration: 100, ease: Ease.out),
                 TweenKey(target: 1.0,  duration: 260, ease: Ease.back),
             ])
@@ -568,7 +586,7 @@ final class BotEngine: ObservableObject {
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.55) { [weak self] in
             guard let self, self.greetToken == tok else { return }
             self.waveUntil = 0
-            self.anim("hands", keys: [TweenKey(target: 0, duration: 200, ease: Ease.inOut)])
+            self.anim(.hands, keys: [TweenKey(target: 0, duration: 200, ease: Ease.inOut)])
         }
 
         // 1.75s: brief happy eyes then back to normal
@@ -585,7 +603,7 @@ final class BotEngine: ObservableObject {
         greetToken += 1   // invalidate any pending closures
         waveUntil = 0
         waveStart = 0
-        anim("hands", keys: [TweenKey(target: 0, duration: 150, ease: Ease.inOut)])
+        anim(.hands, keys: [TweenKey(target: 0, duration: 150, ease: Ease.inOut)])
     }
 
     /// Sets a permanent eye expression that survives blinks and transient emotes.
@@ -617,50 +635,50 @@ final class BotEngine: ObservableObject {
 
         switch emote {
         case .love:
-            anim("blush", keys: [
+            anim(.blush, keys: [
                 TweenKey(target: 1, duration: 300, ease: Ease.out),
                 TweenKey(target: 1, duration: CGFloat((duration - 0.6) * 1000), ease: Ease.lin),
                 TweenKey(target: 0, duration: 300, ease: Ease.inOut),
             ])
             emit(.heart, count: 4)
-            anim("oy", keys: [
+            anim(.oy, keys: [
                 TweenKey(target: -0.1, duration: 160, ease: Ease.out),
                 TweenKey(target: 0,    duration: 300, ease: Ease.back),
             ])
         case .surprised:
-            anim("oy", keys: [
+            anim(.oy, keys: [
                 TweenKey(target: -0.3, duration: 140, ease: Ease.out),
                 TweenKey(target: 0,    duration: 380, ease: Ease.back),
             ])
-            anim("es", keys: [
+            anim(.es, keys: [
                 TweenKey(target: 1.25, duration: 120, ease: Ease.out),
                 TweenKey(target: 1,    duration: 500, ease: Ease.inOut),
             ])
         case .proud:
             squash()
             emit(.star, count: 5)
-            anim("tilt", keys: [
+            anim(.tilt, keys: [
                 TweenKey(target: -0.14, duration: 220, ease: Ease.out),
                 TweenKey(target: -0.14, duration: CGFloat((duration - 0.5) * 1000), ease: Ease.lin),
                 TweenKey(target: 0,     duration: 280, ease: Ease.inOut),
             ])
-            anim("blush", keys: [
+            anim(.blush, keys: [
                 TweenKey(target: 0.7, duration: 250, ease: Ease.out),
                 TweenKey(target: 0.7, duration: CGFloat((duration - 0.5) * 1000), ease: Ease.lin),
                 TweenKey(target: 0,   duration: 300, ease: Ease.inOut),
             ])
         case .wink:
-            anim("tilt", keys: [
+            anim(.tilt, keys: [
                 TweenKey(target: 0.12, duration: 160, ease: Ease.out),
                 TweenKey(target: 0.12, duration: CGFloat((duration - 0.4) * 1000), ease: Ease.lin),
                 TweenKey(target: 0,    duration: 240, ease: Ease.inOut),
             ])
         case .yawn:
-            anim("sy", keys: [
+            anim(.sy, keys: [
                 TweenKey(target: 1.12, duration: 500, ease: Ease.inOut),
                 TweenKey(target: 1,    duration: 500, ease: Ease.inOut),
             ])
-            anim("sx", keys: [
+            anim(.sx, keys: [
                 TweenKey(target: 0.94, duration: 500, ease: Ease.inOut),
                 TweenKey(target: 1,    duration: 500, ease: Ease.inOut),
             ])
@@ -669,7 +687,7 @@ final class BotEngine: ObservableObject {
                 self?.emit(.z, count: 2)
             }
         case .happy:
-            anim("blush", keys: [
+            anim(.blush, keys: [
                 TweenKey(target: 0.6, duration: 200, ease: Ease.out),
                 TweenKey(target: 0,   duration: 600, ease: Ease.inOut),
             ])
@@ -706,28 +724,32 @@ final class BotEngine: ObservableObject {
         let now = CACurrentMediaTime()
         let dtCG = CGFloat(dt)
 
-        // Process tweens
-        for key in tweens.keys {
-            guard var tw = tweens[key] else { continue }
+        // Process tweens: the ones running when the frame starts (a completion handler
+        // may start or replace others; those begin next frame unless already in the set).
+        var running: UInt32 = 0
+        for i in tweens.indices where tweens[i] != nil { running |= 1 << UInt32(i) }
+        var index = 0
+        while running != 0 {
+            defer { running >>= 1; index += 1 }
+            guard running & 1 != 0, var tw = tweens[index] else { continue }
             let k = tw.keys[tw.keyIndex]
             let elapsed = now * 1000 - tw.startTime
             let p = min(1, max(0, CGFloat(elapsed) / k.duration))
             let val = tw.from + (k.target - tw.from) * k.ease(p)
-            setProperty(key, value: val)
+            setProperty(tw.property, value: val)
 
             if p >= 1 {
                 tw.from = k.target
                 tw.keyIndex += 1
                 tw.startTime = now * 1000
                 if tw.keyIndex >= tw.keys.count {
-                    tweens.removeValue(forKey: key)
-                    locks.remove(key)
+                    tweens[index] = nil
                     tw.onComplete?()
                 } else {
-                    tweens[key] = tw
+                    tweens[index] = tw
                 }
             } else {
-                tweens[key] = tw
+                tweens[index] = tw
             }
         }
 
@@ -772,7 +794,7 @@ final class BotEngine: ObservableObject {
 
         let bounce = cfg.bounces ? -abs(sin(t * 5.2)) * 0.07 : CGFloat(0)
         // oy tween can override if not locked
-        if !locks.contains("oy") { oy += (bounce - oy) * CGFloat(1 - pow(0.0008, dt)) }
+        if !isAnimating(.oy) { oy += (bounce - oy) * CGFloat(1 - pow(0.0008, dt)) }
 
         if cfg.breathes {
             let amp: CGFloat = isMini ? 0.07 : 0.035
@@ -795,12 +817,12 @@ final class BotEngine: ObservableObject {
         let kLook = CGFloat(1 - pow(0.0025, dt))
         let kGen  = CGFloat(1 - pow(0.0008, dt))
 
-        if !locks.contains("yaw")   { yaw   += (tgYaw   - yaw)   * kLook }
-        if !locks.contains("pitch") { pitch += (tgPitch  - pitch) * kLook }
-        if !locks.contains("tilt")  { tilt  += (tgTilt   - tilt)  * kGen  }
-        if !locks.contains("sy")    { sy    += (tgSy     - sy)    * kGen  }
-        if !locks.contains("sx")    { sx    += (tgSx     - sx)    * kGen  }
-        if !locks.contains("es")    { es    += (tgEs     - es)    * kGen  }
+        if !isAnimating(.yaw)   { yaw   += (tgYaw   - yaw)   * kLook }
+        if !isAnimating(.pitch) { pitch += (tgPitch  - pitch) * kLook }
+        if !isAnimating(.tilt)  { tilt  += (tgTilt   - tilt)  * kGen  }
+        if !isAnimating(.sy)    { sy    += (tgSy     - sy)    * kGen  }
+        if !isAnimating(.sx)    { sx    += (tgSx     - sx)    * kGen  }
+        if !isAnimating(.es)    { es    += (tgEs     - es)    * kGen  }
 
         // Animate color
         col = mixColor(col, colT, 1 - pow(0.002, dt))
@@ -865,6 +887,19 @@ final class BotEngine: ObservableObject {
         physDy += physVy * dtCG
 
         lastTime = now
+    }
+
+    // MARK: - Frame rate hint
+
+    /// True while Mochi moves fast enough to want the display's full frame rate: a squash,
+    /// hop, roll, shake, head turn or emote tween, the dizzy or approval animation, the
+    /// greeting wave, the mailbox mouth spring. Blinks, the badge, tint and blush fades,
+    /// particles, breathing, looking around and dancing read fine at 30 fps.
+    var hasFastMotion: Bool {
+        for case let tween? in tweens where tween.property.isFast { return true }
+        if cfg.bounces || state == .dizzy { return true }
+        if CACurrentMediaTime() < waveUntil { return true }
+        return abs(slotHVel) > 0.01 || abs(slotHTarget - slotH) > 0.005
     }
 
     // MARK: - Dance transform
@@ -1128,25 +1163,25 @@ final class BotEngine: ObservableObject {
 
     // MARK: - Private draw helpers
 
+    /// Last body outline drawn without morph: it only changes with the canvas size.
+    private var bodyPathCache: (rx: CGFloat, ry: CGFloat, path: Path)?
+
     private func mochiPath(rx: CGFloat, ry: CGFloat, morph: CGFloat, R: CGFloat) -> Path {
-        let n = 72
-        let expN: CGFloat = 2.0 / 2.7
+        if morph < 0.005, let c = bodyPathCache, c.rx == rx, c.ry == ry { return c.path }
         // Target mailbox dims (spec: 1.0R wide, 0.94R tall, 0.42R corner radius)
         let tw = R * 1.0
         let th = R * 0.94
         let tr = R * 0.42
         var path = Path()
-        for i in 0...n {
-            let a = CGFloat(i) / CGFloat(n) * .pi * 2
-            let ca = cos(a), sa = sin(a)
-            let px0 = rx * (ca >= 0 ? pow(ca, expN) : -pow(-ca, expN))
-            let py0 = ry * (sa >= 0 ? pow(sa, expN) : -pow(-sa, expN))
+        for (i, u) in MochiOutline.points72.enumerated() {
+            let px0 = rx * u.ux
+            let py0 = ry * u.uy
             let px: CGFloat
             let py: CGFloat
             if morph < 0.005 {
                 px = px0; py = py0
             } else {
-                let rr = rrPoint(ca: ca, sa: sa, W: tw, H: th, cr: tr)
+                let rr = rrPoint(ca: u.ca, sa: u.sa, W: tw, H: th, cr: tr)
                 px = lerp(px0, rr.x, morph)
                 py = lerp(py0, rr.y, morph)
             }
@@ -1154,6 +1189,7 @@ final class BotEngine: ObservableObject {
             else { path.addLine(to: CGPoint(x: px, y: py)) }
         }
         path.closeSubpath()
+        if morph < 0.005 { bodyPathCache = (rx, ry, path) }
         return path
     }
 
@@ -1205,10 +1241,8 @@ final class BotEngine: ObservableObject {
             ctx.fill(path, with: .color(Color(cgColor: bc)))
         } else {
             // Main bot: linear gradient body
-            let top: Color = pumpkinColors ? Color(hex: "#FFA94D") : Color(red: 0.929, green: 0.929, blue: 0.937)
-            let bot: Color = pumpkinColors ? Color(hex: "#E8590C") : Color(red: 0.769, green: 0.773, blue: 0.792)
             ctx.fill(path, with: .linearGradient(
-                Gradient(colors: [top, bot]),
+                pumpkinColors ? BotPaint.pumpkinBody : BotPaint.body,
                 startPoint: CGPoint(x: rx*0.7, y: -ry*0.85),
                 endPoint: CGPoint(x: -rx*0.8, y: ry*0.9)
             ))
@@ -1227,19 +1261,12 @@ final class BotEngine: ObservableObject {
             }
             // Shadow rim
             ctx.fill(path, with: .radialGradient(
-                Gradient(stops: [
-                    .init(color: .clear, location: 0),
-                    .init(color: .clear, location: 0.6),
-                    .init(color: Color.black.opacity(0.2), location: 1)
-                ]),
+                BotPaint.shadowRim,
                 center: .zero, startRadius: R*0.15, endRadius: R*1.25
             ))
             // Highlight
             ctx.fill(path, with: .radialGradient(
-                Gradient(stops: [
-                    .init(color: Color.white.opacity(0.55), location: 0),
-                    .init(color: .clear, location: 1)
-                ]),
+                BotPaint.highlight,
                 center: CGPoint(x: rx*0.34, y: -ry*0.46),
                 startRadius: 0,
                 endRadius: R*0.42
@@ -1300,7 +1327,7 @@ final class BotEngine: ObservableObject {
     }
 
     private func drawEyeShape(ctx: inout GraphicsContext, shape: EyeShape, w: CGFloat, h: CGFloat, open: CGFloat, sd: CGFloat, R: CGFloat) {
-        let ink = isMini ? Color(cgColor: MochiConst.miniInk) : Color(cgColor: MochiConst.ink)
+        let ink = isMini ? BotPaint.miniInk : BotPaint.ink
         let now = CGFloat(CACurrentMediaTime())
 
         switch shape {
@@ -1360,12 +1387,12 @@ final class BotEngine: ObservableObject {
 
         case .heart:
             let heartPath = heartShape(size: w * 1.2)
-            ctx.fill(heartPath, with: .color(Color(hex: "#FF4D6D")))
+            ctx.fill(heartPath, with: .color(BotPaint.heart))
 
         case .star:
             ctx.rotate(by: .radians(now * 1.5 * sd))
             let starPath = starShape(outer: w * 1.05, inner: w * 0.46)
-            ctx.fill(starPath, with: .color(Color(hex: "#F7B32B")))
+            ctx.fill(starPath, with: .color(BotPaint.star))
 
         case .tired:
             var p1 = Path()
@@ -1486,10 +1513,10 @@ final class BotEngine: ObservableObject {
             switch p.type {
             case .heart:
                 pctx.rotate(by: .radians(sin(CGFloat(p.age) * 6) * 0.3))
-                pctx.fill(heartShape(size: sz), with: .color(Color(hex: "#FF4D6D")))
+                pctx.fill(heartShape(size: sz), with: .color(BotPaint.heart))
             case .star:
                 pctx.rotate(by: .radians(p.rot + CGFloat(p.age) * 2))
-                pctx.fill(starShape(outer: sz, inner: sz*0.45), with: .color(Color(hex: "#F7B32B")))
+                pctx.fill(starShape(outer: sz, inner: sz*0.45), with: .color(BotPaint.star))
             case .spark:
                 pctx.rotate(by: .radians(p.rot))
                 pctx.fill(starShape(outer: sz*0.8, inner: sz*0.18), with: .color(.white))
@@ -1498,7 +1525,7 @@ final class BotEngine: ObservableObject {
                 drop.move(to: CGPoint(x: 0, y: -sz))
                 drop.addQuadCurve(to: CGPoint(x: 0, y: sz*0.6), control: CGPoint(x: sz*0.8, y: sz*0.2))
                 drop.addQuadCurve(to: CGPoint(x: 0, y: -sz), control: CGPoint(x: -sz*0.8, y: sz*0.2))
-                pctx.fill(drop, with: .color(Color(hex: "#7CC7FF")))
+                pctx.fill(drop, with: .color(BotPaint.sweat))
             case .z:
                 pctx.draw(Text("z").font(.system(size: sz*1.9, weight: .bold)).foregroundColor(Color(red: 0.82, green: 0.86, blue: 0.92)),
                           at: .zero)
@@ -1508,66 +1535,95 @@ final class BotEngine: ObservableObject {
 
     // MARK: - Tween helpers
 
-    func anim(_ key: String, keys: [TweenKey], onComplete: (() -> Void)? = nil) {
-        let current = getProperty(key)
-        tweens[key] = Tween(property: key, keys: keys, keyIndex: 0,
-                            from: current, startTime: CACurrentMediaTime() * 1000,
-                            onComplete: onComplete)
-        locks.insert(key)
+    func anim(_ key: TweenProp, keys: [TweenKey], onComplete: (() -> Void)? = nil) {
+        tweens[key.rawValue] = Tween(property: key, keys: keys, keyIndex: 0,
+                                     from: getProperty(key), startTime: CACurrentMediaTime() * 1000,
+                                     onComplete: onComplete)
     }
 
-    private func setTarget(key: String, value: CGFloat) {
-        guard !locks.contains(key) else { return }
+    private func setProperty(_ key: TweenProp, value: CGFloat) {
         switch key {
-        case "tint":  tint  += (value - tint)  // immediate target, smoothed in update
-        case "tilt":  tgTilt = value
-        default: break
+        case .yaw:            yaw            = value
+        case .pitch:          pitch          = value
+        case .roll:           roll           = value
+        case .tilt:           tilt           = value
+        case .open:           open           = value
+        case .sx:             sx             = value
+        case .sy:             sy             = value
+        case .oy:             oy             = value
+        case .ox:             ox             = value
+        case .tint:           tint           = value
+        case .morph:          morph          = value
+        case .hands:          hands          = value
+        case .blush:          blush          = value
+        case .es:             es             = value
+        case .badgeS:         badgeS         = value
+        case .outfitPresence: outfitPresence = value
         }
     }
 
-    private func setProperty(_ key: String, value: CGFloat) {
+    private func getProperty(_ key: TweenProp) -> CGFloat {
         switch key {
-        case "yaw":           yaw           = value
-        case "pitch":         pitch         = value
-        case "roll":          roll          = value
-        case "tilt":          tilt          = value
-        case "open":          open          = value
-        case "sx":            sx            = value
-        case "sy":            sy            = value
-        case "oy":            oy            = value
-        case "ox":            ox            = value
-        case "tint":          tint          = value
-        case "morph":         morph         = value
-        case "hands":         hands         = value
-        case "blush":         blush         = value
-        case "es":            es            = value
-        case "badgeS":        badgeS        = value
-        case "outfitPresence": outfitPresence = value
-        default: break
+        case .yaw:            return yaw
+        case .pitch:          return pitch
+        case .roll:           return roll
+        case .tilt:           return tilt
+        case .open:           return open
+        case .sx:             return sx
+        case .sy:             return sy
+        case .oy:             return oy
+        case .ox:             return ox
+        case .tint:           return tint
+        case .morph:          return morph
+        case .hands:          return hands
+        case .blush:          return blush
+        case .es:             return es
+        case .badgeS:         return badgeS
+        case .outfitPresence: return outfitPresence
+        }
+    }
+}
+
+// MARK: - Constant geometry and paints (built once, not every frame)
+
+/// The superellipse outline of Mochi's body for a unit radius: rx * ux, ry * uy.
+enum MochiOutline {
+    struct Point: Sendable { let ca, sa, ux, uy: CGFloat }
+
+    static func points(_ n: Int) -> [Point] {
+        let expN: CGFloat = 2.0 / 2.7
+        return (0...n).map { i in
+            let a = CGFloat(i) / CGFloat(n) * .pi * 2
+            let ca = cos(a), sa = sin(a)
+            return Point(ca: ca, sa: sa,
+                         ux: ca >= 0 ? pow(ca, expN) : -pow(-ca, expN),
+                         uy: sa >= 0 ? pow(sa, expN) : -pow(-sa, expN))
         }
     }
 
-    private func getProperty(_ key: String) -> CGFloat {
-        switch key {
-        case "yaw":           return yaw
-        case "pitch":         return pitch
-        case "roll":          return roll
-        case "tilt":          return tilt
-        case "open":          return open
-        case "sx":            return sx
-        case "sy":            return sy
-        case "oy":            return oy
-        case "ox":            return ox
-        case "tint":          return tint
-        case "morph":         return morph
-        case "hands":         return hands
-        case "blush":         return blush
-        case "es":            return es
-        case "badgeS":        return badgeS
-        case "outfitPresence": return outfitPresence
-        default:              return 0
-        }
-    }
+    /// BotEngine's body (72 segments).
+    static let points72 = points(72)
+}
+
+/// Colors and gradients BotEngine draws with every frame.
+private enum BotPaint {
+    static let body = Gradient(colors: [Color(red: 0.929, green: 0.929, blue: 0.937),
+                                        Color(red: 0.769, green: 0.773, blue: 0.792)])
+    static let pumpkinBody = Gradient(colors: [Color(hex: "#FFA94D"), Color(hex: "#E8590C")])
+    static let shadowRim = Gradient(stops: [
+        .init(color: .clear, location: 0),
+        .init(color: .clear, location: 0.6),
+        .init(color: Color.black.opacity(0.2), location: 1)
+    ])
+    static let highlight = Gradient(stops: [
+        .init(color: Color.white.opacity(0.55), location: 0),
+        .init(color: .clear, location: 1)
+    ])
+    static let ink = Color(cgColor: MochiConst.ink)
+    static let miniInk = Color(cgColor: MochiConst.miniInk)
+    static let heart = Color(hex: "#FF4D6D")
+    static let star = Color(hex: "#F7B32B")
+    static let sweat = Color(hex: "#7CC7FF")
 }
 
 // MARK: - Math helpers
