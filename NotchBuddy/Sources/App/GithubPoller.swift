@@ -38,10 +38,14 @@ final class GithubPoller: @unchecked Sendable {
 
     // MARK: - Stats (unchanged logic)
 
+    /// Like the pulse and the activity: no request while the pill is off and the iPhone sync
+    /// is off (isWanted is read on the main thread, the requests go from a background queue).
     private func pollStats() {
         guard !DemoEngine.isPollerPaused else { return }
-        guard let token = KeychainStore.shared.get("github-token") else { return }
-        fetchUser(token: token)
+        DispatchQueue.main.async { [weak self] in
+            guard let self, Self.isWanted, let token = KeychainStore.shared.get("github-token") else { return }
+            DispatchQueue.global(qos: .background).async { self.fetchUser(token: token) }
+        }
     }
 
     private func fetchUser(token: String) {
