@@ -33,10 +33,12 @@ Meet **Mochi**: a soft little squircle with big eyes that pops out of your notch
 
 - 🤖 **Claude Code, Cursor, Codex, Gemini CLI, Antigravity, Copilot CLI, Muse Code, OpenCode, Amp, Hermes, Claude Desktop and other agents, live** — see every session in your notch: what it reads, edits and runs, step by step. Tag a hook payload with `coucou_agent` to give any agent its own pill (see [`docs/AGENTS.md`](docs/AGENTS.md)). Finished? Mochi does a happy little jump.
 - See what Claude is editing, live in the notch: each file modification shows the file name and +N −M counts in the ticker, tap to read the full diff
-- 🧩 **A pill for every IDE** *(macOS)* — Claude Code and Codex sessions get the pill of the app they run in, with its real name and icon: WebStorm, PyCharm and the other JetBrains IDEs, Zed, Xcode, Windsurf… Any IDE is detected on its own, even one Coucou has never heard of, and **Open WebStorm** (or Zed, or…) brings it to the front. VS Code, Cursor and terminals keep their pills.
-- 🗂️ **Several sessions per pill** *(macOS)* — two Claude Code sessions in the same IDE no longer overwrite each other: the pill follows the one that needs you most (an approval, a question, an error) and lists the others.
-- 🔔 **macOS notifications** *(macOS)* — finished, failed, waiting for your OK or stalled: get a quiet notification (Mochi already makes the sound) when you're looking elsewhere, and none when the session's app is already in front or the notch is showing it. Each kind can be turned off in Settings.
-- ⏳ **Stalled-session detection** *(macOS)* — a session that says it's working but has sent nothing for a few minutes (3 by default, adjustable) gets a badge and, if you want, a notification. Nothing runs in the background while no session works.
+- 🧩 **A pill for every IDE** *(macOS)* — Claude Code and Codex sessions get the pill of the app they run in, with its real name and icon: WebStorm, PyCharm and the other JetBrains IDEs, Zed, Xcode, Windsurf, Orca… Coucou finds the app by walking the hook's process tree, so any IDE is detected on its own, even one it has never heard of. **Open WebStorm** (or Zed, or…) brings its window to the front, even a minimised or hidden one. VS Code, Cursor and terminals keep their pills.
+- 🗂️ **Several sessions per pill** *(macOS)* — two Claude Code sessions in the same IDE no longer overwrite each other: the pill follows the one that needs you most (an approval, a question, an error) and lists the others. A session whose agent quit without saying goodbye leaves on its own.
+- 🔔 **macOS notifications** *(macOS)* — finished, failed, waiting for your OK or stalled: get a quiet notification (Mochi already makes the sound) when you're looking elsewhere, and none when the session's app is already in front or the notch is showing it. Each kind can be turned off in Settings → Notifications.
+- ⏳ **Stalled-session detection** *(macOS)* — a session that says it's working but has sent nothing for a few minutes (3 by default, adjustable) gets an hourglass on its pill and, if you want, a notification. Nothing runs in the background while no session works.
+- 📟 **Live status in the folded notch** *(macOS)* — while an agent works, the closed island says what it is doing right now: the pill's name, an icon and a short activity (the file it edits, the command it runs, Thinking…, Done) with the turn's elapsed time. It turns amber when the agent needs your OK or asks a question; click it to open the card.
+- 〰️ **Sound visualizer** *(macOS, GitHub build)* — while music (or any app's sound) plays and no agent is at work, the folded notch shows 12 live bars of the sound's spectrum and the song. macOS asks once for the System Audio Recording permission; nothing is recorded or saved, and the capture stops as soon as the bars leave the screen. Turn it off in Settings → General → Display.
 - ✅ **Approve and answer from the notch** — Claude Code permission requests show up with **Allow / Deny / Always**; `AskUserQuestion` prompts show the choices right in the notch (single or multi-select, up to 4 questions). One click, or "Reply in terminal" to fall back to the CLI. Codex also gets Allow / Deny.
 - 🧑‍💻 **Jump to the right terminal** — open the exact terminal window of a session *(macOS)*.
 - 💬 **Chat with Claude, Gemini, OpenAI, or a local model (Ollama / LM Studio)** — click the model name above the chat box to switch provider and pick a model. Cloud providers use your own API key; local providers connect to a server running on your Mac. *(Gemini, OpenAI and local models: macOS)*
@@ -47,8 +49,9 @@ Meet **Mochi**: a soft little squircle with big eyes that pops out of your notch
 - 🖥️ **Mochi on the desktop** — drag Mochi out of the island to set him loose on your desktop: he floats as a 120 pt companion, follows your cursor, wears his outfit, reacts to alerts by flying home and flying back, and comes back where you left him on next launch.
 - 🪟 **Drag Mochi onto any window** — attach that window as context for Claude *(macOS)*.
 - 🔌 **Integrations** — Stripe payments, n8n workflows, GitHub (open PRs, reviews requested, CI status), Vercel deployments, Resend emails, Notion, Cal.com. Each one gets its own little colored Mochi.
-- 🎵 **Apple Music pill** *(macOS, GitHub build)* — add the Apple Music pill in Settings → Active pills to see what's playing and control playback from the notch; Mochi dances while it plays.
-- 🎧 **Spotify pill** *(macOS, GitHub build)* — add the Spotify pill in Settings → Active pills: album cover, title and artist, a progress bar you drag to seek, play/pause, previous/next, shuffle, repeat and volume, right from the notch; Mochi dances while it plays.
+- 🎵 **Music, automatically** *(macOS, GitHub build)* — when Apple Music, Spotify or TIDAL plays, its pill shows up on its own (no need to declare it, and it doesn't take one of your 4 slots), then leaves 30 s after the music stops; Mochi dances to whatever plays. Turn it off with **Show music automatically** in Settings → General → Behavior, or declare a music pill in Settings → Active pills to keep it.
+- 🎧 **Spotify** *(macOS, GitHub build)* — album cover, title and artist, a progress bar you drag to seek, play/pause, previous/next, shuffle, repeat and volume, right from the notch.
+- 🌊 **TIDAL** *(macOS, GitHub build)* — the track and artist, play/pause and previous/next from the notch. TIDAL has no AppleScript, so Coucou reads its player through the Accessibility permission (and falls back to the media keys for the controls); without that permission the visualizer still shows "TIDAL".
 - 👗 **Dress Mochi up** — right-click him for the wardrobe. He also dresses up for the seasons on his own.
 - ⌨️ **Keyboard shortcuts** — open the chat, jump to an alert or a terminal, switch pills, mute, send Mochi to the desktop or open the wardrobe from anywhere; all customizable in Settings → Shortcuts.
 - 🎭 **A real character** — idle breathing, blinks, eyes on a sphere that follow your mouse, emotes, 28 handcrafted sounds, a greeting on launch.
@@ -58,7 +61,7 @@ Meet **Mochi**: a soft little squircle with big eyes that pops out of your notch
 - 🖥️ **Any Mac, notch or not** — on an iMac, a Mac mini, or a MacBook with its lid closed on an external display, Mochi sits in a small bar at the top of the screen. With several displays, pick his screen in Settings → General, or let him follow your mouse *(macOS)*.
 - 📱 **Coucou on iPhone** — your sessions, approvals and services in your pocket, with Live Activities, widgets and Siri. See [Coucou on iPhone](#coucou-on-iphone).
 - 📅 **Weekly recap** *(macOS)* — every Monday morning Coucou shows a summary of the past week: time coding, sessions, files, lines changed, commands, permissions, top agent and project, busiest day and longest session. Share it as a 1080 × 1920 image with Mochi — project names optional. All local, no sync.
-- 🌍 **10 languages** — English, 中文, हिन्दी, Español, العربية, Français, বাংলা, Português, Русский, Bahasa Indonesia. Pick one in Settings → General → Language; community translations welcome.
+- 🌍 **11 languages** — English, 中文, हिन्दी, Español, العربية, Français, বাংলা, Português, Русский, Bahasa Indonesia, 한국어. Pick one in Settings → General → Language; community translations welcome.
 - 🔒 **Private by design** — no telemetry, no account. Keys live in your macOS Keychain. The app only talks to the services you plug in.
 
 ## Coucou on iPhone
@@ -132,7 +135,7 @@ Nothing is written to disk during the demo — no Keychain entries, no hook file
 
 Coucou is coming to the **Mac App Store** and the **iPhone App Store**: one click to install, automatic updates, and the iPhone app pairs with your Mac through your iCloud account, with nothing to configure. The links will be here as soon as Apple publishes them.
 
-The App Store build of the Mac app runs in Apple's sandbox, so a few features stay in the GitHub build: Claude plan usage, the Apple Music pill and attaching the front window to the chat.
+The App Store build of the Mac app runs in Apple's sandbox, so a few features stay in the GitHub build: Claude plan usage, the music pills (Apple Music, Spotify, TIDAL) and the sound visualizer's audio capture, dictation, and attaching the front window to the chat.
 
 ### iPhone
 
@@ -185,21 +188,21 @@ If Coucou isn't running, the hook exits immediately: **Claude Code is never bloc
 
 ### Supported agents
 
-| Agent | How it connects | Mac-only? |
-|---|---|---|
-| Claude Code | Settings → Claude Code → **Install hooks** | No |
-| Gemini CLI | Settings → Gemini CLI → **Install hooks** | Mac only |
-| Antigravity | Settings → Antigravity → **Install hooks** | Mac only |
-| Cursor | Hooks installed automatically alongside Claude Code | No |
-| Codex | `--agent codex` flag; Settings → Codex → **Install hooks** | No |
-| Copilot CLI | `--agent copilot` flag + camelCase events | No |
-| Muse Code | `--agent muse` flag | No |
-| OpenCode | Plugin — **Settings → OpenCode Plugin → Install** | Mac only |
-| Amp | Plugin — **Settings → Amp Plugin → Install** | Mac only |
-| Hermes | Plugin — **Settings → Agents → Hermes → Install** | Mac only |
-| Any other | `--agent <name>` flag; see [`docs/AGENTS.md`](docs/AGENTS.md) | No |
+| Agent | How it connects |
+|---|---|
+| Claude Code | Settings → Claude Code → **Install hooks** |
+| Gemini CLI | Settings → Gemini CLI → **Install hooks** |
+| Antigravity | Settings → Antigravity → **Install hooks** |
+| Cursor | Hooks installed automatically alongside Claude Code |
+| Codex | `--agent codex` flag; Settings → Codex → **Install hooks** |
+| Copilot CLI | `--agent copilot` flag + camelCase events |
+| Muse Code | `--agent muse` flag |
+| OpenCode | Plugin — **Settings → OpenCode Plugin → Install** (OpenCode 1 and 2) |
+| Amp | Plugin — **Settings → Amp Plugin → Install** |
+| Hermes | Plugin — **Settings → Agents → Hermes → Install** |
+| Any other | `--agent <name>` flag; see [`docs/AGENTS.md`](docs/AGENTS.md) |
 
-OpenCode, Amp and Hermes use a plugin model rather than a hook command. Coucou installs the plugin file into `~/.config/opencode/plugins/`, `~/.config/amp/plugins/` and `~/.hermes/plugins/coucou/` respectively.
+OpenCode, Amp and Hermes use a plugin model rather than a hook command. Coucou installs the plugin file into `~/.config/opencode/plugins/`, `~/.config/amp/plugins/` and `~/.hermes/plugins/coucou/` respectively. OpenCode 1 and OpenCode 2 have incompatible plugin APIs: Coucou asks `opencode --version` and writes the matching one.
 
 ## Things to try
 
@@ -219,7 +222,7 @@ OpenCode, Amp and Hermes use a plugin model rather than a hook command. Coucou i
 **macOS**
 
 - **Island**: a borderless `NSPanel` hugging the notch, driven by a small state machine (`hidden → petit → home`).
-- **Character**: drawn in SwiftUI `Canvas` + `TimelineView` at 60 fps — squircle body, eyes projected on a sphere, spring animations. No Rive, no Lottie, no images.
+- **Character**: drawn in SwiftUI `Canvas` + `TimelineView` — squircle body, eyes projected on a sphere, spring animations — at the display's rate while Mochi moves fast, and 30 fps while a small Mochi is calm. No Rive, no Lottie, no images.
 - **Claude Code**: a tiny `nb-hook` script receives hook events and forwards them over a Unix socket to the app. For approvals it waits for your click, then answers the hook.
 - **Integrations**: lightweight pollers, paused when nothing is watching.
 - **Declared pills**: `PillCatalog.swift` is the single source of truth — every pill (coding tools, agents, AI providers, services) is declared there with its ID, color and category.
