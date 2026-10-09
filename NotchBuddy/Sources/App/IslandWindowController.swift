@@ -672,7 +672,8 @@ final class IslandWindowController: NSWindowController {
             NotificationCenter.default.post(name: .triggerEmote, object: BotEmote.annoyed)
             return
         }
-        if !TerminalTarget.activate(sessionBundleId: state.focusTask?.sessionBundleId) {
+        // The session's app: its IDE, its terminal, or VS Code; then any known terminal.
+        if !SessionHost.activate(state.focusTask) {
             NSWorkspace.shared.open(
                 URL(fileURLWithPath: "/System/Applications/Utilities/Terminal.app"))
         }

@@ -48,7 +48,7 @@ struct OverviewView: View {
 
                 // Title row + ticker stacked (or integration card)
                 if let agent = agent {
-                    if agent.isIntegration {
+                    if agent.isIntegration || HostResolver.isIDEPill(agent.id) {
                         IntegrationCardView(task: agent, showingDetail: $showingN8nDetail, onDiffTap: { diffIdx in
                             withAnimation(.easeIn(duration: 0.16)) { activeDiffId = diffIdx }
                         })
@@ -186,6 +186,11 @@ struct OverviewView: View {
 
     private func openAgentTarget(_ task: AgentTask?) {
         guard let task else { return }
+        // IDE pills (WebStorm, Zed…): the IDE the sessions run in.
+        if HostResolver.isIDEPill(task.id) {
+            SessionHost.activate(task)
+            return
+        }
         switch task.id {
         case "integration_claude":
             if ClaudeHost.activate(task.hostApp) { return }
@@ -299,11 +304,26 @@ struct ApprovalView: View {
 
     var approval: ApprovalInfo? { state.pendingApproval }
 
+    /// The session asking, from the approval's pill book (nil without one).
+    private var who: SessionWho? {
+        let pillId = approval?.pillId ?? state.focusId ?? ""
+        let session = SessionCardText.session(in: state.sessionBooks[pillId], id: approval?.sessionId,
+                                              phase: .waitingApproval)
+        return SessionWho(task: state.focusTask, session: session)
+    }
+
     var body: some View {
+        let who = self.who
         ZStack {
             CardBackground(wash: .amber)
             VStack(alignment: .leading, spacing: 5) {
-                AgentWho(task: state.focusTask, label: "needs permission")
+                if let who {
+                    AgentWho(task: state.focusTask,
+                             label: String(localized: "\(who.who) needs permission"),
+                             name: who.name, verbatimLabel: true)
+                } else {
+                    AgentWho(task: state.focusTask, label: "needs permission")
+                }
                 CodeBlock(text: approval?.command ?? approval?.tool ?? "…")
                 HStack(spacing: 8) {
                     SecondaryButton("Deny") {
@@ -313,9 +333,11 @@ struct ApprovalView: View {
                         HookServer.shared.sendApprovalDecision("allow")
                     }
                     // Codex, Copilot CLI and Muse Code do not support updatedPermissions
+                    // (Codex also asks from VS Code, Cursor and IDE pills)
                     let hideAlways = approval?.pillId == "agent_codex"
                         || approval?.pillId == "agent_copilot"
                         || approval?.pillId == "agent_muse"
+                        || who?.session.agent.lowercased() == AgentKind.codex.rawValue
                     if !hideAlways {
                         SecondaryButton("Always") {
                             HookServer.shared.sendApprovalDecision("always")
@@ -346,6 +368,17 @@ struct QuestionView: View {
 
     var question: AskQuestion? { state.pendingQuestion }
 
+    /// "Claude Code is asking" (translated key), or "Codex in WebStorm is asking" from the
+    /// focused pill's session waiting on an answer (the question's pill takes the focus).
+    private var askingLabel: (text: String, verbatim: Bool) {
+        let session = SessionCardText.session(in: state.sessionBooks[state.focusId ?? ""],
+                                              phase: .waitingAnswer)
+        guard let who = SessionWho(task: state.focusTask, session: session), !who.isClaudeCode else {
+            return ("Claude Code is asking", false)
+        }
+        return (String(localized: "\(who.who) is asking"), true)
+    }
+
     var body: some View {
         ZStack {
             CardBackground(wash: .cyan)
@@ -362,7 +395,7 @@ struct QuestionView: View {
                 VStack(alignment: .leading, spacing: 4) {
                     // Header row: agent name + question counter + "Reply in terminal" link
                     HStack(spacing: 4) {
-                        AgentWho(task: nil, label: "Claude Code is asking")
+                        AgentWho(task: nil, label: askingLabel.text, verbatimLabel: askingLabel.verbatim)
                         Spacer(minLength: 4)
                         if q.questions.count > 1 {
                             Text("\(qi + 1)/\(q.questions.count)")
@@ -595,12 +628,25 @@ private func openClaudeDesktopApp() {
 struct FinishedView: View {
     @ObservedObject var state: AppState
 
+    /// The session that just finished on the focused pill (nil without a session book).
+    private var who: SessionWho? {
+        let session = SessionCardText.session(in: state.sessionBooks[state.focusId ?? ""], phase: .finished)
+        return SessionWho(task: state.focusTask, session: session)
+    }
+
     var body: some View {
+        let who = self.who
         ZStack {
             CardBackground(wash: .green)
             VStack(alignment: .leading, spacing: 5) {
-                AgentWho(task: state.focusTask, label: "Claude Code finished")
+                if let who, !who.isClaudeCode {
+                    AgentWho(task: state.focusTask, label: String(localized: "\(who.who) finished"),
+                             name: who.name, verbatimLabel: true)
+                } else {
+                    AgentWho(task: state.focusTask, label: "Claude Code finished", name: who?.name)
+                }
                 Text({
+                    if who?.session.phase == .finished, let fl = who?.session.finalLine, !fl.isEmpty { return fl }
                     if let fl = state.focusTask?.finalLine { return fl }
                     if let s = state.focusTask?.steps.last(where: { !$0.isDiffStep }) { return s }
                     return String(localized: "Session finished")
@@ -617,14 +663,17 @@ struct FinishedView: View {
                         }
                     } else {
                         #if !APPSTORE
-                        PrimaryButton("Open terminal") {
-                            // The app the session runs in (its terminal, or VS Code), then any known terminal
-                            let task = state.focusTask
-                            if !(task?.id == "integration_claude" && ClaudeHost.activate(task?.hostApp)),
-                               !TerminalTarget.activate(sessionBundleId: task?.sessionBundleId) {
+                        let openSession = {
+                            // The app the session runs in (its IDE, its terminal, or VS Code), then any known terminal
+                            if !SessionHost.activate(state.focusTask) {
                                 NSWorkspace.shared.open(URL(fileURLWithPath: "/System/Applications/Utilities/Terminal.app"))
                             }
                             NotificationCenter.default.post(name: .islandCollapse, object: nil)
+                        }
+                        if let title = SessionHost.openButtonTitle(for: state.focusTask) {
+                            PrimaryButton(verbatim: title, action: openSession)
+                        } else {
+                            PrimaryButton("Open terminal", action: openSession)
                         }
                         #endif
                     }
@@ -1799,6 +1848,8 @@ struct IntegrationCardView: View {
 
     // Workspace/agent pill with active session: show ticker layout
     private var agentSessionActive: Bool {
+        // IDE pills only exist while an agent session runs in that IDE.
+        if HostResolver.isIDEPill(task.id) { return true }
         guard let def = PillCatalog.definition(for: task.id) else { return false }
         guard def.category == .workspace || def.category == .agent else { return false }
         return task.state != .idle || !task.steps.isEmpty
@@ -1996,41 +2047,9 @@ struct IntegrationCardView: View {
                 .transition(.opacity)
             #endif
         } else if agentSessionActive {
-            // Active session view — reuse overview layout
-            VStack(alignment: .leading, spacing: 0) {
-                HStack(spacing: 6) {
-                    Circle()
-                        .fill(Color(hex: task.color))
-                        .frame(width: 7, height: 7)
-                    Text(task.name)
-                        .font(.system(size: 12, weight: .semibold))
-                        .foregroundColor(Color(hex: "#F5F6F8"))
-                        .lineLimit(1).truncationMode(.tail)
-                        .layoutPriority(1)
-                    Text(PillCatalog.definition(for: task.id)?.sessionSubtitle ?? "Agent")
-                        .font(.system(size: 11))
-                        .foregroundColor(Color(hex: "#8E939C"))
-                        .lineLimit(1).truncationMode(.tail)
-                    Spacer(minLength: 2)
-                    if task.steps.count > 1 {
-                        Text("\(min(task.stepIndex + 1, task.steps.count))/\(task.steps.count)")
-                            .font(.system(size: 11))
-                            .foregroundColor(Color(hex: "#6B7079"))
-                            .fixedSize()
-                    }
-                }
-                .padding(.top, 6)
-                .padding(.leading, 108)
-                .padding(.trailing, 36)
-
-                TickerView(task: task, onDiffTap: onDiffTap)
-                    .frame(height: 44)
-                    .padding(.top, 6)
-                    .padding(.leading, 108)
-                    .padding(.trailing, 12)
-            }
-            .frame(maxWidth: .infinity, alignment: .topLeading)
-            .padding(.top, 4)
+            // Active session view — reuse overview layout; several sessions list first
+            AgentSessionCard(task: task, onDiffTap: onDiffTap)
+                .id(task.id)
         } else {
             // Idle / not connected view — slides in from left when returning from detail
             VStack(alignment: .leading, spacing: 6) {
@@ -2038,6 +2057,7 @@ struct IntegrationCardView: View {
                     Circle()
                         .fill(Color(hex: task.color))
                         .frame(width: 7, height: 7)
+                    PillAppIcon(task: task)
                     Text(task.id == "integration_claude" ? ClaudeHost.pillName(hostApp: task.hostApp)
                                                          : PillCatalog.definition(for: task.id)?.name ?? task.name)
                         .font(.system(size: 12, weight: .semibold))
@@ -2215,6 +2235,354 @@ struct IntegrationCardView: View {
         }
     }
 
+}
+
+// MARK: - Agent session card (workspace / agent / IDE pill with a session)
+//
+// One session: the title row and ticker, exactly as before (plus "No activity for N min"
+// under the ticker when the session went quiet). Several sessions (AppState.sessionBooks):
+// a compact list, most urgent first; a row opens that session's steps, ‹ goes back.
+
+struct AgentSessionCard: View {
+    let task: AgentTask
+    var onDiffTap: ((Int) -> Void)? = nil
+    @ObservedObject private var appState = AppState.shared
+    @Environment(\.islandViewActive) private var isActive
+    /// Session opened from the list, nil = the list (or the only session).
+    @State private var pickedId: String? = nil
+
+    /// The list shows at most this many rows at once; more scroll.
+    private static let visibleRows = 3
+    private static let rowHeight: CGFloat = 18
+    private static let rowSpacing: CGFloat = 3
+
+    var body: some View {
+        let book = appState.sessionBooks[task.id]
+        let several = (book?.count ?? 0) > 1
+        let picked = pickedId.flatMap { book?.session($0) }
+        if several, let book, picked == nil {
+            listBody(book)
+                .transition(.opacity)
+        } else if several, let picked {
+            detailBody(shown: task.showing(picked), session: picked, canGoBack: true)
+                .id(picked.id)
+                .transition(.opacity)
+        } else {
+            detailBody(shown: task, session: book?.sessions.first, canGoBack: false)
+        }
+    }
+
+    // MARK: One session
+
+    private func subtitle(for session: AgentSession?) -> String {
+        guard let session else {
+            if HostResolver.isIDEPill(task.id) { return task.source == .claudeCode ? "Claude Code" : "Agent" }
+            return PillCatalog.definition(for: task.id)?.sessionSubtitle ?? "Agent"
+        }
+        return SessionCardText.subtitle(agent: session.agent, project: session.projectName,
+                                        title: task.name, hostName: SessionHost.hostName(for: task))
+    }
+
+    private func detailBody(shown: AgentTask, session: AgentSession?, canGoBack: Bool) -> some View {
+        VStack(alignment: .leading, spacing: 0) {
+            HStack(spacing: 6) {
+                if canGoBack {
+                    Button(action: {
+                        withAnimation(.easeIn(duration: 0.16)) { pickedId = nil }
+                    }) {
+                        HStack(spacing: 3) {
+                            Image(systemName: "chevron.left")
+                                .font(.system(size: 8, weight: .medium))
+                                .foregroundColor(Color(hex: "#F5F6F8"))
+                            Circle()
+                                .fill(Color(hex: task.color))
+                                .frame(width: 7, height: 7)
+                        }
+                        .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                } else {
+                    Circle()
+                        .fill(Color(hex: task.color))
+                        .frame(width: 7, height: 7)
+                }
+                PillAppIcon(task: task)
+                Text(task.name)
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundColor(Color(hex: "#F5F6F8"))
+                    .lineLimit(1).truncationMode(.tail)
+                    .layoutPriority(1)
+                Text(subtitle(for: session))
+                    .font(.system(size: 11))
+                    .foregroundColor(Color(hex: "#8E939C"))
+                    .lineLimit(1).truncationMode(.tail)
+                Spacer(minLength: 2)
+                if shown.steps.count > 1 {
+                    Text("\(min(shown.stepIndex + 1, shown.steps.count))/\(shown.steps.count)")
+                        .font(.system(size: 11))
+                        .foregroundColor(Color(hex: "#6B7079"))
+                        .fixedSize()
+                }
+            }
+            .padding(.top, 6)
+            .padding(.leading, 108)
+            .padding(.trailing, 36)
+
+            TickerView(task: shown, onDiffTap: onDiffTap)
+                .frame(height: 44)
+                .padding(.top, 6)
+                .padding(.leading, 108)
+                .padding(.trailing, 12)
+
+            if let session, session.phase == .working {
+                let threshold = SessionCardText.stallThresholdMinutes()
+                if threshold > 0 {
+                    // Redrawn every 30 s while the card is on screen, never while hidden.
+                    TimelineView(.animation(minimumInterval: 30, paused: !isActive)) { tl in
+                        if let minutes = SessionCardText.stalledMinutes(session, now: tl.date,
+                                                                         thresholdMinutes: threshold) {
+                            StalledHint(minutes: minutes)
+                        }
+                    }
+                    .padding(.top, 2)
+                    .padding(.leading, 108 + 18)   // under the ticker's text
+                    .padding(.trailing, 12)
+                }
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .topLeading)
+        .padding(.top, 4)
+    }
+
+    // MARK: Several sessions
+
+    private func listBody(_ book: SessionBook) -> some View {
+        let rows = SessionCardText.listOrder(book)
+        let threshold = SessionCardText.stallThresholdMinutes()
+        let anyWorking = threshold > 0 && rows.contains { $0.phase == .working }
+        let shownRows = CGFloat(min(rows.count, Self.visibleRows))
+        let listHeight = shownRows * Self.rowHeight + (shownRows - 1) * Self.rowSpacing
+        let scrolls = rows.count > Self.visibleRows
+
+        return VStack(alignment: .leading, spacing: 0) {
+            HStack(spacing: 6) {
+                Circle()
+                    .fill(Color(hex: task.color))
+                    .frame(width: 7, height: 7)
+                PillAppIcon(task: task)
+                Text(task.name)
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundColor(Color(hex: "#F5F6F8"))
+                    .lineLimit(1).truncationMode(.tail)
+                    .layoutPriority(1)
+                Text(String(localized: "\(rows.count) sessions"))
+                    .font(.system(size: 11))
+                    .foregroundColor(Color(hex: "#8E939C"))
+                    .lineLimit(1)
+                Spacer(minLength: 2)
+            }
+            .padding(.top, 6)
+            .padding(.leading, 108)
+            .padding(.trailing, 36)
+
+            // Redrawn every 30 s while a session works and the card is on screen (stall hints).
+            TimelineView(.animation(minimumInterval: 30, paused: !isActive || !anyWorking)) { tl in
+                ScrollView(.vertical, showsIndicators: false) {
+                    VStack(alignment: .leading, spacing: Self.rowSpacing) {
+                        ForEach(Array(rows.enumerated()), id: \.element.id) { idx, session in
+                            SessionRowView(
+                                session: session,
+                                isLead: idx == 0,
+                                stalledMinutes: SessionCardText.stalledMinutes(session, now: tl.date,
+                                                                               thresholdMinutes: threshold),
+                                height: Self.rowHeight
+                            ) {
+                                appState.sessionBooks[task.id]?.bringToFront(id: session.id)
+                                withAnimation(.easeIn(duration: 0.16)) { pickedId = session.id }
+                            }
+                        }
+                    }
+                }
+                .frame(height: listHeight)
+                // More rows than fit: the last visible one fades, hinting at the scroll.
+                .mask(LinearGradient(
+                    stops: [
+                        .init(color: .black, location: 0),
+                        .init(color: .black, location: scrolls ? 0.8 : 1),
+                        .init(color: .black.opacity(scrolls ? 0.25 : 1), location: 1)
+                    ],
+                    startPoint: .top, endPoint: .bottom
+                ))
+            }
+            .padding(.top, 5)
+            .padding(.leading, 108)
+            .padding(.trailing, 12)
+        }
+        .frame(maxWidth: .infinity, alignment: .topLeading)
+        .padding(.top, 4)
+    }
+}
+
+/// One session in a pill's list: phase dot, "Codex · web", what it is doing.
+struct SessionRowView: View {
+    let session: AgentSession
+    /// The pill's lead session: highlighted like the first Vercel deployment.
+    let isLead: Bool
+    let stalledMinutes: Int?
+    let height: CGFloat
+    let onTap: () -> Void
+    @State private var isHovered = false
+
+    private var detail: String {
+        if let stalledMinutes { return SessionCardText.noActivity(minutes: stalledMinutes) }
+        switch session.phase {
+        case .waitingApproval: return String(localized: "Waiting for approval")
+        case .waitingAnswer:   return String(localized: "Waiting for your answer")
+        case .finished:
+            if let line = session.finalLine, !line.isEmpty { return line }
+            return lastStep ?? String(localized: "Session finished")
+        default:
+            return lastStep ?? "…"
+        }
+    }
+
+    private var lastStep: String? {
+        guard let step = session.steps.last else { return nil }
+        return step.parseDiffStep()?.filename ?? step
+    }
+
+    var body: some View {
+        let accent = sessionPhaseColor(session.phase, stalled: stalledMinutes != nil)
+        Button(action: onTap) {
+            HStack(spacing: 5) {
+                Circle().fill(accent).frame(width: 5, height: 5)
+                Text(SessionCardText.agentAndProject(agent: session.agent, project: session.projectName))
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundColor(Color(hex: isLead || isHovered ? "#C5C8CD" : "#9398A1"))
+                    .lineLimit(1).truncationMode(.tail)
+                    .layoutPriority(1)
+                Text(detail)
+                    .font(.system(size: 10))
+                    .foregroundColor(stalledMinutes != nil ? Color(hex: "#A78BFA") : Color(hex: "#6B7079"))
+                    .lineLimit(1).truncationMode(.tail)
+                Spacer(minLength: 0)
+            }
+            .padding(.horizontal, 8)
+            .frame(height: height)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(isLead ? accent.opacity(0.08) : Color.white.opacity(isHovered ? 0.05 : 0))
+            .clipShape(RoundedRectangle(cornerRadius: 5))
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .onHover { isHovered = $0 }
+    }
+}
+
+/// "⌛ No activity for 4 min", under a quiet session's ticker.
+struct StalledHint: View {
+    let minutes: Int
+
+    var body: some View {
+        HStack(spacing: 4) {
+            Image(systemName: "hourglass")
+                .font(.system(size: 8, weight: .medium))
+            Text(SessionCardText.noActivity(minutes: minutes))
+                .font(.system(size: 10))
+                .lineLimit(1)
+        }
+        .foregroundColor(Color(hex: "#A78BFA"))
+    }
+}
+
+/// Phase dot colours, matching Mochi's glow and the pill badges.
+func sessionPhaseColor(_ phase: SessionPhase, stalled: Bool) -> Color {
+    if stalled { return Color(hex: "#A78BFA") }
+    switch phase {
+    case .working:         return Color(hex: "#3B9EFF")
+    case .waitingApproval: return Color(hex: "#F5A524")
+    case .waitingAnswer:   return Color(hex: "#22D3EE")
+    case .error:           return Color(hex: "#F4505E")
+    case .finished:        return Color(hex: "#22C55E")
+    case .idle:            return Color(hex: "#6B7079")
+    }
+}
+
+extension AgentTask {
+    /// This pill showing one of its sessions instead of its lead: its steps, state and final line.
+    func showing(_ session: AgentSession) -> AgentTask {
+        var copy = self
+        copy.steps = session.steps
+        copy.stepIndex = max(0, session.steps.count - 1)
+        copy.finalLine = session.finalLine
+        switch session.phase {
+        case .working:         copy.state = .working
+        case .waitingApproval: copy.state = .approval
+        case .waitingAnswer:   copy.state = .question
+        case .error:           copy.state = .error
+        case .finished:        copy.state = .finished
+        case .idle:            copy.state = .idle
+        }
+        return copy
+    }
+}
+
+// MARK: - Session host (the app a pill's sessions run in)
+
+@MainActor
+enum SessionHost {
+    /// The app worth naming next to the agent ("Codex in WebStorm"): the IDE of an IDE pill,
+    /// Cursor for the Cursor pill, nil for VS Code and terminals (the pill already says it).
+    static func hostName(for task: AgentTask) -> String? {
+        if HostResolver.isIDEPill(task.id) {
+            if let id = task.sessionBundleId, !id.isEmpty { return HostAppInfo.name(for: id) }
+            return task.name.isEmpty ? nil : task.name
+        }
+        if task.id == "agent_cursor" { return "Cursor" }
+        return nil
+    }
+
+    /// The IDE's icon for an IDE pill, nil for every other pill.
+    static func icon(for task: AgentTask) -> NSImage? {
+        guard HostResolver.isIDEPill(task.id), let id = task.sessionBundleId, !id.isEmpty else { return nil }
+        return HostAppInfo.icon(for: id)
+    }
+
+    /// "Open WebStorm" for IDE pills, nil where the button keeps its current title.
+    static func openButtonTitle(for task: AgentTask?) -> String? {
+        guard let task, HostResolver.isIDEPill(task.id), let name = hostName(for: task) else { return nil }
+        return String(format: String(localized: "Open %@"), name)
+    }
+
+    /// Brings the session's app forward: the IDE of an IDE pill, the terminal of a Claude Code
+    /// terminal session, else the app the session runs in or any running terminal.
+    @discardableResult
+    static func activate(_ task: AgentTask?) -> Bool {
+        guard let task else { return false }
+        if HostResolver.isIDEPill(task.id), let id = task.sessionBundleId, !id.isEmpty,
+           HostAppInfo.activate(id) { return true }
+        if task.id == "integration_claude", ClaudeHost.activate(task.hostApp) { return true }
+        return TerminalTarget.activate(sessionBundleId: task.sessionBundleId)
+    }
+}
+
+/// The IDE's app icon in an IDE pill's title row or pill; nothing at all (no view, so no
+/// stack spacing) for other pills. Modifiers belong inside: one outside would make it a view.
+struct PillAppIcon: View {
+    let task: AgentTask
+    var size: CGFloat = 12
+    var opacity: Double = 1
+
+    var body: some View {
+        if let icon = SessionHost.icon(for: task) {
+            Image(nsImage: icon)
+                .resizable()
+                .interpolation(.high)
+                .aspectRatio(contentMode: .fit)
+                .frame(width: size, height: size)
+                .opacity(opacity)
+        }
+    }
 }
 
 // MARK: - Vercel Deployment List View
@@ -3891,7 +4259,8 @@ struct AgentPill: View {
 
     private var effectiveColor: String { task.color }
 
-    // The Claude pill shows "VS Code" (or "Claude Code" for a terminal session) regardless of project name
+    // The Claude pill shows "VS Code" (or "Claude Code" for a terminal session) regardless of project name;
+    // an IDE pill shows its IDE ("WebStorm"), which is its task name.
     private var displayName: String {
         task.id == "integration_claude" ? ClaudeHost.pillName(hostApp: task.hostApp) : task.name
     }
@@ -3913,14 +4282,18 @@ struct AgentPill: View {
                             .padding(.leading, 8)
                         Spacer()
                     }
-                    Text(displayName)
-                        .font(.system(size: 10, weight: .semibold))
-                        .foregroundColor(isHovered
-                                         ? Color(hex: effectiveColor).lighter(by: 0.3)
-                                         : Color(hex: "#6B7079"))
-                        .lineLimit(1)
-                        .truncationMode(.tail)
-                        .frame(maxWidth: .infinity, alignment: .center)
+                    HStack(spacing: 4) {
+                        // IDE pills: the IDE's icon before its name (nothing for other pills)
+                        PillAppIcon(task: task, size: 11, opacity: isHovered ? 1 : 0.75)
+                        Text(displayName)
+                            .font(.system(size: 10, weight: .semibold))
+                            .foregroundColor(isHovered
+                                             ? Color(hex: effectiveColor).lighter(by: 0.3)
+                                             : Color(hex: "#6B7079"))
+                            .lineLimit(1)
+                            .truncationMode(.tail)
+                    }
+                    .frame(maxWidth: .infinity, alignment: .center)
                 }
                 .frame(maxWidth: .infinity)
                 .frame(height: 28)
@@ -4545,16 +4918,46 @@ extension CardBackground where Content == EmptyView {
 struct AgentWho: View {
     let task: AgentTask?
     let label: String
+    /// Replaces the task's name (e.g. the session's project on an IDE pill).
+    var name: String? = nil
+    /// The label is already localized and filled in ("Codex in WebStorm needs permission").
+    var verbatimLabel = false
 
     var body: some View {
         HStack(spacing: 7) {
             if let task = task {
                 Circle().fill(Color(hex: task.color)).frame(width: 8, height: 8)
-                Text(task.name).font(.system(size: 12, weight: .semibold)).foregroundColor(Color(hex: "#F5F6F8"))
+                PillAppIcon(task: task)
+                Text(name ?? task.name).font(.system(size: 12, weight: .semibold)).foregroundColor(Color(hex: "#F5F6F8"))
             }
-            Text(LocalizedStringKey(label)).font(.system(size: 12)).foregroundColor(Color(hex: "#8E939C"))
+            Group {
+                if verbatimLabel { Text(verbatim: label) } else { Text(LocalizedStringKey(label)) }
+            }
+            .font(.system(size: 12)).foregroundColor(Color(hex: "#8E939C"))
         }
     }
+}
+
+/// What an approval / question / finished card says about who is asking: the session's
+/// project as the name and "Codex in WebStorm needs permission" as the label. nil when the
+/// pill has no session book, so the card keeps its original wording.
+@MainActor
+struct SessionWho {
+    let name: String
+    /// "Claude Code", "Codex in WebStorm"…
+    let who: String
+    let session: AgentSession
+
+    init?(task: AgentTask?, session: AgentSession?) {
+        guard let session else { return nil }
+        self.session = session
+        let project = session.projectName.trimmingCharacters(in: .whitespacesAndNewlines)
+        self.name = project.isEmpty ? (task?.name ?? "") : project
+        self.who = SessionCardText.who(agent: session.agent,
+                                       hostName: task.flatMap { SessionHost.hostName(for: $0) })
+    }
+
+    var isClaudeCode: Bool { who == AgentKind.claude.displayName }
 }
 
 struct CodeBlock: View {
