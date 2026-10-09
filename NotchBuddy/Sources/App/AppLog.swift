@@ -30,10 +30,7 @@ func appendAppLog(_ fileName: String, _ message: String,
 final class AppLog: @unchecked Sendable {
     static let shared = AppLog(directory: defaultDirectory)
 
-    static var defaultDirectory: URL {
-        FileManager.default.urls(for: .libraryDirectory, in: .userDomainMask)[0]
-            .appendingPathComponent("Logs/NotchBuddy")
-    }
+    static var defaultDirectory: URL { AppPaths.logsDirectory }
 
     static let defaultMaxBytes = 1_048_576 // 1 MB
 

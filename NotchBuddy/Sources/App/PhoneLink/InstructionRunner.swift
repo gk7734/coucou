@@ -20,7 +20,7 @@ final class InstructionRunner {
     static let shared = InstructionRunner()
 
     nonisolated static let enabledKey = "iPhoneInstructionsEnabled"
-    nonisolated static var isEnabled: Bool { UserDefaults.standard.bool(forKey: enabledKey) }
+    nonisolated static var isEnabled: Bool { AppDefaults.store.bool(forKey: enabledKey) }
 
     private var database: CKDatabase { CKContainer(identifier: CloudProbe.containerID).privateCloudDatabase }
     private var pollTask: Task<Void, Never>?
@@ -31,7 +31,7 @@ final class InstructionRunner {
     private let maxAge: TimeInterval = 10 * 60
 
     func setEnabled(_ on: Bool) {
-        UserDefaults.standard.set(on, forKey: Self.enabledKey)
+        AppDefaults.store.set(on, forKey: Self.enabledKey)
         if on && CloudProbe.isEnabled { start() } else { stop() }
     }
 
@@ -134,8 +134,7 @@ final class InstructionRunner {
         process.standardInput = FileHandle.nullDevice
         // Output goes to a file (a pipe could fill up and stall claude); its
         // end is logged if the run fails.
-        let logURL = FileManager.default.homeDirectoryForCurrentUser
-            .appendingPathComponent("Library/Logs/NotchBuddy/instruction-last.log")
+        let logURL = AppPaths.logsDirectory.appendingPathComponent("instruction-last.log")
         try? FileManager.default.createDirectory(at: logURL.deletingLastPathComponent(), withIntermediateDirectories: true)
         FileManager.default.createFile(atPath: logURL.path, contents: nil)
         let output = try? FileHandle(forWritingTo: logURL)

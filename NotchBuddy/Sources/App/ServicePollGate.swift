@@ -35,7 +35,7 @@ final class ServicePollGate: @unchecked Sendable {
     @MainActor static func isWanted(_ pillId: String) -> Bool {
         if AppState.shared.activeIntegrations.contains(pillId) { return true }
         #if PHONE_LINK
-        return UserDefaults.standard.bool(forKey: "iPhoneSyncEnabled")
+        return AppDefaults.store.bool(forKey: "iPhoneSyncEnabled")
         #else
         return false
         #endif

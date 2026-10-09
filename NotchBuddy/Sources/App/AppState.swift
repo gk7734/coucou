@@ -88,15 +88,15 @@ final class AppState {
 
     // Sound enabled — persisted
     var soundEnabled: Bool = true {
-        didSet { UserDefaults.standard.set(soundEnabled, forKey: "soundEnabled") }
+        didSet { AppDefaults.store.set(soundEnabled, forKey: "soundEnabled") }
     }
 
     // Weekly recap — persisted
-    var recapEnabled: Bool = (UserDefaults.standard.object(forKey: "recapEnabled") as? Bool) ?? true {
-        didSet { UserDefaults.standard.set(recapEnabled, forKey: "recapEnabled") }
+    var recapEnabled: Bool = (AppDefaults.store.object(forKey: "recapEnabled") as? Bool) ?? true {
+        didSet { AppDefaults.store.set(recapEnabled, forKey: "recapEnabled") }
     }
-    var recapHideProjects: Bool = UserDefaults.standard.bool(forKey: "recapHideProjects") {
-        didSet { UserDefaults.standard.set(recapHideProjects, forKey: "recapHideProjects") }
+    var recapHideProjects: Bool = AppDefaults.store.bool(forKey: "recapHideProjects") {
+        didSet { AppDefaults.store.set(recapHideProjects, forKey: "recapHideProjects") }
     }
 
     // Mochi outfit selection — persisted
@@ -159,30 +159,30 @@ final class AppState {
     // Claude model used by the chat and the search — persisted
     static let defaultClaudeModel = "claude-sonnet-4-6"
     var claudeModel: String = AppState.defaultClaudeModel {
-        didSet { UserDefaults.standard.set(claudeModel, forKey: "claudeModel") }
+        didSet { AppDefaults.store.set(claudeModel, forKey: "claudeModel") }
     }
 
     // In-chat provider + model — picked via the model selector in the prompt view
     var chatProvider: ChatProvider = .anthropic {
-        didSet { UserDefaults.standard.set(chatProvider.rawValue, forKey: "chatProvider") }
+        didSet { AppDefaults.store.set(chatProvider.rawValue, forKey: "chatProvider") }
     }
     var googleChatModel: String = ChatProvider.google.defaultModel {
-        didSet { UserDefaults.standard.set(googleChatModel, forKey: "googleChatModel") }
+        didSet { AppDefaults.store.set(googleChatModel, forKey: "googleChatModel") }
     }
     var openAIChatModel: String = ChatProvider.openai.defaultModel {
-        didSet { UserDefaults.standard.set(openAIChatModel, forKey: "openAIChatModel") }
+        didSet { AppDefaults.store.set(openAIChatModel, forKey: "openAIChatModel") }
     }
     var ollamaChatModel: String = ChatProvider.ollama.defaultModel {
-        didSet { UserDefaults.standard.set(ollamaChatModel, forKey: "ollamaChatModel") }
+        didSet { AppDefaults.store.set(ollamaChatModel, forKey: "ollamaChatModel") }
     }
     var lmstudioChatModel: String = ChatProvider.lmstudio.defaultModel {
-        didSet { UserDefaults.standard.set(lmstudioChatModel, forKey: "lmstudioChatModel") }
+        didSet { AppDefaults.store.set(lmstudioChatModel, forKey: "lmstudioChatModel") }
     }
     var ollamaServerURL: String = "" {
-        didSet { UserDefaults.standard.set(ollamaServerURL, forKey: "ollamaServerURL") }
+        didSet { AppDefaults.store.set(ollamaServerURL, forKey: "ollamaServerURL") }
     }
     var lmstudioServerURL: String = "" {
-        didSet { UserDefaults.standard.set(lmstudioServerURL, forKey: "lmstudioServerURL") }
+        didSet { AppDefaults.store.set(lmstudioServerURL, forKey: "lmstudioServerURL") }
     }
 
     // The main pill (Settings → Active pills → Main), persisted as `mainPill`:
@@ -190,7 +190,7 @@ final class AppState {
     // "Where you code" pill the user picked.
     var mainPillChoice: String = PillCatalog.autoMainPillId {
         didSet {
-            UserDefaults.standard.set(mainPillChoice, forKey: "mainPill")
+            AppDefaults.store.set(mainPillChoice, forKey: "mainPill")
             // A picked main is never one of the active pills (as before Auto).
             if mainPillChoice != PillCatalog.autoMainPillId { activeIntegrations.remove(mainPillChoice) }
             refreshMainPill()
@@ -307,7 +307,7 @@ final class AppState {
     // Sound volume (0–0.2) — persisted, synced to SoundEngine
     var soundVolume: Double = 0.12 {
         didSet {
-            UserDefaults.standard.set(soundVolume, forKey: "soundVolume")
+            AppDefaults.store.set(soundVolume, forKey: "soundVolume")
             SoundEngine.shared.volume = Float(soundVolume)
         }
     }
@@ -331,38 +331,38 @@ final class AppState {
     // Auto-close delay — persisted
     // Hovering the island opens it (folds shortly after the pointer leaves) — persisted, off by default
     var openOnHover: Bool = false {
-        didSet { UserDefaults.standard.set(openOnHover, forKey: "openOnHover") }
+        didSet { AppDefaults.store.set(openOnHover, forKey: "openOnHover") }
     }
     var autoCloseInterval: TimeInterval = 15 {
-        didSet { UserDefaults.standard.set(autoCloseInterval, forKey: "autoCloseInterval") }
+        didSet { AppDefaults.store.set(autoCloseInterval, forKey: "autoCloseInterval") }
     }
 
     // No pointer movement for this long hides the compact island (SPEC §3 rule 6) — persisted
     var absenceInterval: TimeInterval = 3 * 60 {
-        didSet { UserDefaults.standard.set(absenceInterval, forKey: "absenceInterval") }
+        didSet { AppDefaults.store.set(absenceInterval, forKey: "absenceInterval") }
     }
 
     // Hotkey to show island (e.g. ⌘⇧N)
     var hotkeyEnabled: Bool = false {
-        didSet { UserDefaults.standard.set(hotkeyEnabled, forKey: "hotkeyEnabled") }
+        didSet { AppDefaults.store.set(hotkeyEnabled, forKey: "hotkeyEnabled") }
     }
     var hotkeyFlags: UInt = NSEvent.ModifierFlags([.command, .shift]).rawValue {
-        didSet { UserDefaults.standard.set(Int(hotkeyFlags), forKey: "hotkeyFlags") }
+        didSet { AppDefaults.store.set(Int(hotkeyFlags), forKey: "hotkeyFlags") }
     }
     var hotkeyCode: UInt16 = 45 {  // 'n'
-        didSet { UserDefaults.standard.set(Int(hotkeyCode), forKey: "hotkeyCode") }
+        didSet { AppDefaults.store.set(Int(hotkeyCode), forKey: "hotkeyCode") }
     }
 
     // Screen hosting the island (notch screen by default) — persisted
     var islandDisplay: IslandDisplayChoice = .notch {
-        didSet { UserDefaults.standard.set(islandDisplay.storageValue, forKey: "islandDisplay") }
+        didSet { AppDefaults.store.set(islandDisplay.storageValue, forKey: "islandDisplay") }
     }
 
     // Vercel project filter — empty = watch all projects
     var vercelProjectFilter: Set<String> = [] {
         didSet {
             if let data = try? JSONEncoder().encode(Array(vercelProjectFilter)) {
-                UserDefaults.standard.set(data, forKey: "vercelProjectFilter")
+                AppDefaults.store.set(data, forKey: "vercelProjectFilter")
             }
         }
     }
@@ -371,7 +371,7 @@ final class AppState {
     var n8nWorkflowFilter: Set<String> = [] {
         didSet {
             if let data = try? JSONEncoder().encode(Array(n8nWorkflowFilter)) {
-                UserDefaults.standard.set(data, forKey: "n8nWorkflowFilter")
+                AppDefaults.store.set(data, forKey: "n8nWorkflowFilter")
             }
         }
     }
@@ -380,7 +380,7 @@ final class AppState {
     var activeIntegrations: Set<String> = ["integration_resend", "integration_n8n", "integration_vercel", "integration_github"] {
         didSet {
             if let data = try? JSONEncoder().encode(Array(activeIntegrations)) {
-                UserDefaults.standard.set(data, forKey: "activeIntegrations")
+                AppDefaults.store.set(data, forKey: "activeIntegrations")
             }
             // Clear stale GitHub data when the integration is disabled
             if !activeIntegrations.contains("integration_github") && oldValue.contains("integration_github") {
@@ -506,7 +506,7 @@ final class AppState {
         didSet {
             if let u = claudePlanUsage,
                let data = try? JSONEncoder().encode(u) {
-                UserDefaults.standard.set(data, forKey: "claudePlanUsage")
+                AppDefaults.store.set(data, forKey: "claudePlanUsage")
             }
         }
     }
@@ -514,7 +514,7 @@ final class AppState {
     // Plan gauge: show pill in notch header — persisted
     #if !APPSTORE
     var showPlanInNotch: Bool = false {
-        didSet { UserDefaults.standard.set(showPlanInNotch, forKey: "showPlanInNotch") }
+        didSet { AppDefaults.store.set(showPlanInNotch, forKey: "showPlanInNotch") }
     }
     // In-memory plan usage override for demo mode. Never persisted. Set by DemoEngine.
     var demoPlanUsageOverride: PlanUsage? = nil
@@ -525,7 +525,7 @@ final class AppState {
 
     // Codex plan gauge (from `codex app-server`) — fetched when the pill shows
     var showCodexPlanInNotch: Bool = false {
-        didSet { UserDefaults.standard.set(showCodexPlanInNotch, forKey: "showCodexPlanInNotch") }
+        didSet { AppDefaults.store.set(showCodexPlanInNotch, forKey: "showCodexPlanInNotch") }
     }
     var codexPlanUsage: CodexPlanUsage? = nil
     // Which card showingPlanDetail opens
@@ -546,7 +546,7 @@ final class AppState {
     // MARK: - Init (loads persisted settings)
 
     private init() {
-        let ud = UserDefaults.standard
+        let ud = AppDefaults.store
 
         if let v = ud.object(forKey: "soundEnabled") as? Bool   { _soundEnabled = v }
         if let v = ud.object(forKey: "soundVolume")  as? Double { _soundVolume  = v }
@@ -857,7 +857,7 @@ final class AppState {
         }
         lastActiveWorkspacePill = pillId
         lastActiveWorkspaceBundleId = bundleId
-        let ud = UserDefaults.standard
+        let ud = AppDefaults.store
         ud.set(pillId, forKey: "lastActiveWorkspacePill")
         if let bundleId { ud.set(bundleId, forKey: "lastActiveWorkspaceBundleId") }
         else { ud.removeObject(forKey: "lastActiveWorkspaceBundleId") }

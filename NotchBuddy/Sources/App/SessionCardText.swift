@@ -79,7 +79,7 @@ enum SessionCardText {
 
     /// The stall threshold the user set, in minutes; 0 means off. A missing or negative value
     /// reads as the default.
-    static func stallThresholdMinutes(_ defaults: UserDefaults = .standard) -> Int {
+    static func stallThresholdMinutes(_ defaults: UserDefaults = AppDefaults.store) -> Int {
         guard let value = defaults.object(forKey: stallThresholdKey) as? Int, value >= 0 else {
             return defaultStallThresholdMinutes
         }

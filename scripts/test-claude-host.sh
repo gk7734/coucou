@@ -7,5 +7,6 @@ trap 'rm -rf "$TEST_DIR"' EXIT
 swiftc NotchBuddy/Sources/App/ClaudeHost.swift \
     NotchBuddy/Sources/App/HostResolver.swift \
     NotchBuddy/Sources/App/HostAppInfo.swift \
+    NotchBuddy/Sources/CoucouKit/AppDefaults.swift \
     tests/ClaudeHostTests.swift -o "$TEST_DIR/claude-host-tests"
 "$TEST_DIR/claude-host-tests"

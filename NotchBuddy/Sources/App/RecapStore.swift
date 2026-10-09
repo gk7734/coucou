@@ -73,8 +73,7 @@ final class RecapStore {
     private var drafts: [String: TurnDraft] = [:]
 
     private static let storageURL: URL = {
-        let support = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
-        return support.appendingPathComponent("NotchBuddy/recap.json")
+        AppPaths.supportDirectory.appendingPathComponent("recap.json")
     }()
 
     private init() { load() }
@@ -221,7 +220,7 @@ final class RecapStore {
     // MARK: - Persistence
 
     var isEnabled: Bool {
-        UserDefaults.standard.object(forKey: "recapEnabled") as? Bool ?? true
+        AppDefaults.store.object(forKey: "recapEnabled") as? Bool ?? true
     }
 
     func clearHistory() {

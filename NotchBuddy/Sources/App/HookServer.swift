@@ -13,12 +13,11 @@ final class HookServer: @unchecked Sendable {
     static let shared = HookServer()
 
     // Support directory paths
-    static var supportDir: URL {
-        FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
-            .appendingPathComponent("NotchBuddy")
-    }
+    static var supportDir: URL { AppPaths.supportDirectory }
     static var socketPath: String {
         #if APPSTORE
+        // A DEBUG run with COUCOU_SUPPORT_DIR (scripts/smoke.sh) listens in that folder.
+        if let dir = AppPaths.supportOverride { return dir.appendingPathComponent("nb.sock").path }
         // Container home root keeps path ≤ 103 bytes (sun_path limit on macOS is 104 incl. NUL)
         // /Users/louis/Library/Containers/fr.louisraille.Coucou/Data/nb.sock = 66 bytes ✓
         return NSHomeDirectory() + "/nb.sock"
@@ -423,6 +422,10 @@ final class HookServer: @unchecked Sendable {
         case question(fd: Int32, parsed: AskQuestion, payload: [String: Any])
         case permission(fd: Int32, payload: [String: Any])
         case event(name: String, payload: [String: Any])
+        #if DEBUG
+        /// `coucou_kind` "debug_…" (scripts/smoke.sh): answered on the main actor, in order.
+        case debug(fd: Int32, kind: String, payload: [String: Any])
+        #endif
     }
 
     /// Hands a message to the main actor. DispatchQueue.main is one serial FIFO queue, so
@@ -450,6 +453,9 @@ final class HookServer: @unchecked Sendable {
         case .statusLine(let payload):              processStatusLine(payload: payload)
         case .question(let fd, let parsed, let payload): processQuestionRequest(fd: fd, parsed: parsed, payload: payload)
         case .permission(let fd, let payload):      processPermissionRequest(fd: fd, payload: payload)
+        #if DEBUG
+        case .debug(let fd, let kind, let payload): processDebugQuery(fd: fd, kind: kind, payload: payload)
+        #endif
         case .event(let name, let payload):
             // Edit / MultiEdit / Write: the diff of a big edit is computed off the main thread
             // (the island keeps animating); small ones right here, no queue hop.
@@ -491,6 +497,15 @@ final class HookServer: @unchecked Sendable {
         }
 
         let coucouKind = payload["coucou_kind"] as? String ?? ""
+
+        #if DEBUG
+        // Test queries (scripts/smoke.sh): one JSON line back, after every earlier message.
+        if coucouKind.hasPrefix("debug_") {
+            heldOpen = true   // answered and closed on the main actor
+            deliver(.debug(fd: fd, kind: coucouKind, payload: payload))
+            return
+        }
+        #endif
 
         // statusline payloads are handled separately — no session, no reveal, no sound
         if coucouKind == "statusline" {
@@ -579,7 +594,7 @@ final class HookServer: @unchecked Sendable {
         // Hermes only when the plugin sent coucou_has_transport: true, meaning
         // register_approval_transport is wired and Hermes will honour our choice.
         // Without that flag the request is answered "ask" so Hermes handles it natively.
-        if UserDefaults.standard.bool(forKey: "hermesApprovalsEnabled"),
+        if AppDefaults.store.bool(forKey: "hermesApprovalsEnabled"),
            payload["coucou_has_transport"] as? Bool == true {
             agents.insert("hermes")
         }
@@ -1118,6 +1133,75 @@ final class HookServer: @unchecked Sendable {
         }
     }
 
+    // MARK: - DEBUG socket queries (scripts/smoke.sh)
+
+    #if DEBUG
+    /// - `debug_state`: what the island shows and holds (DEBUG builds).
+    /// - `debug_answer` (`decision`: allow / deny / always for the approval on screen;
+    ///   "answer" picks each question's first option, anything else replies "ask"), and
+    ///   `debug_trim` (`advance`: seconds; trims the session books as if that much time had
+    ///   passed): smoke-test runs only (COUCOU_SMOKE=1), never in a build someone uses, so
+    ///   nothing but a click approves a real request.
+    @MainActor
+    private func processDebugQuery(fd: Int32, kind: String, payload: [String: Any]) {
+        var reply: [String: Any] = ["ok": true]
+        switch kind {
+        case "debug_state":
+            reply = debugState()
+        case "debug_answer" where AppPaths.isSmokeTest:
+            let decision = payload["decision"] as? String ?? "deny"
+            if presentedApprovalId != nil {
+                sendApprovalDecision(decision)
+                reply["resolved"] = "approval"
+            } else if presentedQuestionId != nil, let question = AppState.shared.pendingQuestion {
+                if decision == "answer" {
+                    let firsts = question.questions.map { $0.options.first.map { [$0.label] } ?? [] }
+                    sendQuestionAnswers(AskQuestion.buildAnswers(questions: question.questions, selections: firsts))
+                } else {
+                    sendQuestionAsk()
+                }
+                reply["resolved"] = "question"
+            } else {
+                reply["resolved"] = "none"
+            }
+        case "debug_trim" where AppPaths.isSmokeTest:
+            let advance = payload["advance"] as? Double ?? 0
+            trimBooks(now: Date().addingTimeInterval(advance))
+        default:
+            reply = ["ok": false, "error": "unknown or unavailable query \(kind)"]
+        }
+        let line = (try? JSONSerialization.data(withJSONObject: reply, options: [.sortedKeys]))
+            .flatMap { String(data: $0, encoding: .utf8) } ?? #"{"ok":false}"#
+        answerAndClose(fd: fd, line: line)
+    }
+
+    @MainActor
+    private func debugState() -> [String: Any] {
+        let state = AppState.shared
+        let fsm = IslandWindowController.current?.fsm
+        let books = state.sessionBooks.mapValues { book in
+            book.sessions.map { ["id": $0.id, "phase": $0.phase.rawValue, "agent": $0.agent] }
+        }
+        return [
+            "ok": true,
+            "mode": state.mode.rawValue,
+            "view": state.view.rawValue,
+            "fsm": fsm.map { "\($0.state)" } ?? "none",
+            "countdown": fsm?.countdown.map { $0.deadline.timeIntervalSinceNow } ?? NSNull(),
+            "focusId": state.focusId ?? NSNull(),
+            "mainPillId": state.mainPillId,
+            "isPinned": state.isPinned,
+            "isPresent": state.isPresent,
+            "tasks": state.tasks.map { ["id": $0.id, "name": $0.name, "state": $0.state.rawValue] },
+            "sessionBooks": books,
+            "pendingApproval": state.pendingApproval != nil,
+            "pendingQuestion": state.pendingQuestion != nil,
+            "queuedApprovals": approvals.count,
+            "queuedQuestions": questions.count,
+        ]
+    }
+    #endif
+
     // MARK: - Permission request (blocking — Claude Code waits for decision)
 
     @MainActor
@@ -1424,7 +1508,12 @@ final class HookServer: @unchecked Sendable {
         _ = try? FileManager.default.setAttributes([.posixPermissions: 0o755 as NSNumber], ofItemAtPath: wrapperURL.path)
         // nb-hook.py: Python relay
         let pyURL = wrapperURL.deletingLastPathComponent().appendingPathComponent("nb-hook.py")
-        try? nbHookPythonGitHub.write(to: pyURL, atomically: true, encoding: .utf8)
+        var relay = nbHookPythonGitHub
+        if AppPaths.supportOverride != nil {   // DEBUG, COUCOU_SUPPORT_DIR: this run's socket
+            relay = relay.replacingOccurrences(of: "~/Library/Application Support/NotchBuddy/nb.sock",
+                                               with: Self.socketPath)
+        }
+        try? relay.write(to: pyURL, atomically: true, encoding: .utf8)
         _ = try? FileManager.default.setAttributes([.posixPermissions: 0o755 as NSNumber], ofItemAtPath: pyURL.path)
         #endif
     }
@@ -1707,7 +1796,7 @@ final class HookServer: @unchecked Sendable {
 
         // Write settings.json (with backup)
         try ClaudeSettingsFile.write(data, to: settingsURL, expecting: original)
-        UserDefaults.standard.set(true, forKey: "coucouHooksInstalled")
+        AppDefaults.store.set(true, forKey: "coucouHooksInstalled")
     }
 
     /// Removes Coucou's hooks from the panel-selected settings.json (the user confirmed an alert).
@@ -1716,7 +1805,7 @@ final class HookServer: @unchecked Sendable {
         if let removed = try Self.claudeSettingsRemoving(at: settingsURL) {
             try ClaudeSettingsFile.write(removed.data, to: settingsURL, expecting: removed.original)
         }
-        UserDefaults.standard.set(false, forKey: "coucouHooksInstalled")
+        AppDefaults.store.set(false, forKey: "coucouHooksInstalled")
     }
     #endif
 
@@ -1727,7 +1816,7 @@ final class HookServer: @unchecked Sendable {
     static func claudeHooksInstalled() -> Bool {
         #if APPSTORE
         // Sandboxed: can't read ~/.claude directly — check the install flag set on write.
-        return UserDefaults.standard.bool(forKey: "coucouHooksInstalled")
+        return AppDefaults.store.bool(forKey: "coucouHooksInstalled")
         #else
         guard let json = jsonObject(at: claudeSettingsURL) else { return false }
         return coucouHooksPresent(inSettings: json)

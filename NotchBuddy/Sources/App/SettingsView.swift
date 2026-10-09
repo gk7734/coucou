@@ -81,7 +81,7 @@ struct SettingsView: View {
 
     @State private var showHermesConfigDiff: Bool = false
     @State private var pendingHermesConfigContent: String = ""
-    @AppStorage("hermesApprovalsEnabled") private var hermesApprovalsEnabled: Bool = false
+    @AppStorage("hermesApprovalsEnabled", store: AppDefaults.store) private var hermesApprovalsEnabled: Bool = false
     @State private var hermesSupportsApprovals: Bool = false
     #endif
 
@@ -128,18 +128,18 @@ struct SettingsView: View {
     @State private var connectedScreens: [(uuid: String, name: String)] = []
 
     // Sidebar selection persisted across sessions
-    @AppStorage("settingsSection") private var selectedSection: String = "general"
+    @AppStorage("settingsSection", store: AppDefaults.store) private var selectedSection: String = "general"
     // Active pills: the pill whose colour palette is open, if any
     @State private var colorPalettePill: String? = nil
     #if PHONE_LINK
-    @AppStorage("iPhoneSyncEnabled") private var iPhoneSyncEnabled = false
-    @AppStorage("iPhoneLiveActivityEnabled") private var iPhoneLiveActivityEnabled = false
-    @AppStorage("iPhoneInstructionsEnabled") private var iPhoneInstructionsEnabled = false
+    @AppStorage("iPhoneSyncEnabled", store: AppDefaults.store) private var iPhoneSyncEnabled = false
+    @AppStorage("iPhoneLiveActivityEnabled", store: AppDefaults.store) private var iPhoneLiveActivityEnabled = false
+    @AppStorage("iPhoneInstructionsEnabled", store: AppDefaults.store) private var iPhoneInstructionsEnabled = false
     #endif
-    @AppStorage(ClaudeHost.terminalCardsKey) private var terminalCardsEnabled = false
-    @AppStorage(AudioSpectrum.visualizerKey) private var visualizerEnabled = true
+    @AppStorage(ClaudeHost.terminalCardsKey, store: AppDefaults.store) private var terminalCardsEnabled = false
+    @AppStorage(AudioSpectrum.visualizerKey, store: AppDefaults.store) private var visualizerEnabled = true
     #if !APPSTORE
-    @AppStorage(NowPlayingCenter.autoMusicKey) private var autoMusicEnabled = true
+    @AppStorage(NowPlayingCenter.autoMusicKey, store: AppDefaults.store) private var autoMusicEnabled = true
     #endif
     @State private var customSoundCount = SoundEngine.shared.customized.count
 
@@ -456,6 +456,7 @@ struct SettingsView: View {
                     } else {
                         UserDefaults.standard.set([code], forKey: "AppleLanguages")
                     }
+                    // The system reads the app's language from its own domain, never a suite.
                     UserDefaults.standard.synchronize()
                 }
                 HStack(spacing: 8) {

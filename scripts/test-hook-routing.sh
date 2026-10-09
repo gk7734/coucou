@@ -11,5 +11,6 @@ swiftc NotchBuddy/Sources/App/HookRouting.swift \
     NotchBuddy/Sources/CoucouKit/IslandTypes.swift \
     NotchBuddy/Sources/CoucouKit/IslandScreenGeometry.swift \
     NotchBuddy/Sources/CoucouKit/PillColors.swift \
+    NotchBuddy/Sources/CoucouKit/AppDefaults.swift \
     tests/HookRoutingTests.swift -o "$TEST_DIR/hook-routing-tests"
 "$TEST_DIR/hook-routing-tests"

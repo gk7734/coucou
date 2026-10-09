@@ -26,8 +26,8 @@ final class MacDictation: @unchecked Sendable {
     /// What was typed before dictating, kept in front of the words.
     var prefix = ""
     /// `automatic` or a locale identifier (the mic's right-click menu).
-    var language: String = UserDefaults.standard.string(forKey: MacDictation.languageKey) ?? MacDictation.automatic {
-        didSet { UserDefaults.standard.set(language, forKey: Self.languageKey) }
+    var language: String = AppDefaults.store.string(forKey: MacDictation.languageKey) ?? MacDictation.automatic {
+        didSet { AppDefaults.store.set(language, forKey: Self.languageKey) }
     }
 
     @ObservationIgnored private let engine = AVAudioEngine()
@@ -100,7 +100,7 @@ final class MacDictation: @unchecked Sendable {
         if let best = bestCandidate() {
             transcript = best.words
             if candidates.count > 1 {
-                UserDefaults.standard.set(best.locale.identifier, forKey: Self.lastHeardKey)
+                AppDefaults.store.set(best.locale.identifier, forKey: Self.lastHeardKey)
             }
         }
         tearDown()
@@ -222,7 +222,7 @@ final class MacDictation: @unchecked Sendable {
     /// Coucou's own language, then English — one per language, up to three.
     static func automaticLocales() -> [Locale] {
         var ids: [String] = []
-        if let last = UserDefaults.standard.string(forKey: lastHeardKey) { ids.append(last) }
+        if let last = AppDefaults.store.string(forKey: lastHeardKey) { ids.append(last) }
         // The Mac's languages (not Coucou's override in Settings → General → Language).
         ids += (CFPreferencesCopyValue("AppleLanguages" as CFString, kCFPreferencesAnyApplication,
                                        kCFPreferencesCurrentUser, kCFPreferencesAnyHost) as? [String]) ?? []

@@ -34,7 +34,7 @@ final class StallMonitor {
         timer?.cancel()
         timer = nil
 
-        let minutes = NotificationSettings.stallMinutes(defaults: .standard)
+        let minutes = NotificationSettings.stallMinutes(defaults: AppDefaults.store)
         let threshold = TimeInterval(minutes * 60)
         let now = Date()
         if threshold <= 0 { tracker.reset() }

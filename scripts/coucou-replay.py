@@ -10,6 +10,19 @@ Developer tool, Python 3 standard library only (works with macOS' /usr/bin/pytho
     python3 scripts/coucou-replay.py zed-codex --speed 2
     python3 scripts/coucou-replay.py burst -q                 # 3 sessions, ~10 events/s, 60 s
     python3 scripts/coucou-replay.py webstorm-claude --host dev.zed.Zed --dry-run
+    python3 scripts/coucou-replay.py --socket /tmp/x/nb.sock --state  # DEBUG build: island state
+
+Test hooks of DEBUG builds (scripts/smoke.sh):
+  --state           sends {"coucou_kind": "debug_state"} and prints the app's one-line JSON reply
+                    (mode, view, FSM state, tasks, session books, pending requests…).
+  --debug JSON      sends any debug_… payload and prints the reply, e.g.
+                    '{"coucou_kind": "debug_trim", "advance": 660}'.
+  --answer allow|deny|always
+                    answers each held request itself, as a click would: after sending it, sends
+                    {"coucou_kind": "debug_answer", "decision": …} until the app took it
+                    (a question gets its first options for allow/always, "ask" for deny).
+                    Honoured only by an app launched with COUCOU_SMOKE=1. Default none: wait
+                    for the user's click in the notch.
 
 Protocol (the same as the nb-hook relay, HookRelayScripts.swift):
   - one Unix-socket connection per event, the payload as one JSON line ending in "\\n";
@@ -361,7 +374,55 @@ class Stats:
             self.last = now
 
 
+def query(path, payload, timeout=5.0):
+    """Sends a debug_… payload and returns the app's reply line ("" on EOF)."""
+    s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+    try:
+        s.settimeout(timeout)
+        try:
+            s.connect(path)
+        except (FileNotFoundError, ConnectionRefusedError) as e:
+            raise AppUnreachable("Coucou is not listening on %s (%s)" % (path, e.strerror or e))
+        s.sendall((json.dumps(payload) + "\n").encode())
+        chunks = []
+        while True:
+            chunk = s.recv(65536)
+            if not chunk:
+                break
+            chunks.append(chunk)
+            if b"\n" in chunk:
+                break
+        return b"".join(chunks).decode("utf-8", "replace").strip()
+    finally:
+        s.close()
+
+
+def auto_answer(opts, out, payload, done):
+    """--answer: answers the held request like a click, once the app shows it."""
+    decision = opts.answer
+    if payload.get("coucou_kind") == "ask_user_question":
+        decision = "answer" if opts.answer in ("allow", "always") else "ask"
+    deadline = time.monotonic() + 15
+    while not done.wait(0.3) and time.monotonic() < deadline:
+        try:
+            reply = query(opts.socket, {"coucou_kind": "debug_answer", "decision": decision})
+            obj = json.loads(reply) if reply else {}
+        except (OSError, ValueError, AppUnreachable) as e:
+            out.line("auto-answer: %s" % e, force=True)
+            return
+        if not obj.get("ok"):
+            out.line("auto-answer refused: %s (is the app a COUCOU_SMOKE=1 DEBUG build?)"
+                     % obj.get("error", reply), force=True)
+            return
+        if obj.get("resolved", "none") != "none":
+            out.line("auto-answered %s: %s" % (obj["resolved"], decision))
+            return
+
+
 def wait_held(opts, out, step, label):
+    done = threading.Event()
+    if opts.answer:
+        threading.Thread(target=auto_answer, args=(opts, out, step.payload, done), daemon=True).start()
     try:
         reply = send(opts.socket, step.payload, held=True)
     except AppUnreachable:
@@ -372,6 +433,8 @@ def wait_held(opts, out, step, label):
     except OSError as e:
         out.line("%s: connection error (%s)" % (label, e), force=True)
         return ""
+    finally:
+        done.set()
     decision = reply_decision(reply)
     if not reply:
         out.line("%s: connection closed without a decision (app gave up or answered elsewhere)" % label, force=True)
@@ -491,15 +554,21 @@ def parse_args(argv):
     p.add_argument("--dry-run", action="store_true", help="print the payloads, send nothing")
     p.add_argument("--list", action="store_true", help="list the scenarios")
     p.add_argument("-q", "--quiet", action="store_true", help="only print held requests, drops and the summary")
+    p.add_argument("--answer", choices=["allow", "deny", "always", "none"], default="none",
+                   help="answer held requests from the script (DEBUG app run with COUCOU_SMOKE=1)")
+    p.add_argument("--state", action="store_true", help="print the app's debug_state (DEBUG builds) and exit")
+    p.add_argument("--debug", metavar="JSON", default=None, help="send a debug_... payload, print the reply")
     opts = p.parse_args(argv)
+    if opts.answer == "none":
+        opts.answer = None
     if opts.speed <= 0:
         p.error("--speed must be > 0")
     if opts.agent and opts.agent != "claude" and not AGENT_RE.match(opts.agent):
         p.error("--agent must match ^[a-z0-9-]{1,24}$")
     if opts.parallel is not None and opts.parallel < 1:
         p.error("--parallel must be >= 1")
-    if not opts.list and not opts.scenario:
-        p.error("a scenario is required (or --list)")
+    if not opts.list and not opts.scenario and not opts.state and opts.debug is None:
+        p.error("a scenario is required (or --list, --state, --debug)")
     opts.socket = os.path.expanduser(opts.socket or DEFAULT_SOCKET)
     return opts
 
@@ -510,6 +579,19 @@ def main(argv):
         if opts.list:
             opts.parallel = 1
             list_scenarios(opts)
+            return 0
+        if opts.state or opts.debug is not None:
+            payload = {"coucou_kind": "debug_state"}
+            if opts.debug is not None:
+                try:
+                    payload = json.loads(opts.debug)
+                except ValueError as e:
+                    raise ScenarioError("--debug: invalid JSON (%s)" % e)
+            check_socket(opts.socket)
+            reply = query(opts.socket, payload)
+            if not reply:
+                raise AppUnreachable("no reply: is this a DEBUG build of Coucou?")
+            print(reply)
             return 0
         scenario = load_scenario(resolve_scenario(opts.scenario))
         if opts.parallel is None:

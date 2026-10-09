@@ -281,11 +281,11 @@ final class DefaultsKeyObserver: NSObject, @unchecked Sendable {
         self.key = key
         self.onChange = onChange
         super.init()
-        UserDefaults.standard.addObserver(self, forKeyPath: key, options: [.new], context: nil)
+        AppDefaults.store.addObserver(self, forKeyPath: key, options: [.new], context: nil)
     }
 
     deinit {
-        UserDefaults.standard.removeObserver(self, forKeyPath: key)
+        AppDefaults.store.removeObserver(self, forKeyPath: key)
     }
 
     override func observeValue(forKeyPath keyPath: String?, of object: Any?,

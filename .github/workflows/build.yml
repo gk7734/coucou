@@ -69,3 +69,21 @@ jobs:
             -destination 'generic/platform=iOS' \
             build \
             CODE_SIGNING_ALLOWED=NO
+
+  # Live smoke test (scripts/smoke.sh): the real app, DEBUG build, isolated and headless,
+  # with replayed hook traffic — launch, pills, approvals, the island folding, CPU, memory.
+  # A job of its own: slower than the unit tests, and it needs the runner's GUI session.
+  smoke:
+    runs-on: macos-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install XcodeGen
+        run: brew install xcodegen
+
+      - name: Generate project
+        run: cd NotchBuddy && xcodegen
+
+      - name: Live smoke test
+        run: bash scripts/smoke.sh

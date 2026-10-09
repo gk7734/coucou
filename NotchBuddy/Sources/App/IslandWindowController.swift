@@ -51,6 +51,15 @@ final class IslandWindowController: NSWindowController {
     // Island-local key monitor (active only when island is key window)
     private var localKeyMonitor: Any?
 
+    #if DEBUG
+    /// The island, for HookServer's debug_state query (scripts/smoke.sh).
+    static weak var current: IslandWindowController?
+    #endif
+
+    /// Where a smoke-test run (AppPaths.isSmokeTest) sees the pointer: far from every screen,
+    /// so the user's real pointer never hovers, opens or holds the test's island.
+    private static let smokePointer = NSPoint(x: -100_000, y: -100_000)
+
     convenience init() {
         let screen = Self.targetScreen(for: AppState.shared.islandDisplay)
         Self.currentScreen = screen
@@ -76,6 +85,9 @@ final class IslandWindowController: NSWindowController {
         self.notchH = nH
         self.hasNotch = geometry.hasNotch
         setupPanel(screen: screen)
+        #if DEBUG
+        Self.current = self
+        #endif
     }
 
     private func setupPanel(screen: NSScreen) {
@@ -86,6 +98,8 @@ final class IslandWindowController: NSWindowController {
         panel.level = NSWindow.Level(rawValue: Int(CGWindowLevelForKey(.mainMenuWindow)) + 3)
         panel.collectionBehavior = [.canJoinAllSpaces, .stationary, .fullScreenAuxiliary, .ignoresCycle]
         panel.ignoresMouseEvents = true
+        // Smoke-test run: the panel exists and its views run, but nobody can see or click it.
+        if AppPaths.isSmokeTest { panel.alphaValue = 0 }
 
         // Propagate real notch dimensions to AppState
         AppState.shared.notchWidth  = notchW
@@ -236,6 +250,12 @@ final class IslandWindowController: NSWindowController {
         absenceObserver = ChangeObserver({ AppState.shared.absenceInterval }, initial: true) { [weak self] interval in
             self?.fsm.absenceInterval = interval
         }
+        #if DEBUG
+        // scripts/smoke.sh shortens the compact → hidden delay (60 s) to see a hidden island soon.
+        if AppPaths.isSmokeTest, let delay = AppDefaults.store.object(forKey: "smokePetitHideDelay") as? Double {
+            fsm.petitToHiddenDelay = delay
+        }
+        #endif
         fsm.onPresenceChange = { present in
             AppState.shared.isPresent = present
         }
@@ -365,7 +385,7 @@ final class IslandWindowController: NSWindowController {
     private func pollFrame() {
         guard let panel = window as? IslandPanel else { return }
 
-        let mouse = NSEvent.mouseLocation
+        let mouse = AppPaths.isSmokeTest ? Self.smokePointer : NSEvent.mouseLocation
         followMouseIfNeeded(mouse)
 
         // Convert mouse to panel-local coords (macOS: origin bottom-left)
@@ -527,6 +547,7 @@ final class IslandWindowController: NSWindowController {
     // MARK: - Global hot keys (Carbon)
 
     private func startHotKeys() {
+        guard !AppPaths.isSmokeTest else { return }   // the user's shortcuts stay with their Coucou
         HotKeyCenter.shared.start { [weak self] action in
             self?.handleHotKey(action)
         }
@@ -798,7 +819,9 @@ final class IslandWindowController: NSWindowController {
     // MARK: - Keyboard (Escape closes)
 
     private func startKeyMonitor() {
-        keyMonitor = NSEvent.addGlobalMonitorForEvents(matching: .keyDown) { [weak self] event in
+        // A smoke-test run never watches the user's keys or clicks (global monitors).
+        let smoke = AppPaths.isSmokeTest
+        keyMonitor = smoke ? nil : NSEvent.addGlobalMonitorForEvents(matching: .keyDown) { [weak self] event in
             Task { @MainActor in
                 guard let self = self else { return }
                 if event.keyCode == 53 { // Escape
@@ -963,8 +986,10 @@ final class IslandWindowController: NSWindowController {
             }
             return event
         }
-        NSEvent.addGlobalMonitorForEvents(matching: .leftMouseUp) { _ in
-            finishDrag()
+        if !smoke {
+            NSEvent.addGlobalMonitorForEvents(matching: .leftMouseUp) { _ in
+                finishDrag()
+            }
         }
 
         NSEvent.addLocalMonitorForEvents(matching: .rightMouseDown) { [weak self] event in

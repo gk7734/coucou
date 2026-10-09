@@ -5,5 +5,6 @@ TEST_DIR="$(mktemp -d "${TMPDIR:-/tmp}/coucou-app-log.XXXXXX")"
 trap 'rm -rf "$TEST_DIR"' EXIT
 swiftc -swift-version 6 -strict-concurrency=complete \
     NotchBuddy/Sources/App/AppLog.swift \
+    NotchBuddy/Sources/App/AppPaths.swift \
     tests/AppLogTests.swift -o "$TEST_DIR/app-log-tests"
 "$TEST_DIR/app-log-tests"

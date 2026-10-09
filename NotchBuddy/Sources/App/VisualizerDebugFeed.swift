@@ -56,7 +56,7 @@ final class VisualizerDebugFeed: NSObject {
     }
 
     private func apply() {
-        let mode = UserDefaults.standard.string(forKey: Self.key)
+        let mode = AppDefaults.store.string(forKey: Self.key)
         if let source = fakedSource {
             NowPlayingCenter.shared.update(nil, for: source)
             fakedSource = nil
@@ -123,9 +123,9 @@ final class VisualizerDebugFeed: NSObject {
 
     @objc private func pick(_ sender: NSMenuItem) {
         if let mode = sender.representedObject as? String {
-            UserDefaults.standard.set(mode, forKey: Self.key)
+            AppDefaults.store.set(mode, forKey: Self.key)
         } else {
-            UserDefaults.standard.removeObject(forKey: Self.key)
+            AppDefaults.store.removeObject(forKey: Self.key)
         }
         // The key observer applies it (a write of the same value doesn't call it: apply now).
         apply()

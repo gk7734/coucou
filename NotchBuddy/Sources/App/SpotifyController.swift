@@ -69,7 +69,7 @@ final class SpotifyController: ObservableObject {
     }
 
     private var automationGranted: Bool {
-        UserDefaults.standard.bool(forKey: Self.grantedKey)
+        AppDefaults.store.bool(forKey: Self.grantedKey)
     }
 
     var isInstalled: Bool {
@@ -532,10 +532,10 @@ final class SpotifyController: ObservableObject {
         }
         switch result {
         case .success:
-            UserDefaults.standard.set(true, forKey: grantedKey)
+            AppDefaults.store.set(true, forKey: grantedKey)
             automationDenied = false
         case .denied:
-            UserDefaults.standard.set(false, forKey: grantedKey)
+            AppDefaults.store.set(false, forKey: grantedKey)
             automationDenied = true
         case .error:
             break

@@ -110,7 +110,7 @@ enum ShortcutLogic {
 
     /// Current spec for `action`, falling back to the default if not stored.
     static func hotKey(for action: ShortcutAction) -> ShortcutSpec {
-        let ud  = UserDefaults.standard
+        let ud  = AppDefaults.store
         let def = defaults[action]!
         let kc  = ud.object(forKey: action.udKeyCode) as? Int ?? Int(def.keyCode)
         let fl  = ud.object(forKey: action.udFlags)   as? Int ?? Int(def.nsFlags)
@@ -118,17 +118,17 @@ enum ShortcutLogic {
     }
 
     static func save(_ spec: ShortcutSpec, for action: ShortcutAction) {
-        UserDefaults.standard.set(Int(spec.keyCode), forKey: action.udKeyCode)
-        UserDefaults.standard.set(Int(spec.nsFlags),  forKey: action.udFlags)
+        AppDefaults.store.set(Int(spec.keyCode), forKey: action.udKeyCode)
+        AppDefaults.store.set(Int(spec.nsFlags),  forKey: action.udFlags)
     }
 
     static func isEnabled(_ action: ShortcutAction) -> Bool {
-        UserDefaults.standard.object(forKey: action.udEnabled) as? Bool
+        AppDefaults.store.object(forKey: action.udEnabled) as? Bool
             ?? action.enabledByDefault
     }
 
     static func setEnabled(_ enabled: Bool, for action: ShortcutAction) {
-        UserDefaults.standard.set(enabled, forKey: action.udEnabled)
+        AppDefaults.store.set(enabled, forKey: action.udEnabled)
     }
 
     static func resetToDefault(_ action: ShortcutAction) {

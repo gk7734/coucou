@@ -52,7 +52,7 @@ final class CloudProbe {
 
     static let enabledKey = "iPhoneSyncEnabled"
 
-    static var isEnabled: Bool { UserDefaults.standard.bool(forKey: enabledKey) }
+    static var isEnabled: Bool { AppDefaults.store.bool(forKey: enabledKey) }
 
     /// Called at launch: starts only if the user turned the iPhone sync on.
     func startIfEnabled() {
@@ -60,7 +60,7 @@ final class CloudProbe {
     }
 
     func setEnabled(_ on: Bool) {
-        UserDefaults.standard.set(on, forKey: Self.enabledKey)
+        AppDefaults.store.set(on, forKey: Self.enabledKey)
         if on { start() } else { stop() }
     }
 
@@ -117,7 +117,7 @@ final class CloudProbe {
 
         // Step 1 Ping/Pong test: off unless asked for, so the Mac stays idle at rest
         // (defaults write fr.louisraille.NotchBuddy phoneLinkPing -bool YES).
-        guard UserDefaults.standard.bool(forKey: "phoneLinkPing") else {
+        guard AppDefaults.store.bool(forKey: "phoneLinkPing") else {
             log("ping test off (phoneLinkPing)")
             return
         }

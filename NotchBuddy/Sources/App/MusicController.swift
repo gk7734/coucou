@@ -62,7 +62,7 @@ final class MusicController: ObservableObject {
             Task { @MainActor [weak self] in
                 guard let self else { return }
                 guard self.isPillActive,
-                      UserDefaults.standard.bool(forKey: "coucou.musicAutomationGranted") else { return }
+                      AppDefaults.store.bool(forKey: "coucou.musicAutomationGranted") else { return }
                 self.fetchAndApply()
             }
         }
@@ -86,7 +86,7 @@ final class MusicController: ObservableObject {
             guard let self else { return }
             if integrations.contains("integration_music") {
                 if self.isMusicRunning(),
-                   UserDefaults.standard.bool(forKey: "coucou.musicAutomationGranted") {
+                   AppDefaults.store.bool(forKey: "coucou.musicAutomationGranted") {
                     self.fetchAndApply()
                 }
             } else if !self.isFeedOn {
@@ -267,7 +267,7 @@ final class MusicController: ObservableObject {
                     if code == -1743 {
                         Task { @MainActor in
                             AppState.shared.musicAutomationDenied = true
-                            UserDefaults.standard.set(false, forKey: "coucou.musicAutomationGranted")
+                            AppDefaults.store.set(false, forKey: "coucou.musicAutomationGranted")
                         }
                         cont.resume(returning: .denied)
                     } else {
@@ -276,7 +276,7 @@ final class MusicController: ObservableObject {
                     return
                 }
                 Task { @MainActor in
-                    UserDefaults.standard.set(true, forKey: "coucou.musicAutomationGranted")
+                    AppDefaults.store.set(true, forKey: "coucou.musicAutomationGranted")
                     AppState.shared.musicAutomationDenied = false
                 }
                 // Extract values on this queue before resuming (avoids NSAppleEventDescriptor Sendable issues)

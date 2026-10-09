@@ -59,12 +59,12 @@ enum PillColors {
 
     // UserDefaults key "pillColors"; missing or unusable → no colour chosen.
     static var stored: [String: String] {
-        get { parsed(UserDefaults.standard.dictionary(forKey: "pillColors")) }
+        get { parsed(AppDefaults.store.dictionary(forKey: "pillColors")) }
         set {
             if newValue.isEmpty {
-                UserDefaults.standard.removeObject(forKey: "pillColors")
+                AppDefaults.store.removeObject(forKey: "pillColors")
             } else {
-                UserDefaults.standard.set(newValue, forKey: "pillColors")
+                AppDefaults.store.set(newValue, forKey: "pillColors")
             }
         }
     }

@@ -16,7 +16,7 @@ struct ClaudeHost: Equatable {
     /// notch (they then wait for the notch). Off by default: the terminal asks itself.
     /// IDE sessions always get their cards.
     static let terminalCardsKey = "terminalCardsEnabled"
-    static var terminalCardsEnabled: Bool { UserDefaults.standard.bool(forKey: terminalCardsKey) }
+    static var terminalCardsEnabled: Bool { AppDefaults.store.bool(forKey: terminalCardsKey) }
 
     /// The terminal a session runs in, from its payload's bundle id or TERM_PROGRAM, or nil
     /// when it isn't a known terminal.

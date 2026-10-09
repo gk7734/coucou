@@ -18,14 +18,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         signal(SIGPIPE, SIG_IGN)
         // No Keychain warm-up: KeychainStore reads each key the first time it is needed.
         NSApp.setActivationPolicy(.accessory)
-        setupMenuBarItem()
+        // scripts/smoke.sh (DEBUG, COUCOU_SMOKE=1): the island and the hook server only,
+        // nothing that reaches the user's screen, menu bar, notifications or audio.
+        let smoke = AppPaths.isSmokeTest
+        if !smoke { setupMenuBarItem() }
         // Before the island (and its hook server): banners for session alerts, stall watch.
-        MacNotifier.shared.start()
+        if !smoke { MacNotifier.shared.start() }
         StallMonitor.shared.start()
         // "Something plays" listeners, and the visualizer's capture while it is shown.
-        SystemAudioCapture.start()
+        if !smoke { SystemAudioCapture.start() }
         setupIsland()
         #if DEBUG
+        if smoke { return }
         let debugMenu = NSMenu(title: "Debug")
         debugMenu.addItem(NSMenuItem(title: "Render recap image", action: #selector(renderRecapImage), keyEquivalent: ""))
         let debugMenuItem = NSMenuItem(title: "Debug", action: nil, keyEquivalent: "")
@@ -34,7 +38,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         VisualizerDebugFeed.shared.start()
         #endif
         #if PHONE_LINK
-        CloudProbe.shared.startIfEnabled()
+        if !smoke { CloudProbe.shared.startIfEnabled() }
         #endif
     }
 
@@ -93,7 +97,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     @objc private func openSettingsFromNotification(_ notification: Notification) {
         if let section = notification.object as? String {
-            UserDefaults.standard.set(section, forKey: "settingsSection")
+            AppDefaults.store.set(section, forKey: "settingsSection")
         }
         openSettings()
     }
@@ -191,14 +195,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let weekYear = cal.component(.yearForWeekOfYear, from: now)
         let weekNum  = cal.component(.weekOfYear,        from: now)
         let weekKey  = weekYear * 100 + weekNum
-        let lastShown = UserDefaults.standard.integer(forKey: "recapLastShownWeek")
+        let lastShown = AppDefaults.store.integer(forKey: "recapLastShownWeek")
         guard weekKey != lastShown else { return }
         guard RecapStore.shared.weeklySummary() != nil else { return }
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { [weak self] in
             let s = AppState.shared
             guard s.pendingApproval == nil, s.pendingQuestion == nil else { return }
             self?.islandController?.expand(to: .recap)
-            UserDefaults.standard.set(weekKey, forKey: "recapLastShownWeek")
+            AppDefaults.store.set(weekKey, forKey: "recapLastShownWeek")
         }
     }
 
@@ -209,6 +213,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         islandController?.showWindow(nil)
         islandController?.fsm.launch()
         HookServer.shared.start()
+        if AppPaths.isSmokeTest { return }   // no pollers, music or recap in a smoke-test run
         N8nPoller.shared.start()
         VercelPoller.shared.start()
         ResendPoller.shared.start()

@@ -16,6 +16,8 @@ final class SoundEngine {
     private var players: [String: [AVAudioPlayer]] = [:]
 
     private init() {
+        // A smoke-test run (AppPaths.isSmokeTest) is silent: no players, nothing plays.
+        if AppPaths.isSmokeTest { enabled = false; return }
         preload()
     }
 
@@ -28,8 +30,7 @@ final class SoundEngine {
     /// folder replaces it. ~/Library/Application Support/NotchBuddy/Sounds (in the App Store build,
     /// the same path inside the app's container).
     static var customFolder: URL? {
-        FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first?
-            .appendingPathComponent("NotchBuddy/Sounds", isDirectory: true)
+        AppPaths.supportDirectory.appendingPathComponent("Sounds", isDirectory: true)
     }
     private static let customExtensions = ["wav", "aiff", "aif", "caf", "m4a", "mp3"]
 

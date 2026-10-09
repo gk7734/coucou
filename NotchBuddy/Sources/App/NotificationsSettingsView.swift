@@ -8,12 +8,12 @@ import UserNotifications
 struct NotificationsSettingsView: View {
     @ObservedObject private var notifier = MacNotifier.shared
 
-    @AppStorage(NotificationSettings.enabledKey)  private var enabled  = true
-    @AppStorage(NotificationSettings.finishedKey) private var finished = true
-    @AppStorage(NotificationSettings.errorsKey)   private var errors   = true
-    @AppStorage(NotificationSettings.waitingKey)  private var waiting  = true
-    @AppStorage(NotificationSettings.stalledKey)  private var stalled  = true
-    @AppStorage(NotificationSettings.stallThresholdKey)
+    @AppStorage(NotificationSettings.enabledKey, store: AppDefaults.store)  private var enabled  = true
+    @AppStorage(NotificationSettings.finishedKey, store: AppDefaults.store) private var finished = true
+    @AppStorage(NotificationSettings.errorsKey, store: AppDefaults.store)   private var errors   = true
+    @AppStorage(NotificationSettings.waitingKey, store: AppDefaults.store)  private var waiting  = true
+    @AppStorage(NotificationSettings.stalledKey, store: AppDefaults.store)  private var stalled  = true
+    @AppStorage(NotificationSettings.stallThresholdKey, store: AppDefaults.store)
     private var stallMinutes = NotificationSettings.defaultStallMinutes
 
     var body: some View {

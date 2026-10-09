@@ -155,7 +155,7 @@ final class DesktopMochiController {
     /// Fly Mochi to the desktop if not there, or bring him back if he is.
     func flyOutOrHome() {
         if phase == .home {
-            UserDefaults.standard.set(true, forKey: DesktopMochiController.enabledKey)
+            AppDefaults.store.set(true, forKey: DesktopMochiController.enabledKey)
             launchFlyIfNeeded()
         } else if phase == .onDesktop {
             flyHome()
@@ -217,7 +217,7 @@ final class DesktopMochiController {
                 self.panel = p
                 self.phase = .onDesktop
                 AppState.shared.mochiOnDesktop = true
-                UserDefaults.standard.set(true, forKey: DesktopMochiController.enabledKey)
+                AppDefaults.store.set(true, forKey: DesktopMochiController.enabledKey)
                 self.persistPosition()
                 // Alert may have fired during the animation (observeAlerts skipped: phase wasn't .onDesktop)
                 let alertNow = AppState.shared.pendingApproval != nil || AppState.shared.pendingQuestion != nil
@@ -246,7 +246,7 @@ final class DesktopMochiController {
     /// Fly a new panel from the notch to the saved desktop position.
     /// Called by AppDelegate after `.greetComplete`, and by the alert-return path.
     func launchFlyIfNeeded() {
-        guard UserDefaults.standard.bool(forKey: DesktopMochiController.enabledKey) else { return }
+        guard AppDefaults.store.bool(forKey: DesktopMochiController.enabledKey) else { return }
         guard phase == .home else { return }
         guard panel == nil else { return }
         // Alert active: don't fly yet — park in .atNotchForAlert so observeAlerts restores us when it clears
@@ -293,7 +293,7 @@ final class DesktopMochiController {
             Task { @MainActor in
                 self.panel = p
                 self.phase = .onDesktop
-                UserDefaults.standard.set(true, forKey: DesktopMochiController.enabledKey)
+                AppDefaults.store.set(true, forKey: DesktopMochiController.enabledKey)
                 self.persistPosition()
                 // Alert may have fired during the flight (observeAlerts skipped: phase was .flyingOut)
                 let alertNow = AppState.shared.pendingApproval != nil || AppState.shared.pendingQuestion != nil
@@ -402,7 +402,7 @@ final class DesktopMochiController {
         isDragging = false
         isSleeping = false
         AppState.shared.mochiOnDesktop = false
-        UserDefaults.standard.set(false, forKey: DesktopMochiController.enabledKey)
+        AppDefaults.store.set(false, forKey: DesktopMochiController.enabledKey)
     }
 
     // MARK: - Panel factory
@@ -706,7 +706,7 @@ final class DesktopMochiController {
     }
 
     private func loadSavedPosition() -> NSPoint {
-        let ud = UserDefaults.standard
+        let ud = AppDefaults.store
         guard ud.object(forKey: DesktopMochiController.posXKey) != nil else {
             return defaultPosition()
         }
@@ -725,7 +725,7 @@ final class DesktopMochiController {
     private func persistPosition() {
         guard let p = panel else { return }
         let o = p.frame.origin
-        UserDefaults.standard.set(Double(o.x), forKey: DesktopMochiController.posXKey)
-        UserDefaults.standard.set(Double(o.y), forKey: DesktopMochiController.posYKey)
+        AppDefaults.store.set(Double(o.x), forKey: DesktopMochiController.posXKey)
+        AppDefaults.store.set(Double(o.y), forKey: DesktopMochiController.posYKey)
     }
 }

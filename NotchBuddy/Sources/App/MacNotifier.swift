@@ -59,7 +59,7 @@ final class MacNotifier: NSObject, ObservableObject {
             frontmostBundleId: NSWorkspace.shared.frontmostApplication?.bundleIdentifier,
             islandPillId: state.mode == .expanded ? state.focusId : nil,
             now: now)
-        let decision = NotificationPolicy.decide(alert, settings: NotificationSettings(defaults: .standard),
+        let decision = NotificationPolicy.decide(alert, settings: NotificationSettings(defaults: AppDefaults.store),
                                                  context: context, names: names, ledger: ledger)
         let id = NotificationPolicy.identifier(pillId: alert.pillId, sessionId: alert.sessionId)
         switch decision {

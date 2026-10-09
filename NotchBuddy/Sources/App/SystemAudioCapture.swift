@@ -85,7 +85,7 @@ final class SystemAudioCapture: @unchecked Sendable {
     }
 
     private static func settingEnabled() -> Bool {
-        UserDefaults.standard.object(forKey: "visualizerEnabled") as? Bool ?? true
+        AppDefaults.store.object(forKey: "visualizerEnabled") as? Bool ?? true
     }
 
     /// Brings the listeners and the capture in line with the setting and `wanted`.
@@ -462,7 +462,7 @@ private final class TapSession: @unchecked Sendable {
     /// the raw band dB and the published levels go to /tmp/coucou-spectrum.log (tuning aid).
     private func debugLogFrame() {
         debugFrame += 1
-        guard debugFrame % 15 == 0, UserDefaults.standard.bool(forKey: "debugLogSpectrum") else { return }
+        guard debugFrame % 15 == 0, AppDefaults.store.bool(forKey: "debugLogSpectrum") else { return }
         let db = analyzer.decibels.map { String(format: "%6.1f", $0) }.joined(separator: " ")
         let lv = analyzer.levels.map { String(format: "%.2f", $0) }.joined(separator: " ")
         let line = "dB [\(db)]  levels [\(lv)]\n"

@@ -26,7 +26,7 @@ final class LiveActivityRelay {
     /// The deployed relay (relay/README.md).
     static let defaultRelayURL = "https://coucou-relay.raillelouis.workers.dev"
 
-    static var isEnabled: Bool { UserDefaults.standard.bool(forKey: enabledKey) }
+    static var isEnabled: Bool { AppDefaults.store.bool(forKey: enabledKey) }
 
     private struct Phone {
         var env: String
@@ -64,14 +64,14 @@ final class LiveActivityRelay {
     private var doneTask: Task<Void, Never>?
 
     private var relayURL: URL? {
-        let value = UserDefaults.standard.string(forKey: Self.relayURLKey) ?? Self.defaultRelayURL
+        let value = AppDefaults.store.string(forKey: Self.relayURLKey) ?? Self.defaultRelayURL
         return value.isEmpty ? nil : URL(string: value)?.appendingPathComponent("v1/live-activity")
     }
 
     // MARK: Lifecycle
 
     func setEnabled(_ on: Bool) {
-        UserDefaults.standard.set(on, forKey: Self.enabledKey)
+        AppDefaults.store.set(on, forKey: Self.enabledKey)
         if on && CloudProbe.isEnabled { start() } else { stop() }
     }
 

@@ -60,11 +60,11 @@ enum Outfit: String, CaseIterable {
     // UserDefaults key "mochiOutfit", default "auto", unknown value → .auto
     static var stored: Outfit {
         get {
-            let raw = UserDefaults.standard.string(forKey: "mochiOutfit") ?? "auto"
+            let raw = AppDefaults.store.string(forKey: "mochiOutfit") ?? "auto"
             return Outfit(rawValue: raw) ?? .auto
         }
         set {
-            UserDefaults.standard.set(newValue.rawValue, forKey: "mochiOutfit")
+            AppDefaults.store.set(newValue.rawValue, forKey: "mochiOutfit")
         }
     }
 }

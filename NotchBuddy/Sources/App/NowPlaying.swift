@@ -54,7 +54,7 @@ final class NowPlayingCenter {
     /// UserDefaults: show music automatically, without a pill in Active pills (default on).
     static let autoMusicKey = "autoMusicEnabled"
     static var autoMusicEnabled: Bool {
-        UserDefaults.standard.object(forKey: autoMusicKey) as? Bool ?? true
+        AppDefaults.store.object(forKey: autoMusicKey) as? Bool ?? true
     }
 
     /// The latest state of every source that reported, by source.
@@ -94,7 +94,7 @@ final class AudioSpectrum {
     /// UserDefaults: show the visualizer (default on). Off: no audio capture at all.
     static let visualizerKey = "visualizerEnabled"
     static var visualizerEnabled: Bool {
-        UserDefaults.standard.object(forKey: visualizerKey) as? Bool ?? true
+        AppDefaults.store.object(forKey: visualizerKey) as? Bool ?? true
     }
 
     static let bandCount = 12
