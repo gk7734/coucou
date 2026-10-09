@@ -19,8 +19,8 @@ import CloudKit
 final class CloudProbe {
     static let shared = CloudProbe()
 
-    static let containerID = "iCloud.fr.louisraille.Coucou"
-    static let zoneID = CKRecordZone.ID(zoneName: "Coucou", ownerName: CKCurrentUserDefaultName)
+    static let containerID = CloudSchema.containerID
+    static let zoneID = CKRecordZone.ID(zoneName: CloudSchema.zoneName, ownerName: CKCurrentUserDefaultName)
     private static let subscriptionID = "coucou-zone-mac"
 
     private let container = CKContainer(identifier: CloudProbe.containerID)
@@ -161,7 +161,7 @@ final class CloudProbe {
     private func pingTick() async {
         guard await prepare() else { return }
         pingCount += 1
-        let record = CKRecord(recordType: "Ping",
+        let record = CKRecord(recordType: CloudSchema.RecordType.ping,
                               recordID: CKRecord.ID(recordName: UUID().uuidString, zoneID: Self.zoneID))
         let sentAt = Date()
         record["macName"] = macName
@@ -216,7 +216,7 @@ final class CloudProbe {
     }
 
     private func handle(_ record: CKRecord, source: String) {
-        guard record.recordType == "Pong" else { return }
+        guard record.recordType == CloudSchema.RecordType.pong else { return }
         let id = record.recordID.recordName
         guard !seenPongs.contains(id) else { return }
         seenPongs.insert(id)

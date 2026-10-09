@@ -63,6 +63,7 @@
 		2A30FA2F046492E22A1C5719 /* ServiceDetail.swift in Sources */ = {isa = PBXBuildFile; fileRef = 65F64746B2740D5FE26B7E5A /* ServiceDetail.swift */; };
 		2C798C3837A63B9BB561A1A0 /* HookServer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 79D8DD79C3DD9BBC584B3CB2 /* HookServer.swift */; };
 		2CC2E3B688B15BBEB3AE3BCE /* WindowContextCapture.swift in Sources */ = {isa = PBXBuildFile; fileRef = E91B733ADC638E14E9BB6EFA /* WindowContextCapture.swift */; };
+		2DC8BC5E46C2A2827DBF0FFB /* CloudSchema.swift in Sources */ = {isa = PBXBuildFile; fileRef = 977A280276BC2C882FD7C13E /* CloudSchema.swift */; };
 		2DEB459FBD0BA3CEAAA5FDE9 /* ClaudeService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A83D5410BD030B243ADDCFF4 /* ClaudeService.swift */; };
 		2F36E3C6C073E968A682AFA4 /* NotionPoller.swift in Sources */ = {isa = PBXBuildFile; fileRef = BE03E03D1804B0B92C5C2DAD /* NotionPoller.swift */; };
 		3756B7E1A55D9CEC8C4D34A4 /* IslandStateMachine.swift in Sources */ = {isa = PBXBuildFile; fileRef = D8212018F09EA1E96FBD63CD /* IslandStateMachine.swift */; };
@@ -131,6 +132,8 @@
 		78B3C6814431B2DD9D1F4949 /* SoundEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1BE21C2B315D37AA70ED45E9 /* SoundEngine.swift */; };
 		78F045A55E6F4EEA5787EEEF /* MochiStill.swift in Sources */ = {isa = PBXBuildFile; fileRef = 045E7300878138F0AC385920 /* MochiStill.swift */; };
 		78FCEDC8F78B683AB10E6529 /* NotionPoller.swift in Sources */ = {isa = PBXBuildFile; fileRef = BE03E03D1804B0B92C5C2DAD /* NotionPoller.swift */; };
+		795CE815BDF3CCA3254D3D9A /* CloudSchema.swift in Sources */ = {isa = PBXBuildFile; fileRef = 977A280276BC2C882FD7C13E /* CloudSchema.swift */; };
+		7A1217318BD0BE499C34D2BA /* CloudSchema.swift in Sources */ = {isa = PBXBuildFile; fileRef = 977A280276BC2C882FD7C13E /* CloudSchema.swift */; };
 		7A449E237CAAB62758508C7C /* RecapStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 78FB882D49084DEA6A10DB4D /* RecapStore.swift */; };
 		7AEED9FBB924F0DD1D07E1A5 /* Localizable.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = B2AA83D80260660475FAB052 /* Localizable.xcstrings */; };
 		7C75CCB3DC0116D8D3B12313 /* AskQuestion.swift in Sources */ = {isa = PBXBuildFile; fileRef = EBB84A66045EB20CAC93A8A6 /* AskQuestion.swift */; };
@@ -198,6 +201,7 @@
 		B3EC9CF3C8BD629C3530E8F1 /* sounds in Resources */ = {isa = PBXBuildFile; fileRef = C066E2B991AA4F56B2724263 /* sounds */; };
 		B5D8D34DD7A72F340030EF46 /* MacStubs.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9B66D0C664FB9FF74517AAF5 /* MacStubs.swift */; };
 		B605F976F4141435F27CF266 /* IslandRootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 15A1A8206F73376F4CAF2057 /* IslandRootView.swift */; };
+		B608539B2273B7D32FA77EB7 /* CloudSchema.swift in Sources */ = {isa = PBXBuildFile; fileRef = 977A280276BC2C882FD7C13E /* CloudSchema.swift */; };
 		B69DE31E2B0C2E35594CAA87 /* RecapStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 78FB882D49084DEA6A10DB4D /* RecapStore.swift */; };
 		B733A76DD197F6D6D949284C /* HotKeyCenter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1218B86E249691AF44F819AC /* HotKeyCenter.swift */; };
 		B7C93262AA9D5DEAA0B79C7C /* MacStubs.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9B66D0C664FB9FF74517AAF5 /* MacStubs.swift */; };
@@ -211,6 +215,7 @@
 		C0E18D0F6F5F6D131E6066B8 /* GreetingCanvasView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C581F7B1A9F14B281B60063E /* GreetingCanvasView.swift */; };
 		C18227D148D99FE6EE3CC51A /* GithubPoller.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8CB8B6E5E9DA6164F979E88F /* GithubPoller.swift */; };
 		C209B71CDC296F561F10A443 /* ServiceSnapshot.swift in Sources */ = {isa = PBXBuildFile; fileRef = 84ECC59BE7CDDEE348FC7096 /* ServiceSnapshot.swift */; };
+		C2DD2EE9478E740DF9890F4D /* CloudSchema.swift in Sources */ = {isa = PBXBuildFile; fileRef = 977A280276BC2C882FD7C13E /* CloudSchema.swift */; };
 		C3D39D96E087E98F8BF59226 /* LastTurnView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 112D2BD70628CD67ACDD18AF /* LastTurnView.swift */; };
 		C3ECA730677F467D28910AF6 /* LiveActivityRelay.swift in Sources */ = {isa = PBXBuildFile; fileRef = 136626568FF0C3EAB1D08067 /* LiveActivityRelay.swift */; };
 		C5549C2D60998E297A7DC593 /* TurnSnapshot.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2A1C4152EBDBD7C24CABFFD7 /* TurnSnapshot.swift */; };
@@ -398,6 +403,7 @@
 		9466FDE02C9B3FB4EF01DFF8 /* IslandScreenGeometry.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IslandScreenGeometry.swift; sourceTree = "<group>"; };
 		966DCEEC903061A89ABE0CAF /* AgentHookConfig.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentHookConfig.swift; sourceTree = "<group>"; };
 		96C64C4C5D705CE486221B74 /* PillCatalog.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PillCatalog.swift; sourceTree = "<group>"; };
+		977A280276BC2C882FD7C13E /* CloudSchema.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CloudSchema.swift; sourceTree = "<group>"; };
 		9AF705275522F99CAE7E1429 /* ServiceStatus.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ServiceStatus.swift; sourceTree = "<group>"; };
 		9B66D0C664FB9FF74517AAF5 /* MacStubs.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MacStubs.swift; sourceTree = "<group>"; };
 		9F6D7015D6A77AA59323C0E7 /* AppLog.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppLog.swift; sourceTree = "<group>"; };
@@ -660,6 +666,7 @@
 			isa = PBXGroup;
 			children = (
 				66E6F5FC81429871B6F766A8 /* BotEngine.swift */,
+				977A280276BC2C882FD7C13E /* CloudSchema.swift */,
 				8ACB4350729C6513824D1ADF /* ColorHex.swift */,
 				B32FB972D02162720E566674 /* DiffEngine.swift */,
 				9466FDE02C9B3FB4EF01DFF8 /* IslandScreenGeometry.swift */,
@@ -884,6 +891,7 @@
 				2DEB459FBD0BA3CEAAA5FDE9 /* ClaudeService.swift in Sources */,
 				88C3F0A4F3AE29DBED8710A0 /* ClaudeSettingsFile.swift in Sources */,
 				D45D9C8EAF67FC2F46E9F352 /* CloudProbe.swift in Sources */,
+				795CE815BDF3CCA3254D3D9A /* CloudSchema.swift in Sources */,
 				9AD370335A3ECC9C82375F93 /* CodexPlanGauge.swift in Sources */,
 				EE3AB10544113500486A9684 /* ColorHex.swift in Sources */,
 				B0CE5AC8B579866A14BD61D0 /* DemoEngine.swift in Sources */,
@@ -960,6 +968,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				6D71A1FA10C766E465F326D4 /* BotEngine.swift in Sources */,
+				2DC8BC5E46C2A2827DBF0FFB /* CloudSchema.swift in Sources */,
 				6B4A9D635FD529CE1C2692B8 /* ColorHex.swift in Sources */,
 				8E9A18333EE821A3CF9F7E34 /* DiffEngine.swift in Sources */,
 				73BD92A06DA7C72FFF26DD0F /* IslandScreenGeometry.swift in Sources */,
@@ -989,6 +998,7 @@
 				40473EEC3029D466B2769672 /* AppleStyle.swift in Sources */,
 				9492F8E414E8E1814F01EE66 /* ApprovalCard.swift in Sources */,
 				ED484F8DAC497C77F3E81F0E /* BotEngine.swift in Sources */,
+				7A1217318BD0BE499C34D2BA /* CloudSchema.swift in Sources */,
 				607E548D1DD274CD73FDC290 /* ColorHex.swift in Sources */,
 				8AC19BAF88822CB31519D447 /* CoucouIntents.swift in Sources */,
 				EF9E6418C3F39F6FE88FD812 /* CoucouPhoneApp.swift in Sources */,
@@ -1056,6 +1066,7 @@
 				0329E76BA4A8FEEA8A6D76E7 /* ClaudeService.swift in Sources */,
 				D9EEB1079ACBCEEF74439C44 /* ClaudeSettingsFile.swift in Sources */,
 				FDF87CF7C5F703EDD9A7CC14 /* CloudProbe.swift in Sources */,
+				B608539B2273B7D32FA77EB7 /* CloudSchema.swift in Sources */,
 				EB1D9680D3DB0F0707D4A043 /* CodexPlanGauge.swift in Sources */,
 				9ECEE890D4486B6E83BD5B7F /* ColorHex.swift in Sources */,
 				F157D7A9BF878DB2B286B1F7 /* DemoEngine.swift in Sources */,
@@ -1132,6 +1143,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				81250AE3E83493CF806D459B /* BotEngine.swift in Sources */,
+				C2DD2EE9478E740DF9890F4D /* CloudSchema.swift in Sources */,
 				924CE1172B5572DA3E45A7C9 /* ColorHex.swift in Sources */,
 				724E602A05FE5A6D58218E27 /* CoucouControl.swift in Sources */,
 				875FB3F71BD34B53B0524063 /* CoucouWidgets.swift in Sources */,

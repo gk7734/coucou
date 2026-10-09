@@ -59,8 +59,8 @@ struct ServiceDetail: Codable, Equatable, Sendable {
     var error: String? = nil
     var lastAction: ServiceActionResult? = nil
 
-    static let recordType = "ServiceDetail"
-    static let requestType = "ServiceAction"
+    static let recordType = CloudSchema.RecordType.serviceDetail
+    static let requestType = CloudSchema.RecordType.serviceAction
     static let refreshKind = "refresh"
 
     static func recordName(for pillId: String) -> String { "detail-\(pillId)" }

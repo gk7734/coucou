@@ -16,7 +16,7 @@ import Combine
 final class QuestionRelay {
     static let shared = QuestionRelay()
 
-    private let container = CKContainer(identifier: "iCloud.fr.louisraille.Coucou")
+    private let container = CKContainer(identifier: CloudSchema.containerID)
     private var database: CKDatabase { container.privateCloudDatabase }
     private var zoneID: CKRecordZone.ID { SessionSnapshot.zoneID }
 
@@ -70,7 +70,7 @@ final class QuestionRelay {
             while more {
                 let changes = try await database.recordZoneChanges(inZoneWith: zoneID, since: changeToken)
                 for (id, result) in changes.modificationResultsByID {
-                    guard case .success(let mod) = result, mod.record.recordType == "Answer" else { continue }
+                    guard case .success(let mod) = result, mod.record.recordType == CloudSchema.RecordType.answer else { continue }
                     let record = mod.record
                     let answeredAt = record["answeredAt"] as? Date ?? .distantPast
                     guard answeredAt >= since.addingTimeInterval(-5) else { continue }

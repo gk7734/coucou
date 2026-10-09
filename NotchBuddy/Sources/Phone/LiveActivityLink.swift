@@ -76,7 +76,7 @@ final class LiveActivityLink {
     }
 
     private func save() async {
-        let record = CKRecord(recordType: "PhoneToken", recordID: recordID)
+        let record = CKRecord(recordType: CloudSchema.RecordType.phoneToken, recordID: recordID)
         record["env"] = apnsEnvironment
         record["activityId"] = activityID
         record["updatedAt"] = Date()

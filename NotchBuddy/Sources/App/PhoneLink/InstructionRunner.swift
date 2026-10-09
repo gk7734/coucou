@@ -66,7 +66,7 @@ final class InstructionRunner {
             while more {
                 let changes = try await database.recordZoneChanges(inZoneWith: SessionSnapshot.zoneID, since: changeToken)
                 for (_, result) in changes.modificationResultsByID {
-                    if case .success(let mod) = result, mod.record.recordType == "Instruction" { found.append(mod.record) }
+                    if case .success(let mod) = result, mod.record.recordType == CloudSchema.RecordType.instruction { found.append(mod.record) }
                 }
                 changeToken = changes.changeToken
                 more = changes.moreComing

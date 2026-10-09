@@ -18,7 +18,7 @@ import Combine
 final class SessionPublisher {
     static let shared = SessionPublisher()
 
-    private let container = CKContainer(identifier: "iCloud.fr.louisraille.Coucou")
+    private let container = CKContainer(identifier: CloudSchema.containerID)
     private var database: CKDatabase { container.privateCloudDatabase }
     private var cancellable: AnyCancellable?
 
@@ -157,7 +157,7 @@ final class SessionPublisher {
 /// The part of an AgentTask the iPhone needs. Equatable so unchanged sessions
 /// are not rewritten.
 struct SessionSnapshot: Equatable {
-    static let recordType = "Session"
+    static let recordType = CloudSchema.RecordType.session
 
     let pillId: String
     let name: String
@@ -211,7 +211,7 @@ struct SessionSnapshot: Equatable {
 
     /// Same zone as CloudProbe.zoneID, rebuilt here because that one is main-actor isolated.
     static var zoneID: CKRecordZone.ID {
-        CKRecordZone.ID(zoneName: "Coucou", ownerName: CKCurrentUserDefaultName)
+        CKRecordZone.ID(zoneName: CloudSchema.zoneName, ownerName: CKCurrentUserDefaultName)
     }
 
     static func recordID(for pillId: String) -> CKRecord.ID {

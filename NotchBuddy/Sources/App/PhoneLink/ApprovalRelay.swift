@@ -21,7 +21,7 @@ import CryptoKit
 final class ApprovalRelay {
     static let shared = ApprovalRelay()
 
-    private let container = CKContainer(identifier: "iCloud.fr.louisraille.Coucou")
+    private let container = CKContainer(identifier: CloudSchema.containerID)
     private var database: CKDatabase { container.privateCloudDatabase }
     private var zoneID: CKRecordZone.ID { SessionSnapshot.zoneID }
 
@@ -85,7 +85,7 @@ final class ApprovalRelay {
     }
 
     private func publishRequest(_ approval: ApprovalInfo, fingerprint: String) async {
-        let record = CKRecord(recordType: "ApprovalRequest", recordID: requestID(fingerprint))
+        let record = CKRecord(recordType: CloudSchema.RecordType.approvalRequest, recordID: requestID(fingerprint))
         record["pillId"] = approval.pillId
         record["fingerprint"] = fingerprint
         record["createdAt"] = Date()
@@ -110,7 +110,7 @@ final class ApprovalRelay {
             while more {
                 let changes = try await database.recordZoneChanges(inZoneWith: zoneID, since: changeToken)
                 for (id, result) in changes.modificationResultsByID {
-                    guard case .success(let mod) = result, mod.record.recordType == "Decision" else { continue }
+                    guard case .success(let mod) = result, mod.record.recordType == CloudSchema.RecordType.decision else { continue }
                     let record = mod.record
                     let decidedAt = record["decidedAt"] as? Date ?? .distantPast
                     guard decidedAt >= since.addingTimeInterval(-5) else { continue }

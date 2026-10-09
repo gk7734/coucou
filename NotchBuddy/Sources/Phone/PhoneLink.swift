@@ -75,8 +75,8 @@ final class PhoneLink {
         case failed(String)
     }
 
-    static let containerID = "iCloud.fr.louisraille.Coucou"
-    static let zoneID = CKRecordZone.ID(zoneName: "Coucou", ownerName: CKCurrentUserDefaultName)
+    static let containerID = CloudSchema.containerID
+    static let zoneID = CKRecordZone.ID(zoneName: CloudSchema.zoneName, ownerName: CKCurrentUserDefaultName)
     private static let subscriptionID = "coucou-zone-phone-silent"
     /// Step 1's subscription showed a "Ping from your Mac" banner. A saved
     /// subscription keeps its notification settings, so it is deleted rather than reused.
@@ -171,7 +171,7 @@ final class PhoneLink {
     private func subscribeToApprovals() async {
         // A saved subscription keeps its sound: one ID per sound, the other one is deleted.
         let mochi = PhoneSettings.mochiSounds
-        let approvals = CKQuerySubscription(recordType: "ApprovalRequest", predicate: NSPredicate(value: true),
+        let approvals = CKQuerySubscription(recordType: CloudSchema.RecordType.approvalRequest, predicate: NSPredicate(value: true),
                                             subscriptionID: mochi ? "coucou-approvals-mochi" : "coucou-approvals",
                                             options: [.firesOnRecordCreation])
         approvals.zoneID = Self.zoneID
@@ -191,7 +191,7 @@ final class PhoneLink {
         } catch {
             // In the Development environment a query subscription needs the
             // record type to exist: create it once with a throwaway record.
-            let seed = CKRecord(recordType: "ApprovalRequest",
+            let seed = CKRecord(recordType: CloudSchema.RecordType.approvalRequest,
                                 recordID: CKRecord.ID(recordName: "approval-schema", zoneID: Self.zoneID))
             seed["pillId"] = ""
             seed["fingerprint"] = ""
@@ -223,7 +223,7 @@ final class PhoneLink {
                 for (_, result) in changes.modificationResultsByID {
                     if case .success(let mod) = result, add(mod.record) { gotNew = true }
                 }
-                for deletion in changes.deletions where deletion.recordType == "Session" {
+                for deletion in changes.deletions where deletion.recordType == CloudSchema.RecordType.session {
                     sessions.removeAll { "session-\($0.id)" == deletion.recordID.recordName }
                     gotNew = true
                 }
@@ -282,7 +282,7 @@ final class PhoneLink {
             services[snapshot.pillId] = snapshot
             return true
         }
-        if record.recordType == "Session" {
+        if record.recordType == CloudSchema.RecordType.session {
             let item = SessionItem(record: record)
             // Services used to come as sessions; they have their own records now.
             guard PillCatalog.isSession(item.id) else { return false }
@@ -292,7 +292,7 @@ final class PhoneLink {
             sessions.sort { $0.updatedAt > $1.updatedAt }
             return true
         }
-        guard record.recordType == "Ping",
+        guard record.recordType == CloudSchema.RecordType.ping,
               !pings.contains(where: { $0.id == record.recordID }) else { return false }
         pings.append(PingItem(
             id: record.recordID,
@@ -411,7 +411,7 @@ final class PhoneLink {
     /// Answers the question a session waits on. The Mac takes it within ~2 s,
     /// only if it is still the same question and the picks are among its choices.
     func answer(fingerprint: String, pillId: String, selections: [[String]]) async -> Bool {
-        let record = CKRecord(recordType: "Answer",
+        let record = CKRecord(recordType: CloudSchema.RecordType.answer,
                               recordID: CKRecord.ID(recordName: "answer-\(UUID().uuidString)", zoneID: Self.zoneID))
         record["fingerprint"] = fingerprint
         record["pillId"] = pillId
@@ -482,7 +482,7 @@ final class PhoneLink {
     /// Sends an instruction to continue a session on the Mac. The Mac takes it
     /// within ~15 s and deletes it; it never runs twice.
     func sendInstruction(_ text: String, pillId: String) async -> Bool {
-        let record = CKRecord(recordType: "Instruction",
+        let record = CKRecord(recordType: CloudSchema.RecordType.instruction,
                               recordID: CKRecord.ID(recordName: "instruction-\(UUID().uuidString)", zoneID: Self.zoneID))
         record["pillId"] = pillId
         record["createdAt"] = Date()
@@ -508,7 +508,7 @@ final class PhoneLink {
     /// Sends allow / deny for one exact request. The Mac applies it only if the
     /// fingerprint still matches the request it is waiting on.
     func decide(_ decision: Decision, fingerprint: String, pillId: String, summary: String) async -> Bool {
-        let record = CKRecord(recordType: "Decision",
+        let record = CKRecord(recordType: CloudSchema.RecordType.decision,
                               recordID: CKRecord.ID(recordName: "decision-\(UUID().uuidString)", zoneID: Self.zoneID))
         record["fingerprint"] = fingerprint
         record["pillId"] = pillId
@@ -548,7 +548,7 @@ final class PhoneLink {
     /// Writes a Pong linked to the latest Ping.
     func sendPong() async {
         guard let ping = pings.first else { return }
-        let record = CKRecord(recordType: "Pong",
+        let record = CKRecord(recordType: CloudSchema.RecordType.pong,
                               recordID: CKRecord.ID(recordName: UUID().uuidString, zoneID: Self.zoneID))
         let repliedAt = Date()
         record["ping"] = CKRecord.Reference(recordID: ping.id, action: .none)

@@ -33,7 +33,7 @@ struct ServiceSnapshot: Codable, Equatable, Sendable {
     var sections: [ServiceSection]
     var updatedAt: Date
 
-    static let recordType = "Service"
+    static let recordType = CloudSchema.RecordType.service
 
     static func recordName(for pillId: String) -> String { "service-\(pillId)" }
 

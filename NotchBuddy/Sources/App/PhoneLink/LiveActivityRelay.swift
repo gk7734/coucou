@@ -358,7 +358,7 @@ final class LiveActivityRelay {
             while more {
                 let changes = try await database.recordZoneChanges(inZoneWith: CloudProbe.zoneID, since: changeToken)
                 for (id, result) in changes.modificationResultsByID {
-                    guard case .success(let mod) = result, mod.record.recordType == "PhoneToken" else { continue }
+                    guard case .success(let mod) = result, mod.record.recordType == CloudSchema.RecordType.phoneToken else { continue }
                     let record = mod.record
                     phones[id.recordName] = Phone(
                         env: record["env"] as? String ?? "production",
@@ -366,7 +366,7 @@ final class LiveActivityRelay {
                         updateToken: record.encryptedValues["updateToken"] as? String ?? "",
                         updatedAt: record["updatedAt"] as? Date ?? .distantPast)
                 }
-                for deletion in changes.deletions where deletion.recordType == "PhoneToken" {
+                for deletion in changes.deletions where deletion.recordType == CloudSchema.RecordType.phoneToken {
                     phones[deletion.recordID.recordName] = nil
                 }
                 changeToken = changes.changeToken

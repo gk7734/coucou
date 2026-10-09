@@ -45,7 +45,7 @@ struct TurnSnapshot: Codable, Equatable, Sendable {
     var startedAt: Date
     var endedAt: Date?
 
-    static let recordType = "Turn"
+    static let recordType = CloudSchema.RecordType.turn
 
     static func recordName(for pillId: String) -> String { "turn-\(pillId)" }
 
