@@ -8,7 +8,7 @@ import CloudKit
 // your OK, with the agent and the command. The Review and Deny buttons stay
 // the system's, under this view.
 
-final class NotificationViewController: UIViewController, @preconcurrency UNNotificationContentExtension {
+final class NotificationViewController: UIViewController, UNNotificationContentExtension {
     private let host = UIHostingController(rootView: ApprovalNotificationView(pillId: "integration_claude", title: "", message: ""))
 
     override func viewDidLoad() {
