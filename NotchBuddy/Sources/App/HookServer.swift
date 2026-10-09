@@ -1465,7 +1465,7 @@ final class HookServer: @unchecked Sendable {
         let snapshot = try ClaudeSettingsFile.read(at: url)
         let merged = try AgentHookConfig.claudeInstalling(into: snapshot.object, command: command,
                                                           name: url.lastPathComponent)
-        return (try AgentHookConfig.encoded(merged, escapingSlashes: true), snapshot.bytes)
+        return (try AgentHookConfig.encoded(merged), snapshot.bytes)
     }
 
     /// settings.json without Coucou's hooks, or nil when there are none to remove.
@@ -1473,7 +1473,7 @@ final class HookServer: @unchecked Sendable {
         let snapshot = try ClaudeSettingsFile.read(at: url)
         guard let hooks = snapshot.object["hooks"] as? [String: Any], containsCoucouHook(inEvents: hooks),
               let cleaned = AgentHookConfig.claudeRemoving(from: snapshot.object) else { return nil }
-        return (try AgentHookConfig.encoded(cleaned, escapingSlashes: true), snapshot.bytes)
+        return (try AgentHookConfig.encoded(cleaned), snapshot.bytes)
     }
 
     /// Returns true if settings.json has a Coucou hook that needs updating:
@@ -1505,7 +1505,22 @@ final class HookServer: @unchecked Sendable {
         pendingClaudeHooks = PendingFileChange(url: url, label: "~/.claude/settings.json",
                                                data: change.data, original: change.original)
         pendingClaudeHooksInstall = install
-        return String(data: change.data, encoding: .utf8) ?? ""
+        let newText = String(data: change.data, encoding: .utf8) ?? ""
+        pendingClaudeHooksDiff = Self.settingsDiff(original: change.original, newText: newText)
+        return newText
+    }
+
+    /// The previewed change as a line diff against the current file, re-encoded the same way
+    /// so only Coucou's own lines show (nil when there is no current file or it is too big).
+    private(set) var pendingClaudeHooksDiff: FileDiff?
+
+    private static func settingsDiff(original: Data?, newText: String) -> FileDiff? {
+        guard let original,
+              let object = (try? JSONSerialization.jsonObject(with: original)) as? [String: Any],
+              let oldData = try? AgentHookConfig.encoded(object),
+              let oldText = String(data: oldData, encoding: .utf8) else { return nil }
+        let diff = DiffEngine.fromEdit(old: oldText, new: newText, path: "settings.json")
+        return diff.tooLarge ? nil : diff
     }
 
     /// Writes the previewed settings.json (call after the user confirms the preview).

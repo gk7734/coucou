@@ -591,10 +591,22 @@ struct SettingsView: View {
 
                 #if !APPSTORE
                 if showDiff {
+                    // What the write will do, then only the lines it changes.
+                    let installing = HookServer.shared.pendingClaudeHooksInstall
+                    let diff = HookServer.shared.pendingClaudeHooksDiff
+                    Text(installing
+                         ? "Install: adds Coucou's hooks to ~/.claude/settings.json. Everything else stays as it is."
+                         : "Uninstall: removes only Coucou's hooks from ~/.claude/settings.json.")
+                        .font(.system(size: 11, weight: .semibold))
+                        .fixedSize(horizontal: false, vertical: true)
                     ScrollView {
-                        Text(pendingHookJSON)
-                            .font(.system(size: 10, design: .monospaced))
-                            .frame(maxWidth: .infinity, alignment: .leading)
+                        if let diff {
+                            SettingsDiffLines(diff: diff)
+                        } else {
+                            Text(pendingHookJSON)
+                                .font(.system(size: 10, design: .monospaced))
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                        }
                     }
                     .frame(height: 140)
                     .background(Color(NSColor.textBackgroundColor))
@@ -2064,5 +2076,49 @@ struct ShortcutRecorderButton: View {
             34:"I", 37:"L", 38:"J", 40:"K", 45:"N", 46:"M", 49:"Space", 50:"`", 27:"-"
         ]
         return map[c] ?? "·"
+    }
+}
+
+
+/// A settings file change as diff lines: + green, − red, a little context in grey,
+/// "…" between hunks.
+struct SettingsDiffLines: View {
+    let diff: FileDiff
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            Text("+\(diff.added) −\(diff.removed) lines")
+                .font(.system(size: 10, design: .monospaced))
+                .foregroundColor(.secondary)
+                .padding(.bottom, 4)
+            ForEach(Array(diff.hunks.enumerated()), id: \.offset) { index, hunk in
+                if index > 0 {
+                    Text("…").font(.system(size: 10, design: .monospaced)).foregroundColor(.secondary)
+                }
+                ForEach(Array(hunk.lines.enumerated()), id: \.offset) { _, line in
+                    Text(verbatim: prefix(line.kind) + line.text)
+                        .font(.system(size: 10, design: .monospaced))
+                        .foregroundColor(color(line.kind))
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .background(background(line.kind))
+                }
+            }
+        }
+        .padding(6)
+        .textSelection(.enabled)
+    }
+
+    private func prefix(_ kind: DiffLine.Kind) -> String {
+        switch kind { case .added: "+ "; case .removed: "− "; case .context: "  " }
+    }
+    private func color(_ kind: DiffLine.Kind) -> Color {
+        switch kind { case .added: Color(hex: "#34D399"); case .removed: Color(hex: "#F4505E"); case .context: .secondary }
+    }
+    private func background(_ kind: DiffLine.Kind) -> Color {
+        switch kind {
+        case .added:   Color(hex: "#34D399").opacity(0.08)
+        case .removed: Color(hex: "#F4505E").opacity(0.08)
+        case .context: .clear
+        }
     }
 }
