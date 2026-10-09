@@ -161,6 +161,9 @@ final class LiveActivityRelay {
     private func stateChanged(_ lead: MochiActivityState?) {
         if lead?.tone != latest?.tone, let lead { log("phase: \(lead.agent) \(lead.statusText)\(locked ? "" : " (Mac unlocked, stays on the Mac)")") }
         latest = lead
+        // Every question has the same restart key: allow one restart per request,
+        // not one per run of the app.
+        if lead?.tone != "waiting" && lead?.tone != "question" { restartedFor = nil }
         guard locked else { return }
         if startedAt == nil {
             if let lead, lead.isActive { beginSoon(lead) }
@@ -309,7 +312,8 @@ final class LiveActivityRelay {
     /// Sends one push through the relay. Returns true when Apple accepted it.
     @discardableResult
     private func post(event: String, token: String, env: String, state: MochiActivityState,
-                      urgent: Bool = false, dismissAfter: Int? = nil, phoneID: String) async -> Bool {
+                      urgent: Bool = false, dismissAfter: Int? = nil, phoneID: String,
+                      triedOtherServer: Bool = false) async -> Bool {
         guard let url = relayURL else { return false }
         var state = state
         if state.since == nil { state.since = activitySince }
@@ -327,16 +331,18 @@ final class LiveActivityRelay {
             let status = (response as? HTTPURLResponse)?.statusCode ?? 0
             if status == 200 { return true }
             let reason = String(data: data, encoding: .utf8) ?? ""
-            if reason.contains("BadDeviceToken") {
+            if reason.contains("BadDeviceToken"), !triedOtherServer {
                 // A token only works on one of Apple's two push servers (sandbox for
                 // builds run from Xcode, production for TestFlight and the App Store).
-                // Try the other one once and keep it if it works.
+                // Try the other one once and keep it if it works. A token refused by
+                // both (stale, app reinstalled) must not bounce between them forever.
                 let other = env == "production" ? "development" : "production"
                 if phones[phoneID]?.env == env {
                     phones[phoneID]?.env = other
                     log("relay \(event): token not valid on \(env), trying \(other)")
                     return await post(event: event, token: token, env: other, state: state,
-                                      urgent: urgent, dismissAfter: dismissAfter, phoneID: phoneID)
+                                      urgent: urgent, dismissAfter: dismissAfter, phoneID: phoneID,
+                                      triedOtherServer: true)
                 }
             }
             if status == 410 {

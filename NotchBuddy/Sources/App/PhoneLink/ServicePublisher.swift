@@ -57,11 +57,15 @@ final class ServicePublisher {
         }
         published = [:]
         cleanedUp = false
+        again = false
         Task { _ = try? await database.modifyRecords(saving: [], deleting: ids, savePolicy: .changedKeys, atomically: false) }
         log("service publisher off")
     }
 
     private func publish() {
+        // A write that was queued behind one in flight when the sync was turned off
+        // must not save every service again after stop() deleted them.
+        guard cancellable != nil else { return }
         guard !writing else { again = true; return }
         writing = true
         let snapshots = ServiceSnapshots.all(from: AppState.shared)

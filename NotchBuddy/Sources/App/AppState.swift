@@ -795,7 +795,11 @@ struct CalcomBooking: Identifiable, Equatable {
     let attendeeEmail: String?
     let attendeeNotes: String?
 
-    var isActive: Bool { status == "ACCEPTED" || status == "PENDING" }
+    /// API v2 sends lowercase statuses ("accepted"), the demo data uppercase ones.
+    var isActive: Bool {
+        let s = status.uppercased()
+        return s == "ACCEPTED" || s == "PENDING"
+    }
     var timeLabel: String {
         let f = DateFormatter(); f.dateFormat = "HH:mm"; return f.string(from: startTime)
     }

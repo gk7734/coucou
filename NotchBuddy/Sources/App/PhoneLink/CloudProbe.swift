@@ -36,6 +36,7 @@ final class CloudProbe {
     private var started = false
     private var pingTask: Task<Void, Never>?
     private var pollTask: Task<Void, Never>?
+    private var prepareTask: Task<Void, Never>?
 
     private var appLabel: String {
         #if APPSTORE
@@ -68,6 +69,7 @@ final class CloudProbe {
         started = false
         pingTask?.cancel(); pingTask = nil
         pollTask?.cancel(); pollTask = nil
+        prepareTask?.cancel(); prepareTask = nil
         NSApplication.shared.unregisterForRemoteNotifications()
         SessionPublisher.shared.stop()
         ApprovalRelay.shared.stop()
@@ -103,7 +105,15 @@ final class CloudProbe {
         #endif
         LiveActivityRelay.shared.startIfEnabled()
         // The silent database subscription, so the iPhone's requests (services) wake this Mac.
-        Task { _ = await prepare() }
+        // Retried every 60 s until iCloud is ready (at most an hour), ping test or not.
+        prepareTask = Task { [weak self] in
+            for _ in 0..<60 {
+                guard let self, !Task.isCancelled else { return }
+                if await self.prepare() { break }
+                try? await Task.sleep(for: .seconds(60))
+            }
+            self?.prepareTask = nil
+        }
 
         // Step 1 Ping/Pong test: off unless asked for, so the Mac stays idle at rest
         // (defaults write fr.louisraille.NotchBuddy phoneLinkPing -bool YES).
