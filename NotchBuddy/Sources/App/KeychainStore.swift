@@ -30,6 +30,12 @@ enum Keychain {
     }
 
     static func load(key: String) -> String? {
+        if case .value(let value) = read(key: key) { return value }
+        return nil
+    }
+
+    /// A read that tells a missing item from a failed read (Keychain locked, access refused).
+    static func read(key: String) -> KeychainRead {
         let query: [String: Any] = [
             kSecClass as String:       kSecClassGenericPassword,
             kSecAttrService as String: service,
@@ -38,9 +44,16 @@ enum Keychain {
             kSecMatchLimit as String:  kSecMatchLimitOne,
         ]
         var result: AnyObject?
-        guard SecItemCopyMatching(query as CFDictionary, &result) == errSecSuccess,
-              let data = result as? Data else { return nil }
-        return String(data: data, encoding: .utf8)
+        let status = SecItemCopyMatching(query as CFDictionary, &result)
+        switch status {
+        case errSecSuccess:
+            guard let data = result as? Data, let value = String(data: data, encoding: .utf8) else { return .missing }
+            return .value(value)
+        case errSecItemNotFound:
+            return .missing
+        default:
+            return .failed
+        }
     }
 
     static func delete(key: String) {
@@ -51,6 +64,15 @@ enum Keychain {
         ]
         SecItemDelete(query as CFDictionary)
     }
+}
+
+/// What a Keychain read found.
+enum KeychainRead: Equatable, Sendable {
+    case value(String)
+    /// No item for the key: cached as nil.
+    case missing
+    /// The read failed (Keychain locked, access refused…): not cached, the next get retries.
+    case failed
 }
 
 // MARK: - Keychain cache (each key read lazily, at most once; then served from memory)
@@ -65,11 +87,11 @@ final class KeychainStore: @unchecked Sendable {
 
     /// Where values live: the real Keychain, or a fake in tests.
     struct Backend: Sendable {
-        var load: @Sendable (String) -> String?
+        var load: @Sendable (String) -> KeychainRead
         var save: @Sendable (String, String) -> Void
         var delete: @Sendable (String) -> Void
 
-        static let system = Backend(load: { Keychain.load(key: $0) },
+        static let system = Backend(load: { Keychain.read(key: $0) },
                                     save: { Keychain.save(key: $0, value: $1) },
                                     delete: { Keychain.delete(key: $0) })
     }
@@ -100,16 +122,28 @@ final class KeychainStore: @unchecked Sendable {
         }
     }
 
-    /// Thread-safe read. Touches the Keychain only the first time a key is asked for.
+    /// Thread-safe read. Touches the Keychain only the first time a key is asked for, or
+    /// again after a read that failed (a failure is not cached: it would keep the service
+    /// off until the next launch).
     func get(_ key: String) -> String? {
         let slot = slot(key)
-        return slot.lock.withLock {
-            if !slot.loaded {
-                slot.value = backend.load(key)
-                slot.loaded = true
-            }
-            return slot.value
+        return slot.lock.withLock { load(slot, key) }
+    }
+
+    /// The slot's value, read from the backend if needed. Call with the slot's lock held.
+    private func load(_ slot: Slot, _ key: String) -> String? {
+        guard !slot.loaded else { return slot.value }
+        switch backend.load(key) {
+        case .value(let value):
+            slot.value = value
+            slot.loaded = true
+        case .missing:
+            slot.value = nil
+            slot.loaded = true
+        case .failed:
+            return nil
         }
+        return slot.value
     }
 
     /// Updates cache + persists to Keychain. Posts `.keychainValueChanged` when
@@ -117,7 +151,7 @@ final class KeychainStore: @unchecked Sendable {
     func set(_ key: String, value: String) {
         let slot = slot(key)
         let changed = slot.lock.withLock { () -> Bool in
-            let old = slot.loaded ? slot.value : backend.load(key)
+            let old = load(slot, key)
             slot.value = value
             slot.loaded = true
             return old != value
@@ -130,7 +164,7 @@ final class KeychainStore: @unchecked Sendable {
     func remove(_ key: String) {
         let slot = slot(key)
         let had = slot.lock.withLock { () -> Bool in
-            let exists = slot.loaded ? slot.value != nil : backend.load(key) != nil
+            let exists = load(slot, key) != nil
             slot.value = nil
             slot.loaded = true
             return exists

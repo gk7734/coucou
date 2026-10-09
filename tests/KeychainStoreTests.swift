@@ -14,6 +14,12 @@ final class FakeKeychain: @unchecked Sendable {
     private let lock = NSLock()
     private var items: [String: String]
     private var reads: [String: Int] = [:]
+    /// Keys whose reads fail (a locked Keychain) until cleared.
+    var failing: Set<String> {
+        get { lock.withLock { _failing } }
+        set { lock.withLock { _failing = newValue } }
+    }
+    private var _failing: Set<String> = []
     private(set) var saves = 0
     private(set) var deletes = 0
 
@@ -26,7 +32,11 @@ final class FakeKeychain: @unchecked Sendable {
         KeychainStore.Backend(
             load: { key in
                 Thread.sleep(forTimeInterval: 0.002)   // a slow read widens any race
-                return self.lock.withLock { self.reads[key, default: 0] += 1; return self.items[key] }
+                return self.lock.withLock {
+                    self.reads[key, default: 0] += 1
+                    if self._failing.contains(key) { return .failed }
+                    return self.items[key].map(KeychainRead.value) ?? .missing
+                }
             },
             save: { key, value in self.lock.withLock { self.saves += 1; self.items[key] = value } },
             delete: { key in self.lock.withLock { self.deletes += 1; self.items[key] = nil } })
@@ -65,6 +75,18 @@ enum KeychainStoreTests {
             check("missing key: nil, read once", store.get("vercel-token") == nil && store.get("vercel-token") == nil
                   && fake.readCount("vercel-token") == 1)
             check("other keys untouched", fake.readCount("stripe-api-key") == 0)
+        }
+
+        print("KeychainStore — a failed read is not cached")
+        do {
+            let fake = FakeKeychain(["github-token": "ghp_1"])
+            fake.failing = ["github-token"]
+            let store = KeychainStore(backend: fake.backend)
+            check("failed read: nil", store.get("github-token") == nil && fake.readCount("github-token") == 1)
+            fake.failing = []
+            check("next get reads again and finds it", store.get("github-token") == "ghp_1"
+                  && fake.readCount("github-token") == 2)
+            check("then cached", store.get("github-token") == "ghp_1" && fake.readCount("github-token") == 2)
         }
 
         print("KeychainStore — any key name works")
