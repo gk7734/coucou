@@ -7,24 +7,22 @@ import Foundation
 
 final class N8nPoller: @unchecked Sendable {
     static let shared = N8nPoller()
-    private var timer: DispatchSourceTimer?
+    private let gate = ServicePollGate(pillId: "integration_n8n", keychainKeys: ["n8n-url", "n8n-api-key"])
+    // Read and written only by the poll, which the gate runs one at a time.
     private var lastExecutionId: String = ""
 
     private init() {}
 
+    @MainActor
     func start() {
-        guard timer == nil else { return }
-        let t = DispatchSource.makeTimerSource(queue: .global(qos: .background))
-        t.schedule(deadline: .now() + 3, repeating: 15)
-        t.setEventHandler { [weak self] in self?.poll() }
-        t.resume()
-        timer = t
+        gate.start(after: 3, every: 15) { [weak self] generation in
+            await self?.poll(generation: generation)
+        }
     }
 
     // MARK: - Poll list endpoint
 
-    private func poll() {
-        guard !DemoEngine.isPollerPaused else { return }
+    private func poll(generation: Int) async {
         guard let apiKey  = KeychainStore.shared.get("n8n-api-key"),
               let rawBase = KeychainStore.shared.get("n8n-url") else {
             n8nLog("No API key or URL configured")
@@ -35,10 +33,10 @@ final class N8nPoller: @unchecked Sendable {
             "\(base)/api/v1/executions?limit=1&includeData=false",
             "\(base)/rest/executions?limit=1&includeData=false",
         ]
-        tryList(endpoints, apiKey: apiKey, base: base, idx: 0)
+        await tryList(endpoints, apiKey: apiKey, base: base, idx: 0, generation: generation)
     }
 
-    private func tryList(_ urls: [String], apiKey: String, base: String, idx: Int) {
+    private func tryList(_ urls: [String], apiKey: String, base: String, idx: Int, generation: Int) async {
         guard idx < urls.count, let url = URL(string: urls[idx]) else {
             n8nLog("All list endpoints failed")
             return
@@ -48,100 +46,94 @@ final class N8nPoller: @unchecked Sendable {
         req.setValue("application/json", forHTTPHeaderField: "Accept")
         n8nLog("Polling \(url.host ?? "?")\(url.path)")
 
-        URLSession.shared.dataTask(with: req) { [weak self] data, response, error in
-            guard let self else { return }
-            let code = (response as? HTTPURLResponse)?.statusCode ?? 0
-            if let error {
-                self.n8nLog("Network error: \(error.localizedDescription)")
-                self.tryList(urls, apiKey: apiKey, base: base, idx: idx + 1)
-                return
-            }
-            guard let data else {
-                self.tryList(urls, apiKey: apiKey, base: base, idx: idx + 1)
-                return
-            }
-            self.n8nLog("HTTP \(code) · \(data.count) bytes")
-            guard code == 200 else {
-                self.tryList(urls, apiKey: apiKey, base: base, idx: idx + 1)
-                return
-            }
-            guard let json = try? JSONSerialization.jsonObject(with: data) else { return }
+        let (data, code, error) = await ServicePollGate.load(req)
+        if let error {
+            n8nLog("Network error: \(error.localizedDescription)")
+            await tryList(urls, apiKey: apiKey, base: base, idx: idx + 1, generation: generation)
+            return
+        }
+        guard let data else {
+            await tryList(urls, apiKey: apiKey, base: base, idx: idx + 1, generation: generation)
+            return
+        }
+        n8nLog("HTTP \(code) · \(data.count) bytes")
+        guard code == 200 else {
+            await tryList(urls, apiKey: apiKey, base: base, idx: idx + 1, generation: generation)
+            return
+        }
+        guard let json = try? JSONSerialization.jsonObject(with: data) else { return }
 
-            // Response is either { "data": [...] } or [...]
-            let items: [[String: Any]]
-            if let obj = json as? [String: Any], let arr = obj["data"] as? [[String: Any]] {
-                items = arr
-            } else if let arr = json as? [[String: Any]] {
-                items = arr
-            } else {
-                self.n8nLog("Unexpected response shape")
-                return
-            }
+        // Response is either { "data": [...] } or [...]
+        let items: [[String: Any]]
+        if let obj = json as? [String: Any], let arr = obj["data"] as? [[String: Any]] {
+            items = arr
+        } else if let arr = json as? [[String: Any]] {
+            items = arr
+        } else {
+            n8nLog("Unexpected response shape")
+            return
+        }
 
-            guard let first = items.first else { self.n8nLog("No executions found"); return }
+        guard let first = items.first else { n8nLog("No executions found"); return }
 
-            let id: String
-            if let s = first["id"] as? String      { id = s }
-            else if let n = first["id"] as? Int    { id = "\(n)" }
-            else { self.n8nLog("No id in execution"); return }
+        let id: String
+        if let s = first["id"] as? String      { id = s }
+        else if let n = first["id"] as? Int    { id = "\(n)" }
+        else { n8nLog("No id in execution"); return }
 
-            guard id != self.lastExecutionId else {
-                self.n8nLog("Same id=\(id) — no change")
-                return
-            }
+        guard id != lastExecutionId else {
+            n8nLog("Same id=\(id) — no change")
+            return
+        }
 
-            // Terminal check: use status field — more reliable than the `finished` bool
-            // (published workflows often have finished=false on error)
-            let status = first["status"] as? String ?? ""
-            let isTerminal = ["success", "error", "crashed", "canceled", "failed"].contains(status)
-            guard isTerminal else {
-                self.n8nLog("id=\(id) status=\(status.isEmpty ? "?" : status) — not terminal")
-                return
-            }
+        // Terminal check: use status field — more reliable than the `finished` bool
+        // (published workflows often have finished=false on error)
+        let status = first["status"] as? String ?? ""
+        let isTerminal = ["success", "error", "crashed", "canceled", "failed"].contains(status)
+        guard isTerminal else {
+            n8nLog("id=\(id) status=\(status.isEmpty ? "?" : status) — not terminal")
+            return
+        }
 
-            self.lastExecutionId = id
-            let success = status == "success"
-            self.n8nLog("New execution id=\(id) status=\(status)")
+        lastExecutionId = id
+        let success = status == "success"
+        n8nLog("New execution id=\(id) status=\(status)")
 
-            // Fetch full detail (includeData=true required in some n8n versions)
-            let detailUrls = [
-                "\(base)/api/v1/executions/\(id)?includeData=true",
-                "\(base)/api/v1/executions/\(id)",
-                "\(base)/rest/executions/\(id)?includeData=true",
-                "\(base)/rest/executions/\(id)",
-            ]
-            self.fetchDetail(detailUrls, apiKey: apiKey, success: success, idx: 0)
-        }.resume()
+        // Fetch full detail (includeData=true required in some n8n versions)
+        let detailUrls = [
+            "\(base)/api/v1/executions/\(id)?includeData=true",
+            "\(base)/api/v1/executions/\(id)",
+            "\(base)/rest/executions/\(id)?includeData=true",
+            "\(base)/rest/executions/\(id)",
+        ]
+        await fetchDetail(detailUrls, apiKey: apiKey, success: success, idx: 0, generation: generation)
     }
 
     // MARK: - Fetch full execution detail
 
-    private func fetchDetail(_ urls: [String], apiKey: String, success: Bool, idx: Int) {
+    private func fetchDetail(_ urls: [String], apiKey: String, success: Bool, idx: Int, generation: Int) async {
         guard idx < urls.count, let url = URL(string: urls[idx]) else {
-            dispatch(success: success, name: "Workflow", detail: nil)
+            dispatch(success: success, name: "Workflow", detail: nil, generation: generation)
             return
         }
         var req = URLRequest(url: url, timeoutInterval: 10)
         req.setValue(apiKey, forHTTPHeaderField: "X-N8N-API-KEY")
         req.setValue("application/json", forHTTPHeaderField: "Accept")
 
-        URLSession.shared.dataTask(with: req) { [weak self] data, response, _ in
-            guard let self else { return }
-            let code = (response as? HTTPURLResponse)?.statusCode ?? 0
-            guard let data, code == 200 else {
-                self.n8nLog("Detail HTTP \(code) \(url.host ?? "?")\(url.path)")
-                self.fetchDetail(urls, apiKey: apiKey, success: success, idx: idx + 1)
-                return
-            }
-            guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
-                self.fetchDetail(urls, apiKey: apiKey, success: success, idx: idx + 1)
-                return
-            }
-            let name = self.extractWorkflowName(from: json)
-            let detail = self.parseDetail(from: json, success: success)
-            self.n8nLog("Parsed: \(name)")
-            self.dispatch(success: success, name: name, detail: detail)
-        }.resume()
+        let (data, code, _) = await ServicePollGate.load(req)
+        guard let data, code == 200 else {
+            n8nLog("Detail HTTP \(code) \(url.host ?? "?")\(url.path)")
+            await fetchDetail(urls, apiKey: apiKey, success: success, idx: idx + 1, generation: generation)
+            return
+        }
+        guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+            await fetchDetail(urls, apiKey: apiKey, success: success, idx: idx + 1, generation: generation)
+            return
+        }
+        let name = extractWorkflowName(from: json)
+        let detail = parseDetail(from: json, success: success)
+        n8nLog("Parsed: \(name)")
+        dispatch(success: success, name: name, detail: detail, generation: generation)
     }
 
     private func extractWorkflowName(from json: [String: Any]) -> String {
@@ -217,8 +209,11 @@ final class N8nPoller: @unchecked Sendable {
 
     // MARK: - Dispatch to main
 
-    private func dispatch(success: Bool, name: String, detail: String?) {
-        DispatchQueue.main.async { self.handleExecution(success: success, name: name, detail: detail) }
+    private func dispatch(success: Bool, name: String, detail: String?, generation: Int) {
+        DispatchQueue.main.async {
+            guard self.gate.isCurrent(generation) else { return }
+            self.handleExecution(success: success, name: name, detail: detail)
+        }
     }
 
     @MainActor

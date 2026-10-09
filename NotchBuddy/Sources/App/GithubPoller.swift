@@ -33,12 +33,7 @@ final class GithubPoller: @unchecked Sendable {
     /// the notch, or when the iPhone sync is on (the iPhone shows GitHub even
     /// when its pill isn't in the notch).
     @MainActor private static var isWanted: Bool {
-        if AppState.shared.activeIntegrations.contains("integration_github") { return true }
-        #if PHONE_LINK
-        return UserDefaults.standard.bool(forKey: "iPhoneSyncEnabled")
-        #else
-        return false
-        #endif
+        ServicePollGate.isWanted("integration_github")
     }
 
     // MARK: - Stats (unchanged logic)

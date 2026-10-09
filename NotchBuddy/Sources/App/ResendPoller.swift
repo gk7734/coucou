@@ -2,41 +2,36 @@ import Foundation
 
 final class ResendPoller: @unchecked Sendable {
     static let shared = ResendPoller()
-    private var timer: DispatchSourceTimer?
+    private let gate = ServicePollGate(pillId: "integration_resend", keychainKeys: ["resend-api-key"])
     private init() {}
 
+    @MainActor
     func start() {
-        guard timer == nil else { return }
-        let t = DispatchSource.makeTimerSource(queue: .global(qos: .background))
-        t.schedule(deadline: .now() + 6, repeating: 60)
-        t.setEventHandler { [weak self] in self?.poll() }
-        t.resume()
-        timer = t
+        gate.start(after: 6, every: 60) { [weak self] generation in
+            await self?.poll(generation: generation)
+        }
     }
 
-    private func poll() {
-        guard !DemoEngine.isPollerPaused else { return }
+    private func poll(generation: Int) async {
         guard let apiKey = KeychainStore.shared.get("resend-api-key") else { return }
         guard let url = URL(string: "https://api.resend.com/emails?limit=100") else { return }
         var req = URLRequest(url: url, timeoutInterval: 10)
         req.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
         req.setValue("application/json", forHTTPHeaderField: "Accept")
 
-        URLSession.shared.dataTask(with: req) { [weak self] data, response, _ in
-            guard let self else { return }
-            let code = (response as? HTTPURLResponse)?.statusCode ?? 0
-            guard let data, code == 200 else { return }
-            guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-                  let rawList = json["data"] as? [[String: Any]] else { return }
+        let (data, code, _) = await ServicePollGate.load(req)
+        guard let data, code == 200 else { return }
+        guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let rawList = json["data"] as? [[String: Any]] else { return }
 
-            let total = (json["total"] as? Int) ?? (json["count"] as? Int)
-            let emails = rawList.compactMap { self.parseEmail($0) }
+        let total = (json["total"] as? Int) ?? (json["count"] as? Int)
+        let emails = rawList.compactMap { self.parseEmail($0) }
 
-            DispatchQueue.main.async {
-                AppState.shared.resendEmails = Array(emails.prefix(5))
-                AppState.shared.resendTotal  = total ?? (emails.isEmpty ? nil : emails.count)
-            }
-        }.resume()
+        DispatchQueue.main.async {
+            guard self.gate.isCurrent(generation) else { return }
+            AppState.shared.resendEmails = Array(emails.prefix(5))
+            AppState.shared.resendTotal  = total ?? (emails.isEmpty ? nil : emails.count)
+        }
     }
 
     private func parseEmail(_ d: [String: Any]) -> ResendEmail? {

@@ -6,24 +6,22 @@ import Foundation
 
 final class VercelPoller: @unchecked Sendable {
     static let shared = VercelPoller()
-    private var timer: DispatchSourceTimer?
+    private let gate = ServicePollGate(pillId: "integration_vercel", keychainKeys: ["vercel-token"])
+    // Accessed only on the main thread.
     private var lastDeploymentId: String = ""
 
     private init() {}
 
+    @MainActor
     func start() {
-        guard timer == nil else { return }
-        let t = DispatchSource.makeTimerSource(queue: .global(qos: .background))
-        t.schedule(deadline: .now() + 5, repeating: 30)
-        t.setEventHandler { [weak self] in self?.poll() }
-        t.resume()
-        timer = t
+        gate.start(after: 5, every: 30) { [weak self] generation in
+            await self?.poll(generation: generation)
+        }
     }
 
     // MARK: - Poll
 
-    private func poll() {
-        guard !DemoEngine.isPollerPaused else { return }
+    private func poll(generation: Int) async {
         guard let token = KeychainStore.shared.get("vercel-token") else { return }
 
         // Fetch last 5 terminal deployments
@@ -32,22 +30,22 @@ final class VercelPoller: @unchecked Sendable {
         req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         req.setValue("application/json", forHTTPHeaderField: "Accept")
 
-        URLSession.shared.dataTask(with: req) { [weak self] data, response, error in
-            guard let self else { return }
-            let code = (response as? HTTPURLResponse)?.statusCode ?? 0
-            guard let data, code == 200 else { return }
-            guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-                  let rawList = json["deployments"] as? [[String: Any]] else { return }
+        let (data, code, _) = await ServicePollGate.load(req)
+        guard let data, code == 200 else { return }
+        guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let rawList = json["deployments"] as? [[String: Any]] else { return }
 
-            // Only terminal deployments (READY, ERROR, CANCELED)
-            let terminal = ["READY", "ERROR", "CANCELED"]
-            let parsed = rawList
-                .compactMap { self.parseDeployment($0) }
-                .filter { terminal.contains($0.state) }
-            guard !parsed.isEmpty else { return }
+        // Only terminal deployments (READY, ERROR, CANCELED)
+        let terminal = ["READY", "ERROR", "CANCELED"]
+        let parsed = rawList
+            .compactMap { self.parseDeployment($0) }
+            .filter { terminal.contains($0.state) }
+        guard !parsed.isEmpty else { return }
 
-            DispatchQueue.main.async { self.handleDeployments(parsed) }
-        }.resume()
+        DispatchQueue.main.async {
+            guard self.gate.isCurrent(generation) else { return }
+            self.handleDeployments(parsed)
+        }
     }
 
     private func parseDeployment(_ d: [String: Any]) -> VercelDeployment? {

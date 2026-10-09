@@ -2,22 +2,19 @@ import Foundation
 
 final class CalcomPoller: @unchecked Sendable {
     static let shared = CalcomPoller()
-    private var timer: DispatchSourceTimer?
+    private let gate = ServicePollGate(pillId: "integration_calcom", keychainKeys: ["calcom-api-key"])
     private init() {}
 
+    @MainActor
     func start() {
-        guard timer == nil else { return }
-        let t = DispatchSource.makeTimerSource(queue: .global(qos: .background))
-        t.schedule(deadline: .now() + 8, repeating: 300)
-        t.setEventHandler { [weak self] in self?.poll() }
-        t.resume()
-        timer = t
+        gate.start(after: 8, every: 300) { [weak self] generation in
+            await self?.poll(generation: generation)
+        }
     }
 
-    func pollNow() { poll() }
+    func pollNow() { gate.pollNow() }
 
-    private func poll() {
-        guard !DemoEngine.isPollerPaused else { return }
+    private func poll(generation: Int) async {
         guard let key = KeychainStore.shared.get("calcom-api-key") else { return }
         let cal = Calendar.current
         let today = cal.startOfDay(for: Date())
@@ -38,28 +35,29 @@ final class CalcomPoller: @unchecked Sendable {
         req.setValue("Bearer \(key)", forHTTPHeaderField: "Authorization")
         req.setValue("2024-08-13", forHTTPHeaderField: "cal-api-version")
 
-        URLSession.shared.dataTask(with: req) { [weak self] data, response, error in
-            guard let self else { return }
-            let code = (response as? HTTPURLResponse)?.statusCode ?? 0
-            if code != 200 {
-                let msg: String
-                if code == 401 { msg = "Invalid API key (401)" }
-                else if code == 0 { msg = error?.localizedDescription ?? "No connection" }
-                else { msg = "API error \(code)" }
-                DispatchQueue.main.async { AppState.shared.calcomError = msg }
-                return
-            }
-            guard let data,
-                  let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-                  let rawList = json["data"] as? [[String: Any]] else { return }
-
-            let parsed = rawList.compactMap { self.parseBooking($0) }
+        let (data, code, error) = await ServicePollGate.load(req)
+        if code != 200 {
+            let msg: String
+            if code == 401 { msg = "Invalid API key (401)" }
+            else if code == 0 { msg = error?.localizedDescription ?? "No connection" }
+            else { msg = "API error \(code)" }
             DispatchQueue.main.async {
-                AppState.shared.calcomError    = nil
-                AppState.shared.calcomBookings = parsed
-                AppState.shared.calcomLoaded   = true
+                guard self.gate.isCurrent(generation) else { return }
+                AppState.shared.calcomError = msg
             }
-        }.resume()
+            return
+        }
+        guard let data,
+              let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let rawList = json["data"] as? [[String: Any]] else { return }
+
+        let parsed = rawList.compactMap { self.parseBooking($0) }
+        DispatchQueue.main.async {
+            guard self.gate.isCurrent(generation) else { return }
+            AppState.shared.calcomError    = nil
+            AppState.shared.calcomBookings = parsed
+            AppState.shared.calcomLoaded   = true
+        }
     }
 
     private func parseBooking(_ b: [String: Any]) -> CalcomBooking? {
@@ -82,7 +80,8 @@ final class CalcomPoller: @unchecked Sendable {
         guard let startTime else { return nil }
 
         let endStr = (b["end"] as? String) ?? (b["endTime"] as? String) ?? ""
-        let endTime: Date = iso.date(from: endStr) ?? startTime
+        let isoNoFraction = ISO8601DateFormatter(); isoNoFraction.formatOptions = [.withInternetDateTime]
+        let endTime: Date = iso.date(from: endStr) ?? isoNoFraction.date(from: endStr) ?? startTime
 
         let attendees = b["attendees"] as? [[String: Any]] ?? []
         let first = attendees.first

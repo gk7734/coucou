@@ -85,10 +85,16 @@ final class KeychainStore: @unchecked Sendable {
         lock.withLock { cache[key] }
     }
 
-    /// Updates cache + persists to Keychain.
+    /// Updates cache + persists to Keychain. Posts `.keychainValueChanged` when
+    /// the value is new, so the service pollers fetch with it right away.
     func set(_ key: String, value: String) {
-        lock.withLock { cache[key] = value }
+        let changed = lock.withLock { () -> Bool in
+            let old = cache[key]
+            cache[key] = value
+            return old != value
+        }
         Keychain.save(key: key, value: value)
+        if changed { NotificationCenter.default.post(name: .keychainValueChanged, object: key) }
     }
 
     /// Removes from cache + Keychain only if the key was previously set.
@@ -98,7 +104,10 @@ final class KeychainStore: @unchecked Sendable {
             cache[key] = nil
             return exists
         }
-        if had { Keychain.delete(key: key) }
+        if had {
+            Keychain.delete(key: key)
+            NotificationCenter.default.post(name: .keychainValueChanged, object: key)
+        }
     }
 }
 

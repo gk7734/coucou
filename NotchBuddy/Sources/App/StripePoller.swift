@@ -7,94 +7,95 @@ import SwiftUI
 
 final class StripePoller: @unchecked Sendable {
     static let shared = StripePoller()
-    private var timer: DispatchSourceTimer?
+    private let gate = ServicePollGate(pillId: "integration_stripe", keychainKeys: ["stripe-api-key"])
+    // Accessed only on the main thread.
     private var lastChargeId: String = ""
 
     private init() {}
 
+    @MainActor
     func start() {
-        guard timer == nil else { return }
-        let t = DispatchSource.makeTimerSource(queue: .global(qos: .background))
-        t.schedule(deadline: .now() + 6, repeating: 30)
-        t.setEventHandler { [weak self] in self?.poll() }
-        t.resume()
-        timer = t
+        gate.start(after: 6, every: 30) { [weak self] generation in
+            await self?.poll(generation: generation)
+        }
     }
 
     // MARK: - Poll
 
-    func pollNow() { poll() }
+    func pollNow() { gate.pollNow() }
 
-    private func poll() {
-        guard !DemoEngine.isPollerPaused else { return }
+    private func poll(generation: Int) async {
         guard let key = KeychainStore.shared.get("stripe-api-key") else { return }
-        fetchBalance(key: key)
-        fetchCharges(key: key)
+        async let balance: Void = fetchBalance(key: key, generation: generation)
+        async let charges: Void = fetchCharges(key: key, generation: generation)
+        _ = await (balance, charges)
     }
 
     // MARK: - Balance
 
-    private func fetchBalance(key: String) {
+    private func fetchBalance(key: String, generation: Int) async {
         guard let url = URL(string: "https://api.stripe.com/v1/balance") else { return }
         var req = URLRequest(url: url, timeoutInterval: 10)
         // Stripe primary auth: Basic with key as username, empty password
         let creds = Data("\(key):".utf8).base64EncodedString()
         req.setValue("Basic \(creds)", forHTTPHeaderField: "Authorization")
 
-        URLSession.shared.dataTask(with: req) { data, response, error in
-            let code = (response as? HTTPURLResponse)?.statusCode ?? 0
-            if code != 200 {
-                let errMsg: String
-                if code == 401 { errMsg = "Invalid API key (401)" }
-                else if code == 403 { errMsg = "Use secret key (sk_live_… not pk_live_…)" }
-                else if code == 0   { errMsg = error?.localizedDescription ?? "No connection" }
-                else                { errMsg = "API error \(code)" }
-                DispatchQueue.main.async { AppState.shared.stripeError = errMsg }
-                return
-            }
-            guard let data,
-                  let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else { return }
-
-            // Sum available + pending so recent charges show up immediately
-            let available = json["available"] as? [[String: Any]] ?? []
-            let pending   = json["pending"]   as? [[String: Any]] ?? []
-            let allBuckets = available + pending
-            guard let currency = (allBuckets.first)?["currency"] as? String else { return }
-            let amount = allBuckets.compactMap { $0["amount"] as? Int }.reduce(0, +)
-
+        let (data, code, error) = await ServicePollGate.load(req)
+        if code != 200 {
+            let errMsg: String
+            if code == 401 { errMsg = "Invalid API key (401)" }
+            else if code == 403 { errMsg = "Use secret key (sk_live_… not pk_live_…)" }
+            else if code == 0   { errMsg = error?.localizedDescription ?? "No connection" }
+            else                { errMsg = "API error \(code)" }
             DispatchQueue.main.async {
-                let state = AppState.shared
-                state.stripeError    = nil
-                state.stripeCurrency = currency
-                state.stripeBalance  = amount
-                // Always sync display balance if not yet showing a real value
-                // (charges may have set stripeLoaded=true before balance arrived)
-                if state.stripeDisplayBalance == 0 {
-                    state.stripeDisplayBalance = amount
-                }
-                state.stripeLoaded = true
+                guard self.gate.isCurrent(generation) else { return }
+                AppState.shared.stripeError = errMsg
             }
-        }.resume()
+            return
+        }
+        guard let data,
+              let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else { return }
+
+        // Sum available + pending so recent charges show up immediately
+        let available = json["available"] as? [[String: Any]] ?? []
+        let pending   = json["pending"]   as? [[String: Any]] ?? []
+        let allBuckets = available + pending
+        guard let currency = (allBuckets.first)?["currency"] as? String else { return }
+        let amount = allBuckets.compactMap { $0["amount"] as? Int }.reduce(0, +)
+
+        DispatchQueue.main.async {
+            guard self.gate.isCurrent(generation) else { return }
+            let state = AppState.shared
+            state.stripeError    = nil
+            state.stripeCurrency = currency
+            state.stripeBalance  = amount
+            // Always sync display balance if not yet showing a real value
+            // (charges may have set stripeLoaded=true before balance arrived)
+            if state.stripeDisplayBalance == 0 {
+                state.stripeDisplayBalance = amount
+            }
+            state.stripeLoaded = true
+        }
     }
 
     // MARK: - Charges
 
-    private func fetchCharges(key: String) {
+    private func fetchCharges(key: String, generation: Int) async {
         guard let url = URL(string: "https://api.stripe.com/v1/charges?limit=3") else { return }
         var req = URLRequest(url: url, timeoutInterval: 10)
         let creds = Data("\(key):".utf8).base64EncodedString()
         req.setValue("Basic \(creds)", forHTTPHeaderField: "Authorization")
 
-        URLSession.shared.dataTask(with: req) { [weak self] data, response, _ in
-            guard let self else { return }
-            let code = (response as? HTTPURLResponse)?.statusCode ?? 0
-            guard let data, code == 200 else { return }
-            guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-                  let rawList = json["data"] as? [[String: Any]] else { return }
+        let (data, code, _) = await ServicePollGate.load(req)
+        guard let data, code == 200 else { return }
+        guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let rawList = json["data"] as? [[String: Any]] else { return }
 
-            let parsed = rawList.compactMap { self.parseCharge($0) }
-            DispatchQueue.main.async { self.handleCharges(parsed) }
-        }.resume()
+        let parsed = rawList.compactMap { self.parseCharge($0) }
+        DispatchQueue.main.async {
+            guard self.gate.isCurrent(generation) else { return }
+            self.handleCharges(parsed)
+        }
     }
 
     private func parseCharge(_ c: [String: Any]) -> StripePayment? {

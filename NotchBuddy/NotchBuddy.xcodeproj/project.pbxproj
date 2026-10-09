@@ -36,6 +36,7 @@
 		1558BB00C530B721172F6E65 /* StripePoller.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2EF78999D68D56ADE4CEFBE2 /* StripePoller.swift */; };
 		160EDB9D06275E2607DA5151 /* N8nPoller.swift in Sources */ = {isa = PBXBuildFile; fileRef = B89DA1A0C21AE3535A1760BB /* N8nPoller.swift */; };
 		17392C63757FBAC38F22B9D6 /* ServiceViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 08128342A3F894D567AD9E6B /* ServiceViews.swift */; };
+		17D326AE667967D7B1F5162D /* ServicePollGate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2805714A8AA17E5AE5339EE9 /* ServicePollGate.swift */; };
 		17D6063D3B374FB82340314E /* IslandTypes.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0365DDE3C554F5E8570055F4 /* IslandTypes.swift */; };
 		18D47AE663EB96BE5638D5F7 /* ClaudePlanCardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4263B550838CC5614569D13 /* ClaudePlanCardView.swift */; };
 		1969590AFEE6CB21404346F1 /* CalcomPoller.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3104222B3F17BA5E8DEA5277 /* CalcomPoller.swift */; };
@@ -92,6 +93,7 @@
 		58A38FB29F85A95744B208EF /* HookRelayScripts.swift in Sources */ = {isa = PBXBuildFile; fileRef = 76F27AAF61FFAE44E4209B51 /* HookRelayScripts.swift */; };
 		59FABCC0B6794FE95319825C /* CoucouNotificationContent.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = D6DF93125491729E14636AD8 /* CoucouNotificationContent.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		5B1D797F940ED559CDAC9423 /* HostResolver.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3FB897CD268F47C14E0B214C /* HostResolver.swift */; };
+		5B924B518031AEE2F1143C65 /* ServicePollGate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2805714A8AA17E5AE5339EE9 /* ServicePollGate.swift */; };
 		5B9A00AFB0837731FA678E4E /* IslandStateMachine.swift in Sources */ = {isa = PBXBuildFile; fileRef = D8212018F09EA1E96FBD63CD /* IslandStateMachine.swift */; };
 		5C6D0BC8C546718CAA82BF90 /* MusicController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4F142FB3952B5F0639383047 /* MusicController.swift */; };
 		607E548D1DD274CD73FDC290 /* ColorHex.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8ACB4350729C6513824D1ADF /* ColorHex.swift */; };
@@ -336,6 +338,7 @@
 		21B710512DB99390EC564487 /* ServiceLiveDetail.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ServiceLiveDetail.swift; sourceTree = "<group>"; };
 		244A7909EEDA4BFF4C2EA9B5 /* TerminalTarget+AppKit.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "TerminalTarget+AppKit.swift"; sourceTree = "<group>"; };
 		265262A422C270C1798F4A80 /* MochiLive.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MochiLive.swift; sourceTree = "<group>"; };
+		2805714A8AA17E5AE5339EE9 /* ServicePollGate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ServicePollGate.swift; sourceTree = "<group>"; };
 		28323DC20034A281F6829884 /* CloudProbe.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CloudProbe.swift; sourceTree = "<group>"; };
 		29E156CF1C215B8FE713B3A0 /* TurnShare.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TurnShare.swift; sourceTree = "<group>"; };
 		2A1C4152EBDBD7C24CABFFD7 /* TurnSnapshot.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TurnSnapshot.swift; sourceTree = "<group>"; };
@@ -513,6 +516,7 @@
 				78FB882D49084DEA6A10DB4D /* RecapStore.swift */,
 				61B5FDDE03F5F711146937E2 /* ResendPoller.swift */,
 				B2FDED98F7F6C755A72C97A3 /* SafeWebURL.swift */,
+				2805714A8AA17E5AE5339EE9 /* ServicePollGate.swift */,
 				E2A7CF50FD64BC80F35D69C8 /* SessionBook.swift */,
 				7C1A7D5CBE2AC084A10C5FF3 /* SettingsView.swift */,
 				FA51E5B140C20812641168EA /* ShortcutLogic.swift */,
@@ -926,6 +930,7 @@
 				6FC65C190ED614C664C9BC17 /* SafeWebURL.swift in Sources */,
 				2A30FA2F046492E22A1C5719 /* ServiceDetail.swift in Sources */,
 				9F43BE6E77E371FCEB7FE8BA /* ServiceDetailRunner.swift in Sources */,
+				5B924B518031AEE2F1143C65 /* ServicePollGate.swift in Sources */,
 				694AB4504CD65662E1681E5C /* ServicePublisher.swift in Sources */,
 				0393CA5466F52252378F0346 /* ServiceSnapshot.swift in Sources */,
 				E1FA71B2D6BFF207C0166AEA /* SessionBook.swift in Sources */,
@@ -1097,6 +1102,7 @@
 				FEFEF1EBAB0E6CA74A33C10B /* SafeWebURL.swift in Sources */,
 				8C9AF392DAE8F2098A7BE7B6 /* ServiceDetail.swift in Sources */,
 				4755AAC633DCE5DAA6D54A3C /* ServiceDetailRunner.swift in Sources */,
+				17D326AE667967D7B1F5162D /* ServicePollGate.swift in Sources */,
 				D092D0D597D1CBCE6B775B5E /* ServicePublisher.swift in Sources */,
 				1FE62D4EEA85FB25C17FDBA2 /* ServiceSnapshot.swift in Sources */,
 				3984EAC8A755AF7984370DAB /* SessionBook.swift in Sources */,
