@@ -103,7 +103,7 @@ final class KeychainStore: @unchecked Sendable {
 
         #if DEBUG
         /// Holds nothing and keeps nothing (snapshot runs).
-        static let none = Backend(load: { _ in nil }, save: { _, _ in }, delete: { _ in })
+        static let none = Backend(load: { _ in .missing }, save: { _, _ in }, delete: { _ in })
         #endif
     }
 
