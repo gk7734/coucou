@@ -6,8 +6,8 @@ import CryptoKit
 
 // MARK: - HookServer
 // Listens on a Unix domain socket for events from nb-hook (Claude Code hooks).
-// Thread-safe: socket I/O on background threads, every message then handed to the main
-// queue in the order its read finished (see deliver(_:)).
+// Thread-safe: socket I/O on HookSocketServer's background queues, every message then handed
+// to the main queue in the order its read finished (see deliver(_:)).
 
 final class HookServer: @unchecked Sendable {
     static let shared = HookServer()
@@ -30,15 +30,14 @@ final class HookServer: @unchecked Sendable {
     // App Store build derives the command from the panel-selected claudeURL in buildHooksData(claudeURL:).
     static var hookScriptPath: String { supportDir.appendingPathComponent("nb-hook").path }
 
-    private static let maxPayload = 1_048_576          // 1 MB — reject oversized messages
-    private static let receiveTimeoutSeconds: Int = 5   // SO_RCVTIMEO on client sockets
-    private static let maxConnections = 32              // open client connections, held ones included
-    // Held requests stay under maxConnections so short-lived events always find a slot.
+    // Held requests stay under the transport's 32 connections so short-lived events always
+    // find a slot.
     private static let maxQueuedApprovals = 16
     private static let maxQueuedQuestions = 8
 
-    private let connectionLock = NSLock()
-    private var connectionCount = 0                     // guarded by connectionLock
+    /// The socket: accept, reads, connection slots (1 MB per message, 5 s idle timeout,
+    /// 32 connections held ones included — see HookSocketServer).
+    private let transport = HookSocketServer(configuration: .init(socketPath: HookServer.socketPath))
 
     /// Where a hook event goes and which session it belongs to (see HookRouting).
     private struct HookContext {
@@ -103,8 +102,7 @@ final class HookServer: @unchecked Sendable {
 
     /// Closes a client connection and frees its slot under maxConnections.
     private func closeClient(_ fd: Int32) {
-        close(fd)
-        connectionLock.lock(); connectionCount -= 1; connectionLock.unlock()
+        transport.closeClient(fd)
     }
 
     /// Watches a held fd on the main queue: `onHangUp` runs when the relay closes it
@@ -392,131 +390,12 @@ final class HookServer: @unchecked Sendable {
         #if !APPSTORE
         installHookScript()
         #endif
-        Thread.detachNewThread { self.serverThread() }
+        // Both closures are formed here, off the main actor: they run on the transport's queues.
+        transport.start(captureAncestry: { fd in ProcessAncestry.pidChain(fd: fd) },
+                        onMessage: { [self] message in handleMessage(message) })
     }
 
-    // MARK: - Socket server (background thread)
-
-    private enum ListenerResult {
-        case ready(Int32)
-        case failed          // worth trying again later
-        case unusable        // will never work (path too long)
-    }
-
-    /// Runs for the life of the app: creates the listening socket and accepts on it; if the
-    /// socket breaks, closes it and creates a new one after a short, growing delay.
-    private func serverThread() {
-        var attempt = 0
-        while true {
-            switch openListener() {
-            case .unusable:
-                return
-            case .failed:
-                break
-            case .ready(let fd):
-                let acceptedAny = acceptLoop(listener: fd)
-                close(fd)
-                if acceptedAny { attempt = 0 }
-                NSLog("HookServer: listening socket failed, recreating it")
-            }
-            attempt += 1
-            Thread.sleep(forTimeInterval: AcceptRecovery.restartDelay(attempt: attempt))
-        }
-    }
-
-    /// Creates, binds and listens on the Unix socket (owner-only).
-    private func openListener() -> ListenerResult {
-        let path = Self.socketPath
-        // sun_path on macOS is 104 bytes including the NUL terminator → max 103 usable bytes
-        let maxSunPathBytes = MemoryLayout<sockaddr_un>.size - MemoryLayout<sa_family_t>.size - 1
-        guard path.utf8.count <= maxSunPathBytes else {
-            NSLog("HookServer: socket path too long (\(path.utf8.count) bytes, max \(maxSunPathBytes)): \(path)")
-            return .unusable
-        }
-        // The folder may have been deleted since launch; a new one is owner-only.
-        try? FileManager.default.createDirectory(atPath: (path as NSString).deletingLastPathComponent,
-                                                 withIntermediateDirectories: true,
-                                                 attributes: [.posixPermissions: 0o700 as NSNumber])
-        try? FileManager.default.removeItem(atPath: path)
-
-        let fd = socket(AF_UNIX, SOCK_STREAM, 0)
-        guard fd >= 0 else {
-            NSLog("HookServer: socket() failed, errno \(errno)")
-            return .failed
-        }
-
-        var addr = sockaddr_un()
-        addr.sun_family = sa_family_t(AF_UNIX)
-        let cpath = Array(path.utf8CString)
-        withUnsafeMutableBytes(of: &addr.sun_path) { raw in
-            for (i, c) in cpath.enumerated() where i < raw.count { raw[i] = UInt8(bitPattern: c) }
-        }
-
-        let bindRC = withUnsafePointer(to: &addr) { ptr in
-            ptr.withMemoryRebound(to: sockaddr.self, capacity: 1) { Darwin.bind(fd, $0, socklen_t(MemoryLayout<sockaddr_un>.size)) }
-        }
-        guard bindRC == 0 else {
-            NSLog("HookServer: bind() failed, errno \(errno)")
-            close(fd)
-            return .failed
-        }
-        // Restrict socket to owner only
-        chmod(path, 0o600)
-        guard Darwin.listen(fd, 32) == 0 else {
-            NSLog("HookServer: listen() failed, errno \(errno)")
-            close(fd)
-            return .failed
-        }
-        return .ready(fd)
-    }
-
-    /// Accepts clients until the listening socket breaks. Transient errors are retried,
-    /// descriptor shortages wait a little; one failed accept() never ends the server.
-    /// Returns true if at least one client was accepted.
-    private func acceptLoop(listener fd: Int32) -> Bool {
-        var acceptedAny = false
-        var failures = 0
-        while true {
-            let clientFD = Darwin.accept(fd, nil, nil)
-            guard clientFD >= 0 else {
-                let code = errno
-                failures += 1
-                switch AcceptRecovery.forErrno(code, consecutiveFailures: failures) {
-                case .retry:
-                    continue
-                case .backOff:
-                    if failures == 1 { NSLog("HookServer: accept() out of resources, errno \(code)") }
-                    Thread.sleep(forTimeInterval: AcceptRecovery.backOffDelay(consecutiveFailures: failures))
-                    continue
-                case .restartListener:
-                    NSLog("HookServer: accept() failed, errno \(code)")
-                    return acceptedAny
-                }
-            }
-            failures = 0
-            acceptedAny = true
-            // Reject connections from other users (same-UID check)
-            var euid: uid_t = 0
-            var egid: gid_t = 0
-            guard getpeereid(clientFD, &euid, &egid) == 0, euid == getuid() else {
-                close(clientFD)
-                continue
-            }
-            // Enforce the connection ceiling. The slot is freed by closeClient, when the fd
-            // closes — after handleClient for plain events, when the user decides for held requests.
-            connectionLock.lock()
-            let count = connectionCount
-            if count < Self.maxConnections { connectionCount += 1 }
-            connectionLock.unlock()
-            guard count < Self.maxConnections else {
-                close(clientFD)
-                continue
-            }
-            Thread.detachNewThread { self.handleClient(fd: clientFD) }
-        }
-    }
-
-    // MARK: - Client handler (background thread)
+    // MARK: - Message handler (transport's delivery queue)
 
     /// A fully read hook message, on its way to the main actor.
     /// @unchecked: the payload is a fresh JSONSerialization tree, never mutated after parsing.
@@ -575,31 +454,16 @@ final class HookServer: @unchecked Sendable {
         }
     }
 
-    private func handleClient(fd: Int32) {
+    /// One message read by the transport, in the order reads finished. The fd is blocking
+    /// again; `pids` is the relay's process chain, captured as soon as it was accepted.
+    private func handleMessage(_ message: HookSocketServer.Message) {
+        let fd = message.fd
+        let raw = message.data
+        let pids = message.pids
         // Held requests (approvals, questions) keep the fd and its connection slot until the
         // user decides; everything else is answered and closed here.
         var heldOpen = false
         defer { if !heldOpen { closeClient(fd) } }
-        // 5-second receive timeout — unresponsive clients don't hold threads forever
-        var tv = timeval(tv_sec: Self.receiveTimeoutSeconds, tv_usec: 0)
-        setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, &tv, socklen_t(MemoryLayout<timeval>.size))
-        // The relay's process chain, captured before reading: a fire-and-forget relay exits
-        // right after writing, and a gone process has no parent left to walk from.
-        let pids = ProcessAncestry.pidChain(fd: fd)
-
-        // Read newline-delimited JSON
-        var raw = Data()
-        var buf = [UInt8](repeating: 0, count: 4096)
-        outer: while true {
-            let n = recv(fd, &buf, buf.count, 0)
-            if n < 0 && errno == EINTR { continue }
-            if n <= 0 { break }
-            for i in 0..<n {
-                if buf[i] == UInt8(ascii: "\n") { break outer }
-                raw.append(buf[i])
-            }
-            if raw.count > Self.maxPayload { break }
-        }
 
         guard !raw.isEmpty,
               var payload = try? JSONSerialization.jsonObject(with: raw) as? [String: Any] else {
@@ -1472,15 +1336,7 @@ final class HookServer: @unchecked Sendable {
     }
 
     private func sendLine(fd: Int32, text: String) {
-        let bytes = Array((text + "\n").utf8)
-        bytes.withUnsafeBytes { buffer in
-            var sent = 0
-            while sent < buffer.count {
-                let n = Darwin.send(fd, buffer.baseAddress! + sent, buffer.count - sent, 0)
-                if n <= 0 { break }
-                sent += n
-            }
-        }
+        HookSocketServer.sendLine(fd: fd, text: text)
     }
 
     // MARK: - nb-hook script installation

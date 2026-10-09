@@ -70,7 +70,8 @@ cd relay && npm install && npm run typecheck
 
 | 파일 | 역할 |
 |---|---|
-| `HookServer.swift` | 소켓 서버, 이벤트 라우팅, approval/question 큐 운용, 에이전트 설치기 (~2,000줄) |
+| `HookServer.swift` | 이벤트 라우팅, approval/question 큐 운용, 에이전트 설치기 (~1,900줄) |
+| `HookSocketServer.swift` | Foundation만. 소켓 전송 계층: accept·읽기·연결 슬롯·전달 순서 (`test-hook-socket`, 벤치 `scripts/bench-hook-socket.sh`) |
 | `PendingRequestQueue.swift` | 순수. 보관 중인 요청의 FIFO 큐 + `AcceptRecovery`(accept 실패 복구 정책) |
 | `HookRelayScripts.swift` | 순수. `nb-hook` 셸 래퍼, Python 릴레이(GitHub/App Store 두 버전을 한 템플릿에서 생성), OpenCode/Amp/Hermes 플러그인 소스 |
 | `ClaudeHookDetection.swift` | 순수. `CoucouHookCommand`/`isCoucouHookCommand`: Coucou hook 명령을 **정확한 형태**로 인식, `removingCoucouHooks` |
@@ -167,9 +168,11 @@ UI 상태, `[AgentTask]`, `sessionBooks: [pillId: SessionBook]`(§12), ~30개 �
 ## 4. Hook 파이프라인 (에이전트 → 앱)
 
 ### 전송
-- **Unix 도메인 소켓** (HTTP 아님). GitHub 빌드 `~/Library/Application Support/NotchBuddy/nb.sock`, App Store 빌드는 샌드박스 컨테이너의 `nb.sock`. 디렉터리 0700, 소켓 0600, `getpeereid`로 같은 UID만 허용. 동시 연결 32(**보관 중인 approval/question fd도 닫힐 때까지 슬롯을 차지**, 그래서 큐 용량이 approval 16 / question 8로 32보다 작다), 페이로드 1MB, `SO_RCVTIMEO` 5초, `recv`는 EINTR 재시도. 메시지는 JSON 한 줄, 연결당 이벤트 하나.
+- **Unix 도메인 소켓** (HTTP 아님). GitHub 빌드 `~/Library/Application Support/NotchBuddy/nb.sock`, App Store 빌드는 샌드박스 컨테이너의 `nb.sock`. 디렉터리 0700, 소켓 0600, `getpeereid`로 같은 UID만 허용. 동시 연결 32(**보관 중인 approval/question fd도 닫힐 때까지 슬롯을 차지**, 그래서 큐 용량이 approval 16 / question 8로 32보다 작다). 32개가 차면 연결을 끊지 않고 accept를 멈춘다: 새 클라이언트는 listen backlog(128)에서 슬롯이 빌 때까지 기다리고(릴레이는 막히지 않는다), backlog도 차면 connect가 즉시 실패한다. 페이로드 1MB(넘으면 `{"ok":true}`로 답하고 닫음), 연결마다 5초 무응답 타임아웃. 메시지는 JSON 한 줄, 연결당 이벤트 하나.
+- **전송 계층은 `HookSocketServer`** (Foundation만, 스레드-per-연결 아님): 직렬 큐 하나(`ioQueue`)에서 리스닝 소켓의 `DispatchSourceRead`로 non-blocking accept → 대부분의 릴레이는 accept 시점에 이미 한 줄을 다 썼으므로 바로 읽고, 덜 온 연결만 자기 `DispatchSourceRead` + 무응답 타이머를 받는다. 프로세스 사슬(`ProcessAncestry.pidChain`)은 accept 직후 별도 직렬 큐에서 잡고(읽기를 막지 않는다. 동시에 돌리면 sysctl이 커널에서 경합해 CPU가 ~10배), 메시지는 자기 사슬이 잡힐 때까지 기다린다. 다 읽은 메시지는 fd를 blocking으로 되돌려 직렬 전달 큐에서 `HookServer.handleMessage`로 넘긴다(JSON 파싱, 호스트 조회, 메인 큐로 전달, 일반 이벤트는 답하고 `closeClient`). 보관 연결의 hang-up 감시(`makeHoldSource`)와 큐 로직은 그대로다. 모든 핸들러는 nonisolated 코드에서 만들어진다(메인 액터 클로저를 백그라운드 큐에서 부르면 런타임에 트랩).
+- fire-and-forget 릴레이는 쓰고 바로 닫으므로 accept 전에 닫혔으면 `LOCAL_PEERPID`가 실패해 사슬이 비어 있다(벤치에서 이벤트 연결 대부분). 사슬은 연결을 열어 두는 PermissionRequest·질문이나 우연히 일찍 accept된 이벤트에서 잡히고, 세션별 캐시가 나머지를 채운다.
 - **accept 루프는 죽지 않는다**(`AcceptRecovery`, `PendingRequestQueue.swift`): 일시 errno(EINTR, ECONNABORTED…)는 즉시 재시도, EMFILE/ENFILE/ENOBUFS/ENOMEM은 50ms부터 두 배씩 최대 1초 대기, 그 외(EBADF…)나 연속 50번 실패는 리스닝 소켓을 닫고 0.5초부터 최대 30초 간격으로 다시 만든다(폴더가 지워졌으면 0700으로 재생성). 시작 시 bind/listen 실패도 재시도한다. 경로가 sun_path(103바이트)보다 길면 포기.
-- **전달 순서**: 클라이언트마다 스레드가 읽고, 다 읽은 메시지를 `DispatchQueue.main.async`(직렬 FIFO)로 넘긴다. 연결마다 `Task { @MainActor }`를 쓰던 시절과 달리 한 세션의 PreToolUse가 PostToolUse보다 먼저 처리된다(읽기 완료 순서).
+- **전달 순서**: 읽기가 끝난 순서대로 번호를 매기고(`HookSocketServer`의 재정렬 버퍼), 직렬 전달 큐 → `DispatchQueue.main.async`(직렬 FIFO)로 넘긴다. 연결마다 `Task { @MainActor }`를 쓰던 시절과 달리 한 세션의 PreToolUse가 PostToolUse보다 먼저 처리된다(읽기 완료 순서).
 - 앱이 시작할 때 `nb-hook`(`/bin/sh` 래퍼)와 `nb-hook.py`(Python 릴레이)를 지원 디렉터리에 **문자열로 써 넣는다**. 소스는 `HookRelayScripts.swift`(앱 타입 없음, 따로 컴파일·테스트됨). 두 Python 릴레이(GitHub/App Store)는 한 템플릿에서 소켓 경로만 바꿔 생성한다. App Store 빌드는 사용자가 NSOpenPanel로 고른 `~/.claude/coucou/`에 쓴다.
 
 ### "Claude Code를 절대 막지 않는다"의 구현
@@ -182,7 +185,7 @@ UI 상태, `[AgentTask]`, `sessionBooks: [pillId: SessionBook]`(§12), ~30개 �
 - **이 타임아웃 사다리(앱 < 릴레이 < hook)를 바꿀 때는 세 값을 함께 바꾼다.** (`AgentHookConfig.claudeEvents`, `HookRelayScripts`, `HookServer`)
 
 ### 프로토콜
-- `handleClient`가 `coucou_kind`(`statusline`, `ask_user_question`)로 분기 → `hook_event_name == "PermissionRequest"`면 fd를 열어 둔 채 보관 → 나머지는 `processEvent`. 일반 이벤트와 statusline에는 `{"ok":true}\n`으로 답하고 닫는다. 파싱 불가한 줄도 `{"ok":true}`.
+- `handleMessage`가 `coucou_kind`(`statusline`, `ask_user_question`)로 분기 → `hook_event_name == "PermissionRequest"`면 fd를 열어 둔 채 보관 → 나머지는 `processEvent`. 일반 이벤트와 statusline에는 `{"ok":true}\n`으로 답하고 닫는다. 파싱 불가한 줄도 `{"ok":true}`.
 - `ask_user_question`: `--ask` PreToolUse hook이 보낸 `tool_name: "AskUserQuestion"` 페이로드에 릴레이가 `coucou_kind`를 붙인 것. `tool_input.questions`(1–4개, 각 옵션 2–4개, `AskQuestion.parse`)가 잘못되면 즉시 `ask`.
 - 읽는 필드: `session_id`/`conversation_id`, `cwd`, `coucou_agent`, `term_program`, `bundle_id`, `tool_name`, `tool_input`, `prompt`, `message`, `last_assistant_message`, `platform`, `coucou_has_transport`, `permission_suggestions`, `rate_limits`. 릴레이가 `term_program`, `iterm_session_id`, `term_session_id`, `bundle_id`(`__CFBundleIdentifier`), `cwd`를 `setdefault`로 추가하고 Gemini/Antigravity/Copilot 이벤트 이름을 Claude 이름으로 정규화한다. IDE 감지용 새 키 `terminal_emulator`, `coucou_host_bundle_ids`, `coucou_host_override`는 §12.
 - 앱→릴레이 응답: `{"permissionDecision":"allow|always|deny|ask"}` 또는 `{"permissionDecision":"answer","answers":{…}}`. 응답 없이 닫힘(EOF) = 앱이 포기했거나 다른 곳에서 답함. 릴레이가 에이전트별 형식으로 변환한다(Claude/Codex `hookSpecificOutput.decision.behavior`, Claude의 `always`는 `updatedPermissions`, Copilot/Muse 평면 형식, Hermes `{"choice":…}`, AskUserQuestion은 PreToolUse `allow` + `updatedInput`).
@@ -291,6 +294,7 @@ CLI가 아니라 HTTP API 직접 호출. `ClaudeService.chat`→`api.anthropic.c
 | test-hermes-config | `App/HermesConfigMerger` + `App/ClaudeHookDetection` (실제 소스를 테스트) |
 | test-hook-relay | `App/HookRelayScripts` → 생성된 Python을 `tests/hook_relay_check.py`로 가짜 소켓에 실행 (python3 없으면 Python 부분 건너뜀) |
 | test-hook-routing | `App/HookRouting` (+ 스크립트에 적힌 의존 파일. 이벤트 → 호스트 → pill) |
+| test-hook-socket | `App/HookSocketServer` + `App/PendingRequestQueue` (`-strict-concurrency=complete -warnings-as-errors`). 임시 소켓에서 동시 클라이언트, 나뉜 쓰기, 1MB 상한, 무응답 타임아웃, 보관 연결, 연결 상한, 전달 순서 (~5초, 실제 소켓은 건드리지 않음) |
 | test-host-resolver | `App/HostResolver` (`-strict-concurrency=complete`) |
 | test-island-types | `CoucouKit/IslandTypes` + `CoucouKit/IslandScreenGeometry` (프로젝트 색, 채팅 높이) |
 | test-pending-requests | `App/PendingRequestQueue` (`-strict-concurrency=complete`) |
@@ -306,7 +310,7 @@ CLI가 아니라 HTTP API 직접 호출. `ClaudeService.chat`→`api.anthropic.c
 | test-wardrobe | `CoucouKit/MochiWardrobe` |
 
 - 리팩터링의 기본 전략: **로직을 이런 순수 파일로 빼내고, 같은 방식의 테스트 스크립트를 추가**한 뒤 UI를 바꾼다. 새 스크립트는 `scripts/test-*.sh` 이름이면 `test-all.sh`와 CI가 자동으로 집어 간다. 빠르게(수 초) 유지한다.
-- 테스트 없는 영역: AppState, IslandWindowController, HookServer 소켓 루프와 AppState 반영(라우팅 결정 자체는 `test-hook-routing`), MacNotifier·StallMonitor 타이머, 폴러·ServicePollGate, BotEngine, PhoneLink, iPhone 앱 전부. 라우팅은 `coucou-replay.py`로 실행 중인 앱에 대고 손으로 확인한다(§12).
+- 테스트 없는 영역: AppState, IslandWindowController, HookServer의 AppState 반영(라우팅 결정 자체는 `test-hook-routing`, 소켓 전송은 `test-hook-socket`), MacNotifier·StallMonitor 타이머, 폴러·ServicePollGate, BotEngine, PhoneLink, iPhone 앱 전부. 라우팅은 `coucou-replay.py`로 실행 중인 앱에 대고 손으로 확인한다(§12).
 - 손으로 동기화해야 하는 복사본(드리프트 위험): `scripts/test-weekly-recap.swift`(→`RecapStore` 모델), `scripts/RenderOutfits.swift`(스텁), `coucou-replay.py`의 `relay_output`(→ `HookRelayScripts`의 응답 변환, 표시용).
 - 자동 닫힘 테스트는 타이밍 여유에 의존한다(느린 CI에서 flaky했던 이력, #376).
 
@@ -317,7 +321,7 @@ CLI가 아니라 HTTP API 직접 호출. `ClaudeService.chat`→`api.anthropic.c
 ### 핫스팟 (큰 순서)
 1. `App/IslandViewContent.swift` ~4,900줄 — 뷰 ~70개. 뷰별 파일로 분리(§3의 "동시 마운트" 동작 주의).
 2. `App/SettingsView.swift` ~2,060줄 — `@State` ~50개(에이전트마다 installed/showDiff/pendingJSON/pendingInstall), 문자열 switch로 섹션 선택.
-3. `App/HookServer.swift` ~2,040줄 — approval/question 큐(93–360), 소켓 서버(362–590), 이벤트 라우팅(590–860), 헬퍼·권한·질문(860–1310), 설치기(1314–2030). 릴레이 스크립트는 `HookRelayScripts.swift`, 병합 로직은 `AgentHookConfig`/`HermesConfigMerger`로 이미 빠졌다. 라우팅 결정은 `HookRouting`으로 빠졌다. 남은 분리: `HookSocketServer` / `PendingDecisionBroker` / `StepFormatter` / 에이전트별 `AgentInstaller`.
+3. `App/HookServer.swift` ~2,040줄 — approval/question 큐(93–360), 메시지 처리(`handleMessage`), 이벤트 라우팅, 헬퍼·권한·질문(860–1310), 설치기(1314–2030). 릴레이 스크립트는 `HookRelayScripts.swift`, 병합 로직은 `AgentHookConfig`/`HermesConfigMerger`로 이미 빠졌다. 라우팅 결정은 `HookRouting`으로 빠졌다. 소켓 전송은 `HookSocketServer`로 빠졌다. 남은 분리: `PendingDecisionBroker` / `StepFormatter` / 에이전트별 `AgentInstaller`.
 4. `CoucouKit/BotEngine.swift` 1,659줄, `MochiOutfitDrawing.swift` 1,464줄.
 5. `App/IslandWindowController.swift` ~1,290줄 — 창, 폴링, FSM 접착, 단축키, 드래그, dizzy.
 6. `App/AppState.swift` ~850줄 — 설정 / UI 상태 / 세션 / 통합 데이터로 분리.

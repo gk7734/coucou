@@ -4,7 +4,7 @@ import Darwin
 // MARK: - ProcessAncestry
 //
 // The apps above a hook relay in the process tree: the strongest signal of where an agent
-// session runs (HostResolver). Runs on the hook server's client threads, never the main one.
+// session runs (HostResolver). Runs on the hook server's background queues, never the main one.
 //
 // - The relay's pid comes from the connected socket (LOCAL_PEERPID), and the pid chain is
 //   captured as soon as the connection is accepted: a fire-and-forget relay closes and exits

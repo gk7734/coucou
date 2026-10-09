@@ -209,6 +209,7 @@
 		AD94156F1F9CFF62B35202FB /* ApprovalRelay.swift in Sources */ = {isa = PBXBuildFile; fileRef = DD426E81DF79CA79888059D9 /* ApprovalRelay.swift */; };
 		ADB4EF797FBD6CC90F8D25D3 /* MochiActivityAttributes.swift in Sources */ = {isa = PBXBuildFile; fileRef = 323F242B14A61A7C071EC115 /* MochiActivityAttributes.swift */; };
 		ADBB9C15DDA4044625B325BE /* MochiOutfitDrawing.swift in Sources */ = {isa = PBXBuildFile; fileRef = E84E5D91129352E8A1D32AA4 /* MochiOutfitDrawing.swift */; };
+		AE3409F3CBA17142C45B0BF9 /* HookSocketServer.swift in Sources */ = {isa = PBXBuildFile; fileRef = EBEC3FBB8941A27B19C8DE02 /* HookSocketServer.swift */; };
 		B0CE5AC8B579866A14BD61D0 /* DemoEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = AEF5BD66B00BB64BB80AF38C /* DemoEngine.swift */; };
 		B2584220B877056366C8DCAE /* MochiWardrobe.swift in Sources */ = {isa = PBXBuildFile; fileRef = 79A7807ADD0963FF260D1FAD /* MochiWardrobe.swift */; };
 		B2D86BE268D6F4C86BD0C446 /* ChatMarkdown.swift in Sources */ = {isa = PBXBuildFile; fileRef = D797CC384B5BC70D34F121BC /* ChatMarkdown.swift */; };
@@ -267,6 +268,7 @@
 		D9EEB1079ACBCEEF74439C44 /* ClaudeSettingsFile.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3B238F6E7B20EFDED5CD3E8E /* ClaudeSettingsFile.swift */; };
 		D9FF132804EB458F6FA69116 /* GitHubActivity.swift in Sources */ = {isa = PBXBuildFile; fileRef = 168A9A73B519018FAB0AA465 /* GitHubActivity.swift */; };
 		DBA38F8F673F436CE1D4A2E0 /* MochiActivityAttributes.swift in Sources */ = {isa = PBXBuildFile; fileRef = 323F242B14A61A7C071EC115 /* MochiActivityAttributes.swift */; };
+		DBAA93FE823B9383A1E5FC57 /* HookSocketServer.swift in Sources */ = {isa = PBXBuildFile; fileRef = EBEC3FBB8941A27B19C8DE02 /* HookSocketServer.swift */; };
 		DCAC390FF9EC65B945A15B24 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 506824380E9C80B9BC6DCE72 /* Assets.xcassets */; };
 		DD2EEF113DB5EAA35CD88312 /* MochiOutfitDrawing.swift in Sources */ = {isa = PBXBuildFile; fileRef = E84E5D91129352E8A1D32AA4 /* MochiOutfitDrawing.swift */; };
 		DE05D09A32117582AC93A24A /* NotchBuddyApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1BD8F3CAA60CF37640759E1 /* NotchBuddyApp.swift */; };
@@ -486,6 +488,7 @@
 		E84E5D91129352E8A1D32AA4 /* MochiOutfitDrawing.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MochiOutfitDrawing.swift; sourceTree = "<group>"; };
 		E91B733ADC638E14E9BB6EFA /* WindowContextCapture.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WindowContextCapture.swift; sourceTree = "<group>"; };
 		EBB84A66045EB20CAC93A8A6 /* AskQuestion.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AskQuestion.swift; sourceTree = "<group>"; };
+		EBEC3FBB8941A27B19C8DE02 /* HookSocketServer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HookSocketServer.swift; sourceTree = "<group>"; };
 		EE60A834934474CDAE022FF8 /* SearchAndSpotlight.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SearchAndSpotlight.swift; sourceTree = "<group>"; };
 		F1064AD8471C51AFF4F12258 /* SharedSessions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SharedSessions.swift; sourceTree = "<group>"; };
 		F1BD8F3CAA60CF37640759E1 /* NotchBuddyApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotchBuddyApp.swift; sourceTree = "<group>"; };
@@ -546,6 +549,7 @@
 				76F27AAF61FFAE44E4209B51 /* HookRelayScripts.swift */,
 				1FB81C29474C0CD72289CE68 /* HookRouting.swift */,
 				79D8DD79C3DD9BBC584B3CB2 /* HookServer.swift */,
+				EBEC3FBB8941A27B19C8DE02 /* HookSocketServer.swift */,
 				1CD2B28985A5D4E8676D6237 /* HostAppInfo.swift */,
 				3FB897CD268F47C14E0B214C /* HostResolver.swift */,
 				1218B86E249691AF44F819AC /* HotKeyCenter.swift */,
@@ -961,6 +965,7 @@
 				F9915D1B6A25AC29DD8945E5 /* HookRelayScripts.swift in Sources */,
 				4ABDDE677A7BCC0DB327D073 /* HookRouting.swift in Sources */,
 				2C798C3837A63B9BB561A1A0 /* HookServer.swift in Sources */,
+				DBAA93FE823B9383A1E5FC57 /* HookSocketServer.swift in Sources */,
 				B6B69C96325CA2ACEB3A5475 /* HostAppInfo.swift in Sources */,
 				C5A7EE3DBB5B52F420F42831 /* HostResolver.swift in Sources */,
 				B733A76DD197F6D6D949284C /* HotKeyCenter.swift in Sources */,
@@ -1149,6 +1154,7 @@
 				58A38FB29F85A95744B208EF /* HookRelayScripts.swift in Sources */,
 				2927988989262E121F361173 /* HookRouting.swift in Sources */,
 				9DD56C95ECABDDCE23652D50 /* HookServer.swift in Sources */,
+				AE3409F3CBA17142C45B0BF9 /* HookSocketServer.swift in Sources */,
 				430586177AB25FAAB28FC808 /* HostAppInfo.swift in Sources */,
 				5B1D797F940ED559CDAC9423 /* HostResolver.swift in Sources */,
 				530443F46F896F037A56F663 /* HotKeyCenter.swift in Sources */,
