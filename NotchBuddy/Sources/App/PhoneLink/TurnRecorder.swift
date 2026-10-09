@@ -54,8 +54,9 @@ final class TurnRecorder {
         }
     }
 
-    /// Called by HookServer for every event of a session pill.
-    func record(event: String, payload: [String: Any], pillId: String) {
+    /// Called by HookServer for every event of a session pill. `fileDiff`: the diff of a
+    /// PostToolUse file edit (HookFileDiff), computed once for the island and the iPhone.
+    func record(event: String, payload: [String: Any], pillId: String, fileDiff: FileDiff?) {
         guard running, PillCatalog.isSession(pillId) else { return }
         let sessionId = payload["session_id"] as? String ?? payload["conversation_id"] as? String ?? ""
         let cwd = payload["cwd"] as? String ?? ""
@@ -94,7 +95,7 @@ final class TurnRecorder {
             guard let index else { return }
             turn.actions[index].failed = event == "PostToolUseFailure"
             turn.actions[index].output = Self.output(payload, limit: maxOutput)
-            if event == "PostToolUse", let diff = Self.fileDiff(tool: tool, input: input) {
+            if event == "PostToolUse", let diff = fileDiff {
                 let used = turn.files.reduce(0) { $0 + $1.lines.count }
                 let budget = max(0, min(maxLinesPerFile, maxTotalLines - used))
                 turn.files.append(TurnFile(diff: diff, maxLines: budget))
@@ -183,31 +184,6 @@ final class TurnRecorder {
         }
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
         return trimmed.count > limit ? String(trimmed.prefix(limit)) + "\n…" : trimmed
-    }
-
-    static func fileDiff(tool: String, input: [String: Any]) -> FileDiff? {
-        guard let path = input["file_path"] as? String else { return nil }
-        switch tool {
-        case "Edit":
-            guard let old = input["old_string"] as? String, let new = input["new_string"] as? String else { return nil }
-            return DiffEngine.fromEdit(old: old, new: new, path: path)
-        case "MultiEdit":
-            guard let edits = input["edits"] as? [[String: Any]] else { return nil }
-            var added = 0, removed = 0, hunks: [DiffHunk] = [], tooLarge = false
-            for edit in edits {
-                guard let old = edit["old_string"] as? String, let new = edit["new_string"] as? String else { continue }
-                let d = DiffEngine.fromEdit(old: old, new: new, path: path)
-                added += d.added; removed += d.removed
-                hunks += d.hunks
-                tooLarge = tooLarge || d.tooLarge
-            }
-            return FileDiff(path: path, added: added, removed: removed, hunks: hunks, tooLarge: tooLarge, isNewFile: false)
-        case "Write":
-            guard let content = input["content"] as? String else { return nil }
-            return DiffEngine.fromNew(content: content, path: path)
-        default:
-            return nil
-        }
     }
 
     private func log(_ message: String) {

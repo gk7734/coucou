@@ -537,13 +537,41 @@ final class HookServer: @unchecked Sendable {
         }
     }
 
+    /// Keeps that order when a PostToolUse waits for its diff off the main thread: the
+    /// messages behind it wait too (OrderedDelivery), then go in order.
+    @MainActor private let delivery = OrderedDelivery<HookMessage>()
+
     @MainActor
     private func route(_ message: HookMessage) {
+        delivery.submit(message, to: handle)
+    }
+
+    @MainActor
+    private func handle(_ message: HookMessage) {
         switch message {
         case .statusLine(let payload):              processStatusLine(payload: payload)
         case .question(let fd, let parsed, let payload): processQuestionRequest(fd: fd, parsed: parsed, payload: payload)
         case .permission(let fd, let payload):      processPermissionRequest(fd: fd, payload: payload)
-        case .event(let name, let payload):         processEvent(name: name, payload: payload)
+        case .event(let name, let payload):
+            // Edit / MultiEdit / Write: the diff of a big edit is computed off the main thread
+            // (the island keeps animating); small ones right here, no queue hop.
+            guard name == "PostToolUse",
+                  let request = HookFileDiff.Request(tool: payload["tool_name"] as? String ?? "",
+                                                     input: payload["tool_input"] as? [String: Any] ?? [:]) else {
+                processEvent(name: name, payload: payload, fileDiff: nil)
+                return
+            }
+            if request.isSmall {
+                processEvent(name: name, payload: payload, fileDiff: request.compute())
+                return
+            }
+            delivery.hold()
+            request.compute { [self] diff in
+                if case .event(let name, let payload) = message {
+                    processEvent(name: name, payload: payload, fileDiff: diff)
+                }
+                delivery.resume(to: handle)
+            }
         }
     }
 
@@ -675,8 +703,9 @@ final class HookServer: @unchecked Sendable {
         #endif
     }
 
+    /// `fileDiff`: the diff of a PostToolUse file edit, already computed (see handle(_:)).
     @MainActor
-    private func processEvent(name: String, payload: [String: Any]) {
+    private func processEvent(name: String, payload: [String: Any], fileDiff: FileDiff?) {
         let state = AppState.shared
         guard let ctx = context(for: payload) else {
             let termProgram = payload["term_program"] as? String ?? ""
@@ -693,7 +722,7 @@ final class HookServer: @unchecked Sendable {
 
         #if PHONE_LINK
         // The iPhone's "last turn" (prompt, actions, diffs, answer).
-        if !isExternalAgent { TurnRecorder.shared.record(event: name, payload: payload, pillId: agentId) }
+        if !isExternalAgent { TurnRecorder.shared.record(event: name, payload: payload, pillId: agentId, fileDiff: fileDiff) }
         #endif
 
         // A request answered in the editor or terminal (this exact tool call finished, or the
@@ -762,7 +791,7 @@ final class HookServer: @unchecked Sendable {
             }
         case "PostToolUse":
             // Live diff for Edit / MultiEdit / Write
-            if let diff = buildFileDiff(tool: tool, input: payload["tool_input"] as? [String: Any] ?? [:], pillId: agentId) {
+            if let diff = fileDiff.flatMap(HookFileDiff.shown) {
                 let idx = state.appendSessionDiff(diff, for: agentId)
                 step = String.makeDiffStep(filename: diff.name, added: diff.added, removed: diff.removed, diffId: idx)
                 RecapStore.shared.recordFileDiff(sessionId: recapSessionId, path: diff.name, added: diff.added, removed: diff.removed)
@@ -1427,45 +1456,6 @@ final class HookServer: @unchecked Sendable {
                            "xcodebuild test", "unittest"]
         if testRunners.contains(where: { command.contains($0) }) { return String(localized: "step.tests", defaultValue: "Tests") }
         return String(localized: "step.runs", defaultValue: "Runs")
-    }
-
-    // MARK: - Live diff helpers
-
-    @MainActor
-    private func buildFileDiff(tool: String, input: [String: Any], pillId: String) -> FileDiff? {
-        switch tool {
-        case "Edit":
-            guard let old = input["old_string"] as? String,
-                  let new = input["new_string"] as? String,
-                  let path = input["file_path"] as? String,
-                  !old.isEmpty || !new.isEmpty else { return nil }
-            let d = DiffEngine.fromEdit(old: old, new: new, path: path)
-            return (d.added > 0 || d.removed > 0) ? d : nil
-
-        case "MultiEdit":
-            guard let path = input["file_path"] as? String,
-                  let edits = input["edits"] as? [[String: Any]], !edits.isEmpty else { return nil }
-            var totalAdded = 0, totalRemoved = 0, allHunks: [DiffHunk] = [], anyLarge = false
-            for edit in edits {
-                guard let old = edit["old_string"] as? String,
-                      let new = edit["new_string"] as? String else { continue }
-                let d = DiffEngine.fromEdit(old: old, new: new, path: path)
-                totalAdded += d.added; totalRemoved += d.removed
-                allHunks.append(contentsOf: d.hunks); if d.tooLarge { anyLarge = true }
-            }
-            guard totalAdded > 0 || totalRemoved > 0 else { return nil }
-            return FileDiff(path: path, added: totalAdded, removed: totalRemoved,
-                            hunks: allHunks, tooLarge: anyLarge, isNewFile: false)
-
-        case "Write":
-            guard let path = input["file_path"] as? String,
-                  let content = input["content"] as? String, !content.isEmpty else { return nil }
-            let d = DiffEngine.fromNew(content: content, path: path)
-            return (d.added > 0 || d.removed > 0) ? d : nil
-
-        default:
-            return nil
-        }
     }
 
     /// Collapses whitespace so a multi-line command stays one ticker row.
