@@ -91,7 +91,7 @@ enum ClaudeResponseTextTests {
             ["type": "text", "text": "مرحبا"]
         ], expected: "Café ☕ — مرحبا")
 
-        // handleResult extracts the outer braces before parsing the final JSON answer.
+        // A JSON answer after a search stays extractable by its outer braces.
         let json = expectText("JSON after a search remains extractable", content: [
             ["type": "text", "text": "Let me check.\n"],
             ["type": "web_search_tool_result", "tool_use_id": "x", "content": []],
