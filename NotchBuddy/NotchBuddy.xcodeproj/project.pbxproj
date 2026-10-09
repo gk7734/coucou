@@ -65,6 +65,7 @@
 		2F36E3C6C073E968A682AFA4 /* NotionPoller.swift in Sources */ = {isa = PBXBuildFile; fileRef = BE03E03D1804B0B92C5C2DAD /* NotionPoller.swift */; };
 		3756B7E1A55D9CEC8C4D34A4 /* IslandStateMachine.swift in Sources */ = {isa = PBXBuildFile; fileRef = D8212018F09EA1E96FBD63CD /* IslandStateMachine.swift */; };
 		38EEB2D3A6EC538958D92575 /* GitHubPulse.swift in Sources */ = {isa = PBXBuildFile; fileRef = F8D3AD61802A32C4833F3EDA /* GitHubPulse.swift */; };
+		3984EAC8A755AF7984370DAB /* SessionBook.swift in Sources */ = {isa = PBXBuildFile; fileRef = E2A7CF50FD64BC80F35D69C8 /* SessionBook.swift */; };
 		3CF69605BB03E567C2DB0935 /* MacDictation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6544ED02D945CF9F00647AD1 /* MacDictation.swift */; };
 		3E84EA0AE7C450941ED943CF /* NowPlayingViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = F56C7E1EBC74664A7F1689CF /* NowPlayingViews.swift */; };
 		40473EEC3029D466B2769672 /* AppleStyle.swift in Sources */ = {isa = PBXBuildFile; fileRef = 681E15F99FCF1E60C2553004 /* AppleStyle.swift */; };
@@ -88,6 +89,7 @@
 		535EC818E1DAF0FA588545D8 /* QuestionPayload.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6C6993B34A0FFF8E3D454ADC /* QuestionPayload.swift */; };
 		56BE8C733F10A030A638FB60 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7C1A7D5CBE2AC084A10C5FF3 /* SettingsView.swift */; };
 		59FABCC0B6794FE95319825C /* CoucouNotificationContent.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = D6DF93125491729E14636AD8 /* CoucouNotificationContent.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		5B1D797F940ED559CDAC9423 /* HostResolver.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3FB897CD268F47C14E0B214C /* HostResolver.swift */; };
 		5B9A00AFB0837731FA678E4E /* IslandStateMachine.swift in Sources */ = {isa = PBXBuildFile; fileRef = D8212018F09EA1E96FBD63CD /* IslandStateMachine.swift */; };
 		5C6D0BC8C546718CAA82BF90 /* MusicController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4F142FB3952B5F0639383047 /* MusicController.swift */; };
 		607E548D1DD274CD73FDC290 /* ColorHex.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8ACB4350729C6513824D1ADF /* ColorHex.swift */; };
@@ -206,6 +208,7 @@
 		C3ECA730677F467D28910AF6 /* LiveActivityRelay.swift in Sources */ = {isa = PBXBuildFile; fileRef = 136626568FF0C3EAB1D08067 /* LiveActivityRelay.swift */; };
 		C5549C2D60998E297A7DC593 /* TurnSnapshot.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2A1C4152EBDBD7C24CABFFD7 /* TurnSnapshot.swift */; };
 		C5737FE7AE6B2BA92B9A8F72 /* ServiceDetail.swift in Sources */ = {isa = PBXBuildFile; fileRef = 65F64746B2740D5FE26B7E5A /* ServiceDetail.swift */; };
+		C5A7EE3DBB5B52F420F42831 /* HostResolver.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3FB897CD268F47C14E0B214C /* HostResolver.swift */; };
 		C61DDE2EC5FDDB39E4AA3B34 /* IslandWindowController.swift in Sources */ = {isa = PBXBuildFile; fileRef = D710BD7834228045869D0184 /* IslandWindowController.swift */; };
 		C67B690DFC0A294C0E65FCBB /* IslandScreenGeometry.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9466FDE02C9B3FB4EF01DFF8 /* IslandScreenGeometry.swift */; };
 		C808B654C84D9F71DBF8493A /* GithubPoller.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8CB8B6E5E9DA6164F979E88F /* GithubPoller.swift */; };
@@ -237,6 +240,7 @@
 		DE05D09A32117582AC93A24A /* NotchBuddyApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1BD8F3CAA60CF37640759E1 /* NotchBuddyApp.swift */; };
 		DE66BB6D18F467A7F4220CC3 /* SessionPublisher.swift in Sources */ = {isa = PBXBuildFile; fileRef = 824E56D2255CA86DAC350DBF /* SessionPublisher.swift */; };
 		E1581F8F2725B26E90D91C4A /* IntroView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1B2EED5205DD7161E51BE1E1 /* IntroView.swift */; };
+		E1FA71B2D6BFF207C0166AEA /* SessionBook.swift in Sources */ = {isa = PBXBuildFile; fileRef = E2A7CF50FD64BC80F35D69C8 /* SessionBook.swift */; };
 		E2414533EDC7565286141198 /* SpotifyController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6A9E6EB7C8468A8339CF6A5C /* SpotifyController.swift */; };
 		E4B9986674F4D425826F15A8 /* StripePoller.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2EF78999D68D56ADE4CEFBE2 /* StripePoller.swift */; };
 		E701BC8996229D08362CA732 /* ServiceStatus.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9AF705275522F99CAE7E1429 /* ServiceStatus.swift */; };
@@ -339,6 +343,7 @@
 		38BEAB5F20A13E5806A42EC9 /* ApprovalCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ApprovalCard.swift; sourceTree = "<group>"; };
 		3A27178AA6007F7B56901750 /* SessionDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionDetailView.swift; sourceTree = "<group>"; };
 		3B238F6E7B20EFDED5CD3E8E /* ClaudeSettingsFile.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClaudeSettingsFile.swift; sourceTree = "<group>"; };
+		3FB897CD268F47C14E0B214C /* HostResolver.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HostResolver.swift; sourceTree = "<group>"; };
 		444604C7E2C530B664849EF9 /* ClaudeResponseText.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClaudeResponseText.swift; sourceTree = "<group>"; };
 		49E39852175E81C9632A59C9 /* KitPreviewView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KitPreviewView.swift; sourceTree = "<group>"; };
 		4A09E73F1E58019EF6EA2A62 /* IslandDisplayChoice.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IslandDisplayChoice.swift; sourceTree = "<group>"; };
@@ -420,6 +425,7 @@
 		DDB831F5623E699A2506698E /* NotificationViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotificationViewController.swift; sourceTree = "<group>"; };
 		DE18399D1CD69468CCF57966 /* MochiActivityState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MochiActivityState.swift; sourceTree = "<group>"; };
 		E18E74B3586BC0861C69E70A /* InstructionComposer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InstructionComposer.swift; sourceTree = "<group>"; };
+		E2A7CF50FD64BC80F35D69C8 /* SessionBook.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionBook.swift; sourceTree = "<group>"; };
 		E6AAC67875F84A862BC2A9AF /* ServiceDetailRunner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ServiceDetailRunner.swift; sourceTree = "<group>"; };
 		E84E5D91129352E8A1D32AA4 /* MochiOutfitDrawing.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MochiOutfitDrawing.swift; sourceTree = "<group>"; };
 		E91B733ADC638E14E9BB6EFA /* WindowContextCapture.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WindowContextCapture.swift; sourceTree = "<group>"; };
@@ -477,6 +483,7 @@
 				F8D3AD61802A32C4833F3EDA /* GitHubPulse.swift */,
 				C581F7B1A9F14B281B60063E /* GreetingCanvasView.swift */,
 				79D8DD79C3DD9BBC584B3CB2 /* HookServer.swift */,
+				3FB897CD268F47C14E0B214C /* HostResolver.swift */,
 				1218B86E249691AF44F819AC /* HotKeyCenter.swift */,
 				4A09E73F1E58019EF6EA2A62 /* IslandDisplayChoice.swift */,
 				15A1A8206F73376F4CAF2057 /* IslandRootView.swift */,
@@ -494,6 +501,7 @@
 				78FB882D49084DEA6A10DB4D /* RecapStore.swift */,
 				61B5FDDE03F5F711146937E2 /* ResendPoller.swift */,
 				B2FDED98F7F6C755A72C97A3 /* SafeWebURL.swift */,
+				E2A7CF50FD64BC80F35D69C8 /* SessionBook.swift */,
 				7C1A7D5CBE2AC084A10C5FF3 /* SettingsView.swift */,
 				FA51E5B140C20812641168EA /* ShortcutLogic.swift */,
 				62CF42AE7611EF212CA0458F /* ShortcutsSettingsView.swift */,
@@ -871,6 +879,7 @@
 				C808B654C84D9F71DBF8493A /* GithubPoller.swift in Sources */,
 				8C32A0C3EAF536D3836F61D5 /* GreetingCanvasView.swift in Sources */,
 				2C798C3837A63B9BB561A1A0 /* HookServer.swift in Sources */,
+				C5A7EE3DBB5B52F420F42831 /* HostResolver.swift in Sources */,
 				B733A76DD197F6D6D949284C /* HotKeyCenter.swift in Sources */,
 				658C579523CF5F8D67B31369 /* InstructionRunner.swift in Sources */,
 				9E34044A001B01C3A514D20A /* IslandDisplayChoice.swift in Sources */,
@@ -904,6 +913,7 @@
 				9F43BE6E77E371FCEB7FE8BA /* ServiceDetailRunner.swift in Sources */,
 				694AB4504CD65662E1681E5C /* ServicePublisher.swift in Sources */,
 				0393CA5466F52252378F0346 /* ServiceSnapshot.swift in Sources */,
+				E1FA71B2D6BFF207C0166AEA /* SessionBook.swift in Sources */,
 				9728564FCBF0334E68E9E6E7 /* SessionPublisher.swift in Sources */,
 				56BE8C733F10A030A638FB60 /* SettingsView.swift in Sources */,
 				C07E9A04E827284FDF33DB16 /* ShortcutLogic.swift in Sources */,
@@ -1037,6 +1047,7 @@
 				C18227D148D99FE6EE3CC51A /* GithubPoller.swift in Sources */,
 				C0E18D0F6F5F6D131E6066B8 /* GreetingCanvasView.swift in Sources */,
 				9DD56C95ECABDDCE23652D50 /* HookServer.swift in Sources */,
+				5B1D797F940ED559CDAC9423 /* HostResolver.swift in Sources */,
 				530443F46F896F037A56F663 /* HotKeyCenter.swift in Sources */,
 				52F0DF1FBCB522951910390E /* InstructionRunner.swift in Sources */,
 				1D23613B270FE8B11C5E27A7 /* IslandDisplayChoice.swift in Sources */,
@@ -1070,6 +1081,7 @@
 				4755AAC633DCE5DAA6D54A3C /* ServiceDetailRunner.swift in Sources */,
 				D092D0D597D1CBCE6B775B5E /* ServicePublisher.swift in Sources */,
 				1FE62D4EEA85FB25C17FDBA2 /* ServiceSnapshot.swift in Sources */,
+				3984EAC8A755AF7984370DAB /* SessionBook.swift in Sources */,
 				DE66BB6D18F467A7F4220CC3 /* SessionPublisher.swift in Sources */,
 				8D1C01F283FA7806119A1C85 /* SettingsView.swift in Sources */,
 				6CCEC73ED68E9F253C22D692 /* ShortcutLogic.swift in Sources */,
