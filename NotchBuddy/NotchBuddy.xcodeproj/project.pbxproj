@@ -181,6 +181,7 @@
 		9377B2B9A1B44E0113DBF619 /* TurnArchive.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6E5F9E4BB282FDE68D65FE6B /* TurnArchive.swift */; };
 		93AB64BF47D6D1EE7DB4C22B /* QuestionRelay.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB78996E9F9A2E8A80D45E54 /* QuestionRelay.swift */; };
 		93CD58567884F5B7715D3A3E /* QuestionCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8296E14A0C15515E6C3C1DBB /* QuestionCard.swift */; };
+		93F2F16661768D46A9BB0EB0 /* ChangeObserver.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8D661E66A8F3EAFA57983E6B /* ChangeObserver.swift */; };
 		9492F8E414E8E1814F01EE66 /* ApprovalCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 38BEAB5F20A13E5806A42EC9 /* ApprovalCard.swift */; };
 		94E0849D13762C6EC8548FEF /* ClaudePlanCardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4263B550838CC5614569D13 /* ClaudePlanCardView.swift */; };
 		967B525F7D3837F31D740D18 /* ResendPoller.swift in Sources */ = {isa = PBXBuildFile; fileRef = 61B5FDDE03F5F711146937E2 /* ResendPoller.swift */; };
@@ -296,6 +297,7 @@
 		F6D57EEBD7E937EFD2B715CF /* ClaudeHost.swift in Sources */ = {isa = PBXBuildFile; fileRef = D0F0D0F67E7C56B9E37E7648 /* ClaudeHost.swift */; };
 		F8BBF82147AC0E79E035845A /* ProcessAncestry.swift in Sources */ = {isa = PBXBuildFile; fileRef = DE1A6E4C24A8F95F561609C0 /* ProcessAncestry.swift */; };
 		F8F95EAD88F70E0A147D1662 /* MacDictation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6544ED02D945CF9F00647AD1 /* MacDictation.swift */; };
+		F90D60F3FF35D95C5F5A2146 /* ChangeObserver.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8D661E66A8F3EAFA57983E6B /* ChangeObserver.swift */; };
 		F9445A71BBF9E4D20224238E /* QuestionPayload.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6C6993B34A0FFF8E3D454ADC /* QuestionPayload.swift */; };
 		F9915D1B6A25AC29DD8945E5 /* HookRelayScripts.swift in Sources */ = {isa = PBXBuildFile; fileRef = 76F27AAF61FFAE44E4209B51 /* HookRelayScripts.swift */; };
 		FAD78D74C6906D4EC8AA4101 /* UploadSequenceEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6FD65943C32E150F1CD65C31 /* UploadSequenceEngine.swift */; };
@@ -425,6 +427,7 @@
 		8ACB4350729C6513824D1ADF /* ColorHex.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ColorHex.swift; sourceTree = "<group>"; };
 		8BF22817EC70748F2D1FB2E7 /* ClaudePlanGauge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClaudePlanGauge.swift; sourceTree = "<group>"; };
 		8CB8B6E5E9DA6164F979E88F /* GithubPoller.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GithubPoller.swift; sourceTree = "<group>"; };
+		8D661E66A8F3EAFA57983E6B /* ChangeObserver.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChangeObserver.swift; sourceTree = "<group>"; };
 		914A792788D403F836BEB570 /* SpotifyViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpotifyViews.swift; sourceTree = "<group>"; };
 		9466FDE02C9B3FB4EF01DFF8 /* IslandScreenGeometry.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IslandScreenGeometry.swift; sourceTree = "<group>"; };
 		966DCEEC903061A89ABE0CAF /* AgentHookConfig.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentHookConfig.swift; sourceTree = "<group>"; };
@@ -510,6 +513,7 @@
 				EBB84A66045EB20CAC93A8A6 /* AskQuestion.swift */,
 				A29F4C0B02BE91654D02AA0C /* BotCanvasView.swift */,
 				3104222B3F17BA5E8DEA5277 /* CalcomPoller.swift */,
+				8D661E66A8F3EAFA57983E6B /* ChangeObserver.swift */,
 				D797CC384B5BC70D34F121BC /* ChatMarkdown.swift */,
 				BFE88A53AEAA637F866D479D /* ChatMarkdownView.swift */,
 				1EA7D927F6BB2667D37AA963 /* ClaudeHookDetection.swift */,
@@ -917,6 +921,7 @@
 				CD8DECA66B9E09C97E469DB9 /* BotCanvasView.swift in Sources */,
 				845D762E9F4F0AD0D5FCEDF4 /* BotEngine.swift in Sources */,
 				4F1E0B3C838DA3CD6F864BC0 /* CalcomPoller.swift in Sources */,
+				93F2F16661768D46A9BB0EB0 /* ChangeObserver.swift in Sources */,
 				8FC5907E9506DC79EB1DDC3C /* ChatMarkdown.swift in Sources */,
 				4976F8BF814D6F817370F1D8 /* ChatMarkdownView.swift in Sources */,
 				1DCF28998358810CDBC93F91 /* ClaudeHookDetection.swift in Sources */,
@@ -1101,6 +1106,7 @@
 				651FA3F09608DE5D02D61CCE /* BotCanvasView.swift in Sources */,
 				B314F09AD7924387D0E04B45 /* BotEngine.swift in Sources */,
 				1969590AFEE6CB21404346F1 /* CalcomPoller.swift in Sources */,
+				F90D60F3FF35D95C5F5A2146 /* ChangeObserver.swift in Sources */,
 				B2D86BE268D6F4C86BD0C446 /* ChatMarkdown.swift in Sources */,
 				733FCC6A45DE963EF2024B4E /* ChatMarkdownView.swift in Sources */,
 				91B8AAADB623A12FF6769755 /* ClaudeHookDetection.swift in Sources */,
