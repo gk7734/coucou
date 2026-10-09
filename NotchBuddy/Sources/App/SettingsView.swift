@@ -590,7 +590,18 @@ struct SettingsView: View {
                     .fixedSize(horizontal: false, vertical: true)
 
                 #if !APPSTORE
-                if showDiff {
+                if showDiff, HookServer.shared.pendingClaudeHooksInstall,
+                   let diff = HookServer.shared.pendingClaudeHooksDiff, diff.added == 0, diff.removed == 0 {
+                    // Installing would change nothing: say so instead of an empty diff.
+                    HStack(spacing: 8) {
+                        Text("✓ Coucou's hooks are already installed and up to date. Nothing to write.")
+                            .font(.system(size: 11, weight: .semibold))
+                            .fixedSize(horizontal: false, vertical: true)
+                        Spacer()
+                        Button(String(localized: "OK")) { showDiff = false; pendingHookJSON = "" }
+                            .buttonStyle(.bordered)
+                    }
+                } else if showDiff {
                     // What the write will do, then only the lines it changes.
                     let installing = HookServer.shared.pendingClaudeHooksInstall
                     let diff = HookServer.shared.pendingClaudeHooksDiff

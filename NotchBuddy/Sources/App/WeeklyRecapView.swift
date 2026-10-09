@@ -114,7 +114,8 @@ enum RecapSharePanel {
         win.center()
         window = win
         win.makeKeyAndOrderFront(nil)
-        NSApp.activate(ignoringOtherApps: true)
+        NSApp.activate()
+        win.orderFrontRegardless()
     }
 }
 

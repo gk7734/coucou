@@ -97,7 +97,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         if let w = settingsWindow, w.isVisible {
             placeBelowIsland(w)
-            w.makeKeyAndOrderFront(nil); NSApp.activate(ignoringOtherApps: true); return
+            bringForward(w); return
         }
         let win = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 720, height: 560),
                            styleMask: [.titled, .closable, .miniaturizable, .resizable],
@@ -110,8 +110,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         win.isReleasedWhenClosed = false
         placeBelowIsland(win)
         settingsWindow = win
+        bringForward(win)
+    }
+
+    /// Settings in front of whatever app is active. `activate(ignoringOtherApps:)` has no
+    /// effect since macOS 14 and Coucou is an accessory app, so the window used to open
+    /// behind the app the user was in.
+    private func bringForward(_ win: NSWindow) {
+        NSApp.activate()
         win.makeKeyAndOrderFront(nil)
-        NSApp.activate(ignoringOtherApps: true)
+        win.orderFrontRegardless()
     }
 
     /// Centres the window horizontally and keeps its title bar clear of the island when it
