@@ -17618,7 +17618,7 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "✓ Hooks installed — restart VS Code to activate them."
+            "value": "✓ Hooks installed — restart Claude Code to activate them."
           }
         },
         "es": {
@@ -23035,6 +23035,26 @@
           "stringUnit": {
             "state": "translated",
             "value": "%lld 分钟无活动"
+          }
+        }
+      }
+    },
+    "Auto (last IDE you used)": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Auto (last IDE you used)"
+          }
+        }
+      }
+    },
+    "Auto — %@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Auto — %@"
           }
         }
       }

@@ -510,15 +510,20 @@ struct SettingsView: View {
                     .font(.system(size: 11))
                     .foregroundColor(state.activeIntegrations.count >= 4 ? .orange : .secondary)
 
-                Picker(String(localized: "settings.main-pill"), selection: $state.mainPillId) {
+                Picker(String(localized: "settings.main-pill"), selection: $state.mainPillChoice) {
+                    Text("Auto (last IDE you used)").tag(PillCatalog.autoMainPillId)
                     ForEach(PillCatalog.available.filter { $0.category == .workspace && !$0.comingSoon }, id: \.id) { def in
                         Text(def.name).tag(def.id)
                     }
                 }
-                .onChange(of: state.mainPillId) { _, newId in
-                    state.activeIntegrations.remove(newId)
-                    state.loadIntegrationTasks()
-                    state.setFocus(newId)
+                .onChange(of: state.mainPillChoice) { _, _ in
+                    // AppState already moved the main pill (and dropped a picked one from the active pills).
+                    state.setFocus(state.mainPillId)
+                }
+                if state.mainPillChoice == PillCatalog.autoMainPillId {
+                    Text(String(format: String(localized: "Auto — %@"), state.mainPillDisplayName))
+                        .font(.system(size: 11))
+                        .foregroundColor(.secondary)
                 }
 
                 ForEach(PillCategory.allCases, id: \.self) { cat in

@@ -104,6 +104,7 @@
 		5B924B518031AEE2F1143C65 /* ServicePollGate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2805714A8AA17E5AE5339EE9 /* ServicePollGate.swift */; };
 		5B9A00AFB0837731FA678E4E /* IslandStateMachine.swift in Sources */ = {isa = PBXBuildFile; fileRef = D8212018F09EA1E96FBD63CD /* IslandStateMachine.swift */; };
 		5C6D0BC8C546718CAA82BF90 /* MusicController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4F142FB3952B5F0639383047 /* MusicController.swift */; };
+		60187867BEBC54CB9441DAB7 /* AutoMainPill.swift in Sources */ = {isa = PBXBuildFile; fileRef = C11879BF7D8C052ED146D6DC /* AutoMainPill.swift */; };
 		607E548D1DD274CD73FDC290 /* ColorHex.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8ACB4350729C6513824D1ADF /* ColorHex.swift */; };
 		60E361FFE84C387E5E3ED1AA /* SoundEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1BE21C2B315D37AA70ED45E9 /* SoundEngine.swift */; };
 		61CB7049490F61CFA1B36B64 /* AppLog.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9F6D7015D6A77AA59323C0E7 /* AppLog.swift */; };
@@ -216,6 +217,7 @@
 		B314F09AD7924387D0E04B45 /* BotEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 66E6F5FC81429871B6F766A8 /* BotEngine.swift */; };
 		B31955759E2DA9879547E71B /* PendingRequestQueue.swift in Sources */ = {isa = PBXBuildFile; fileRef = 501DFE8274B5D5F1F86F716A /* PendingRequestQueue.swift */; };
 		B3EC9CF3C8BD629C3530E8F1 /* sounds in Resources */ = {isa = PBXBuildFile; fileRef = C066E2B991AA4F56B2724263 /* sounds */; };
+		B4857E89081FCE1E2F978167 /* AutoMainPill.swift in Sources */ = {isa = PBXBuildFile; fileRef = C11879BF7D8C052ED146D6DC /* AutoMainPill.swift */; };
 		B5D8D34DD7A72F340030EF46 /* MacStubs.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9B66D0C664FB9FF74517AAF5 /* MacStubs.swift */; };
 		B605F976F4141435F27CF266 /* IslandRootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 15A1A8206F73376F4CAF2057 /* IslandRootView.swift */; };
 		B608539B2273B7D32FA77EB7 /* CloudSchema.swift in Sources */ = {isa = PBXBuildFile; fileRef = 977A280276BC2C882FD7C13E /* CloudSchema.swift */; };
@@ -465,6 +467,7 @@
 		BFE88A53AEAA637F866D479D /* ChatMarkdownView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatMarkdownView.swift; sourceTree = "<group>"; };
 		C066E2B991AA4F56B2724263 /* sounds */ = {isa = PBXFileReference; lastKnownFileType = folder; name = sounds; path = Resources/sounds; sourceTree = SOURCE_ROOT; };
 		C086E1932F86B9C2B559BE03 /* DesktopMochiLogic.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesktopMochiLogic.swift; sourceTree = "<group>"; };
+		C11879BF7D8C052ED146D6DC /* AutoMainPill.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AutoMainPill.swift; sourceTree = "<group>"; };
 		C22AF9F301D7A23DA6254D49 /* PhoneLink.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PhoneLink.swift; sourceTree = "<group>"; };
 		C2DFAEAF1DD1CBF03D3C314E /* TurnRecorder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TurnRecorder.swift; sourceTree = "<group>"; };
 		C2E4F18AA940EFF7E047B9F7 /* AppState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppState.swift; sourceTree = "<group>"; };
@@ -523,6 +526,7 @@
 				9F6D7015D6A77AA59323C0E7 /* AppLog.swift */,
 				C2E4F18AA940EFF7E047B9F7 /* AppState.swift */,
 				EBB84A66045EB20CAC93A8A6 /* AskQuestion.swift */,
+				C11879BF7D8C052ED146D6DC /* AutoMainPill.swift */,
 				A29F4C0B02BE91654D02AA0C /* BotCanvasView.swift */,
 				3104222B3F17BA5E8DEA5277 /* CalcomPoller.swift */,
 				8D661E66A8F3EAFA57983E6B /* ChangeObserver.swift */,
@@ -934,6 +938,7 @@
 				1F11EC4E6F604C612A1ADAD1 /* AppState.swift in Sources */,
 				23BFB915C12B0BC4E9B50AAA /* ApprovalRelay.swift in Sources */,
 				7C75CCB3DC0116D8D3B12313 /* AskQuestion.swift in Sources */,
+				B4857E89081FCE1E2F978167 /* AutoMainPill.swift in Sources */,
 				CD8DECA66B9E09C97E469DB9 /* BotCanvasView.swift in Sources */,
 				845D762E9F4F0AD0D5FCEDF4 /* BotEngine.swift in Sources */,
 				4F1E0B3C838DA3CD6F864BC0 /* CalcomPoller.swift in Sources */,
@@ -1123,6 +1128,7 @@
 				61F73B27A7E3AFF584B2CC22 /* AppState.swift in Sources */,
 				AD94156F1F9CFF62B35202FB /* ApprovalRelay.swift in Sources */,
 				ED5D9A334DE08C0EB81DE322 /* AskQuestion.swift in Sources */,
+				60187867BEBC54CB9441DAB7 /* AutoMainPill.swift in Sources */,
 				651FA3F09608DE5D02D61CCE /* BotCanvasView.swift in Sources */,
 				B314F09AD7924387D0E04B45 /* BotEngine.swift in Sources */,
 				1969590AFEE6CB21404346F1 /* CalcomPoller.swift in Sources */,

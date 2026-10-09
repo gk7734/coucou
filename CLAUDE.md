@@ -84,6 +84,7 @@ cd relay && npm install && npm run typecheck
 | `HookRouting.swift` | 순수. 이벤트 → 호스트 → pill 라우팅 결정 (`test-hook-routing`) (§12) |
 | `SessionBook.swift` | 순수. pill 하나 뒤의 세션 목록, 긴급도, 보관, 정지 감지 (§12) |
 | `SessionCardText.swift` | 순수. 카드의 세션 목록 문구 (`test-session-card-text`) |
+| `AutoMainPill.swift` | 순수. Auto 메인 pill: 활동 이벤트, flip-flop 방지 전환, 해석 (`test-auto-main-pill`) (§12) |
 | `SessionAlert.swift` | `SessionAlert` + `SessionAlertCenter`(알림 진입점) (§12) |
 | `NotificationPolicy.swift`, `MacNotifier.swift` | 알림을 띄울지 결정(토글·억제) / 무음 macOS 배너 (§12) |
 | `StallMonitor.swift` | 정지 감지. 예약된 검사 하나 (§12) |
@@ -149,7 +150,7 @@ cd relay && npm install && npm run typecheck
 UI 상태, `[AgentTask]`, `sessionBooks: [pillId: SessionBook]`(§12), ~30개 설정(각각 `didSet`에서 UserDefaults 저장), 모든 통합의 데이터, 채팅 기록, pending approval/question(큐의 head만), 세션 diff, 플랜 게이지를 다 가진다. 뷰는 `IslandRootView`에서 내려받은 `@ObservedObject state`와 `AppState.shared` 직접 접근을 섞어 쓴다. `@Published` 하나만 바뀌어도 트리 전체가 다시 그려진다.
 - 새 필드를 추가하면 **`DemoEngine`의 `Snapshot`에도 추가**해야 데모 모드 진입/복귀가 깨지지 않는다.
 - `init` 안에서는 `didSet`이 안 불리므로 `SoundEngine` 볼륨은 수동 동기화한다.
-- `mainPillId`는 `activeIntegrations`에 들어가면 안 되고, 활성 pill은 최대 4개.
+- 메인 pill: `mainPillChoice`(저장값, `"auto"` 또는 사용자가 고른 workspace pill)와 `mainPillId`(해석된 값, `private(set)`, 바뀔 때만 대입). 메인 pill을 읽는 코드는 모두 `mainPillId`를 쓴다. **고른** 메인은 `activeIntegrations`에 들어가면 안 된다. Auto 메인은 들어 있을 수 있다(메인이 옮겨 가도 사용자가 켠 pill이 사라지지 않도록). 활성 pill은 최대 4개(메인과 겹쳐도 `activeIntegrations.count` 기준). Auto 규칙은 §12.
 - `IslandConst.colorForProject`는 FNV-1a(`stableHash`)라 실행·기기마다 같은 색이다. 부분 일치는 길이·이름 고정 순서.
 
 ### Mochi 렌더링
@@ -261,7 +262,7 @@ CLI가 아니라 HTTP API 직접 호출. `ClaudeService.chat`→`api.anthropic.c
 | 번들 ID | `fr.louisraille.NotchBuddy`(Mac GitHub), `fr.louisraille.Coucou`(App Store·iPhone), `.Widgets`, `.NotificationContent`. Keychain·UserDefaults·TCC 권한이 여기 묶여 있다 |
 | Keychain | service `fr.louisraille.NotchBuddy` + §3의 키 이름 12개 |
 | Pill ID | `integration_claude, agent_cursor, agent_antigravity, agent_codex, agent_gemini, agent_copilot, agent_muse, agent_opencode, agent_amp, agent_hermes, agent_claude-desktop, ai_anthropic, ai_google, ai_openai, ai_ollama, ai_lmstudio, integration_resend, integration_n8n, integration_vercel, integration_github, integration_notion, integration_calcom, integration_stripe, integration_music, integration_spotify`, 동적 `agent_<coucou_agent>`, 그리고 새 동적 패밀리 **`ide_<slug>`**(번들 ID 소문자, `[a-z0-9]` 밖의 연속 문자는 `-` 하나, 예: `com.jetbrains.WebStorm` → `ide_com-jetbrains-webstorm`; JetBrains 폴백은 `ide_com-jetbrains-ide`. 슬러그 규칙 `HostResolver.idePillId`를 바꾸면 저장된 ID가 끊긴다). UserDefaults, CloudKit 레코드 이름, `recap.json`, 위젯 설정에 저장된다. 단일 출처는 `CoucouKit/PillCatalog.swift`지만 코드 곳곳에 리터럴로 반복된다 |
-| UserDefaults | `activeIntegrations, mainPill, pillColors, mochiOutfit, soundEnabled, soundVolume, claudeModel, chatProvider, googleChatModel, openAIChatModel, ollamaChatModel, lmstudioChatModel, ollamaServerURL, lmstudioServerURL, openOnHover, autoCloseInterval, absenceInterval, islandDisplay, hotkeyEnabled, hotkeyFlags, hotkeyCode, shortcut.<action>.{keyCode,flags,enabled}, vercelProjectFilter, n8nWorkflowFilter, claudePlanUsage, showPlanInNotch, showCodexPlanInNotch, settingsSection, coucouHooksInstalled, hermesApprovalsEnabled, terminalCardsEnabled, iPhoneSyncEnabled, iPhoneLiveActivityEnabled, iPhoneInstructionsEnabled, phoneRelayURL, phoneLinkPing, mochiOnDesktop, desktopMochiX, desktopMochiY, dictationLanguage, dictationLastLocale, recapEnabled, recapHideProjects, recapLastShownWeek, coucou.spotifyAutomationGranted, coucou.musicAutomationGranted` + 알림·정지 감지(§12): `macNotificationsEnabled, notifyFinished, notifyErrors, notifyWaiting, notifyStalled, stallThresholdMinutes`(Int 분, 기본 3, 0 = 끔) |
+| UserDefaults | `activeIntegrations, mainPill`(workspace pill ID 또는 센티널 **`"auto"`** = `PillCatalog.autoMainPillId`; 키가 없거나 이 빌드에 없는 pill이면 Auto)`, lastActiveWorkspacePill, lastActiveWorkspaceBundleId`(Auto 메인용: 마지막 활성 workspace pill과, `ide_` pill이면 그 앱의 번들 ID — 슬러그는 되돌릴 수 없다)`, pillColors, mochiOutfit, soundEnabled, soundVolume, claudeModel, chatProvider, googleChatModel, openAIChatModel, ollamaChatModel, lmstudioChatModel, ollamaServerURL, lmstudioServerURL, openOnHover, autoCloseInterval, absenceInterval, islandDisplay, hotkeyEnabled, hotkeyFlags, hotkeyCode, shortcut.<action>.{keyCode,flags,enabled}, vercelProjectFilter, n8nWorkflowFilter, claudePlanUsage, showPlanInNotch, showCodexPlanInNotch, settingsSection, coucouHooksInstalled, hermesApprovalsEnabled, terminalCardsEnabled, iPhoneSyncEnabled, iPhoneLiveActivityEnabled, iPhoneInstructionsEnabled, phoneRelayURL, phoneLinkPing, mochiOnDesktop, desktopMochiX, desktopMochiY, dictationLanguage, dictationLastLocale, recapEnabled, recapHideProjects, recapLastShownWeek, coucou.spotifyAutomationGranted, coucou.musicAutomationGranted` + 알림·정지 감지(§12): `macNotificationsEnabled, notifyFinished, notifyErrors, notifyWaiting, notifyStalled, stallThresholdMinutes`(Int 분, 기본 3, 0 = 끔) |
 | 디스크 경로 | `~/Library/Application Support/NotchBuddy/nb.sock`·`nb-hook` (이미 설치된 사용자의 `~/.claude/settings.json`이 이 경로를 가리킨다. `CoucouHookCommand`가 인식하는 형태이기도 하다) |
 | Hook 프로토콜 | 이벤트 이름, `coucou_agent`·`coucou_kind` 필드, `permissionDecision` 응답 형식, 타임아웃 사다리, 릴레이가 붙이는 `term_program`·`bundle_id`·`terminal_emulator`, 서버가 주입하는 `coucou_host_bundle_ids`, DEBUG 전용 `coucou_host_override`(빈 문자열 = "앱 없음")(§12) |
 | CloudKit | `CloudSchema`의 컨테이너·존 `Coucou`·레코드 타입 12개, 레코드 이름 접두사, 필드 이름과 평문/암호화 구분, 구독 ID(`coucou-zone-mac`, `coucou-zone-phone-silent`, `coucou-approvals`, `coucou-approvals-mochi`), 지문 알고리즘, `BotState` raw 값 |
@@ -280,6 +281,7 @@ CLI가 아니라 HTTP API 직접 호출. `ClaudeService.chat`→`api.anthropic.c
 |---|---|
 | test-agent-hooks | `App/ClaudeSettingsFile` + `App/ClaudeHookDetection` + `App/AgentHookConfig` (`-warnings-as-errors`) |
 | test-ask-question | `App/AskQuestion` |
+| test-auto-main-pill | `App/AutoMainPill` + `App/HostResolver` (`-strict-concurrency=complete -warnings-as-errors`, Auto 메인 pill의 전환·해석) |
 | test-auto-close, test-island-hover, test-island-sync | `App/IslandStateMachine` (`-strict-concurrency=complete`) |
 | test-chat-history | `App/ClaudeResponseText` (`-warnings-as-errors`, 기록 변환) |
 | test-chat-parsing | `App/LocalChat` + `App/ChatMarkdown` (`tests/fake_local_llm.py` 서버 사용) |
@@ -405,6 +407,15 @@ CLI가 아니라 HTTP API 직접 호출. `ClaudeService.chat`→`api.anthropic.c
 - `coucou_agent`가 붙은 다른 서드파티 에이전트는 계속 `agent_<name>`.
 - `ide_<slug>` pill의 이름·아이콘은 `HostAppInfo`(설치된 앱에서, 없으면 `HostResolver.fallbackName`: 번들 ID 마지막 성분, 예: "Gram"). 카드의 "Open <IDE>" 버튼은 `HostAppInfo.activate`.
 - 어느 pill이 approval/question 카드를 받는지는 `HookRouting`이 정한다(289ae73까지는 VS Code·Cursor·터미널(설정 시)·Codex 외 호스트에 즉시 `ask`였다).
+- `integration_claude`의 카탈로그 이름은 **"Claude Code"**(예전 "VS Code", ID는 그대로). 섬의 pill·idle 카드는 세션의 앱 이름을 쓴다: 터미널이면 "Warp"/"iTerm"…, VS Code 계열이면 "VS Code", 모르면 "Claude Code"(`ClaudeHost.pillName(hostApp:sessionBundleId:)`). 마지막 세션이 끝나면(`removeTask`의 리셋) 다시 "Claude Code".
+
+### Auto 메인 pill (`AutoMainPill`, `AppState.noteWorkspaceActivity`)
+- Settings → Active pills → Main의 첫 항목 "Auto (last IDE you used)"(기본값). 아래에 "Auto — Orca"처럼 지금 해석된 pill을 보여 준다.
+- Auto 메인 = 마지막으로 활동이 있었던 workspace pill(`integration_claude, agent_cursor, agent_codex, agent_antigravity`, 모든 `ide_…`). 아무 활동도 없었으면 `integration_claude`.
+- 활동으로 치는 이벤트: `UserPromptSubmit`(사용자), `PreToolUse`/`PostToolUse`/`PostToolUseFailure`·approval·question(에이전트). SessionStart/Stop/SessionEnd/Notification은 치지 않는다.
+- **flip-flop 방지**: 사용자 프롬프트는 언제나 메인을 옮긴다. 에이전트 활동은 지금 메인에 바쁜 세션(working 또는 사용자 대기)이 없을 때만 옮긴다. 결정은 순수 함수 `AutoMainPill.shouldSwitch`(test-auto-main-pill).
+- 메인이 바뀌면(`refreshMainPill`): 새 메인의 task를 만들고(`ide_`는 저장된 번들 ID로 `HostAppInfo` 이름·아이콘), 이전 메인은 `activeIntegrations`에 없고 세션도 없을 때만 내린다. 순서는 메인 → 카탈로그에 없는 pill(IDE·서드파티) → 카탈로그 순(`sortTasksByCatalog`). 데모 중에는 멈췄다가 `DemoEngine.stop`에서 따라잡는다.
+- 메인인 `ide_` pill은 `removeTask`에서 보호되어 세션이 없어도 남고, idle 카드("Hooks installed", "Open <IDE>")를 보인다.
 
 ### 다중 세션 (`SessionBook`, `AppState.sessionBooks`)
 - pill마다 `SessionBook` 하나: 세션 ID(`session_id`, 없으면 `<pillId>+<cwd>`)별 `AgentSession`(agent, 프로젝트, cwd, phase, 최근 단계 20개, finalLine, 시작/마지막 이벤트 시각), 최근 활동 순.

@@ -149,7 +149,7 @@ final class HookServer: @unchecked Sendable {
         case "agent_muse":    return "Muse Code"
         case "agent_hermes":  return "Hermes"
         default:
-            guard let host = context.route.host else { return "VS Code" }
+            guard let host = context.route.host else { return "Claude Code" }
             switch host.kind {
             case .ide:      return HostAppInfo.name(for: host.bundleId)
             case .terminal: return ClaudeHost.name(for: host.bundleId)
@@ -706,6 +706,11 @@ final class HookServer: @unchecked Sendable {
         mirror(pillId: agentId, resetState: plan.resetState)
         let lead = plan.applyEvent
 
+        // The Auto main pill follows the IDE the user works in (AutoMainPill).
+        if change != .none, change != .remove, let activity = AutoMainPill.activity(forEvent: name) {
+            state.noteWorkspaceActivity(pillId: agentId, hostBundleId: route.host?.bundleId, activity: activity)
+        }
+
         switch name {
 
         case "SessionStart":
@@ -985,7 +990,7 @@ final class HookServer: @unchecked Sendable {
 
     /// Creates a dynamic pill for a third-party agent on first event, then no-ops.
     /// ID format: "agent_<name>" — never collides with "integration_*" pills.
-    /// Inserted right after integration_claude so it appears in the visible prefix(4).
+    /// Inserted right after the main pill so it appears in the visible prefix(4).
     @MainActor
     private func upsertExternalAgent(id: String, name: String) {
         let state = AppState.shared
@@ -997,8 +1002,8 @@ final class HookServer: @unchecked Sendable {
             color = IslandConst.colorForProject(name)
         }
         let task = AgentTask(id: id, name: name, color: color, state: .idle, steps: [], source: .agent)
-        if let claudeIdx = state.tasks.firstIndex(where: { $0.id == "integration_claude" }) {
-            state.tasks.insert(task, at: claudeIdx + 1)
+        if let mainIdx = state.tasks.firstIndex(where: { $0.id == state.mainPillId }) {
+            state.tasks.insert(task, at: mainIdx + 1)
         } else {
             state.tasks.append(task)
         }
@@ -1118,6 +1123,7 @@ final class HookServer: @unchecked Sendable {
         // The session waits on the user from now on, even while its card waits behind others.
         if !ctx.route.isExternalAgent { ensureTask(ctx, renameExternal: false) }
         recordWaiting(ctx, phase: .waitingApproval)
+        AppState.shared.noteWorkspaceActivity(pillId: pillId, hostBundleId: ctx.route.host?.bundleId, activity: .agent)
         DispatchQueue.main.asyncAfter(deadline: .now() + waitTimeout) { [weak self] in
             self?.expireApprovals()
         }
@@ -1186,6 +1192,8 @@ final class HookServer: @unchecked Sendable {
                                 payload: HeldQuestion(fd: fd, source: source, question: parsed, context: ctx)))
         ensureTask(ctx, renameExternal: false)
         recordWaiting(ctx, phase: .waitingAnswer)
+        AppState.shared.noteWorkspaceActivity(pillId: ctx.route.pillId, hostBundleId: ctx.route.host?.bundleId,
+                                              activity: .agent)
         DispatchQueue.main.asyncAfter(deadline: .now() + 120) { [weak self] in
             self?.expireQuestions()
         }

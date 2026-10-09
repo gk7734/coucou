@@ -185,10 +185,30 @@ final class AppState {
         didSet { UserDefaults.standard.set(lmstudioServerURL, forKey: "lmstudioServerURL") }
     }
 
-    // The always-on workspace pill (default: VS Code). Persisted.
-    var mainPillId: String = PillCatalog.defaultMainPillId {
-        didSet { UserDefaults.standard.set(mainPillId, forKey: "mainPill") }
+    // The main pill (Settings → Active pills → Main), persisted as `mainPill`:
+    // `PillCatalog.autoMainPillId` (the default, also when the key is missing) or a
+    // "Where you code" pill the user picked.
+    var mainPillChoice: String = PillCatalog.autoMainPillId {
+        didSet {
+            UserDefaults.standard.set(mainPillChoice, forKey: "mainPill")
+            // A picked main is never one of the active pills (as before Auto).
+            if mainPillChoice != PillCatalog.autoMainPillId { activeIntegrations.remove(mainPillChoice) }
+            refreshMainPill()
+        }
     }
+
+    /// The always-on workspace pill on the island: the picked one, or for Auto the last
+    /// workspace pill the user worked in (AutoMainPill; `integration_claude` before any).
+    /// Never removed (only reset, see removeTask) nor toggled. Stored, and reassigned only
+    /// when it changes, so views reading it don't redraw on every hook event.
+    private(set) var mainPillId: String = PillCatalog.defaultMainPillId
+
+    /// The last workspace pill a session event moved the Auto main to, and for an IDE pill
+    /// its app's bundle id (an `ide_` id can't be turned back into one): after a relaunch the
+    /// Auto main shows that IDE again. Persisted as `lastActiveWorkspacePill` and
+    /// `lastActiveWorkspaceBundleId`. Not observed: views read mainPillId.
+    @ObservationIgnored private var lastActiveWorkspacePill: String?
+    @ObservationIgnored private var lastActiveWorkspaceBundleId: String?
 
     // Dynamically fetched model lists for the in-chat picker (keyed by provider)
     var fetchedProviderModels: [ChatProvider: [(id: String, label: String)]] = [:]
@@ -538,10 +558,13 @@ final class AppState {
            let a = try? JSONDecoder().decode([String].self, from: d) { _n8nWorkflowFilter = Set(a) }
         if let d = ud.data(forKey: "activeIntegrations"),
            let a = try? JSONDecoder().decode([String].self, from: d) { _activeIntegrations = Set(a) }
-        if let v = ud.string(forKey: "mainPill"), !v.isEmpty,
-           PillCatalog.available.contains(where: { $0.id == v && $0.category == .workspace && !$0.comingSoon }) {
-            _mainPillId = v
+        // Missing, "auto", or a pill this build doesn't have: Auto.
+        if let v = ud.string(forKey: "mainPill"), PillCatalog.workspaceIds.contains(v) {
+            _mainPillChoice = v
         }
+        lastActiveWorkspacePill = ud.string(forKey: "lastActiveWorkspacePill")
+        lastActiveWorkspaceBundleId = ud.string(forKey: "lastActiveWorkspaceBundleId")
+        _mainPillId = resolveMainPill()
         if let d = ud.data(forKey: "claudePlanUsage"),
            let u = try? JSONDecoder().decode(PlanUsage.self, from: d) { _claudePlanUsage = u }
         #if !APPSTORE
@@ -614,6 +637,12 @@ final class AppState {
                 tasks[idx].stepIndex  = 0
                 tasks[idx].pillBadge  = nil
                 if let n = catalogName { tasks[idx].name = n }
+                // The Claude Code pill names its session's app ("VS Code", "Warp"…): that
+                // session is gone. (An IDE pill keeps its app, it is the pill's name and icon.)
+                if id == "integration_claude" {
+                    tasks[idx].hostApp = nil
+                    tasks[idx].sessionBundleId = nil
+                }
             }
             return
         }
@@ -683,12 +712,10 @@ final class AppState {
         // Sanitize: remove saved IDs not in catalog
         let catalogIds = Set(catalog.map { $0.id })
         activeIntegrations = activeIntegrations.filter { catalogIds.contains($0) }
-        // Validate mainPillId: must be a non-comingSoon workspace pill in the catalog
-        if !PillCatalog.available.contains(where: { $0.id == mainPillId && $0.category == .workspace && !$0.comingSoon }) {
-            mainPillId = PillCatalog.defaultMainPillId
-        }
-        // mainPillId must never be in activeIntegrations (migration + invariant)
-        activeIntegrations.remove(mainPillId)
+        // A picked main is never in activeIntegrations (migration + invariant). The Auto main
+        // may be: it stays declared, so it doesn't vanish when the main moves on.
+        if mainPillChoice != PillCatalog.autoMainPillId { activeIntegrations.remove(mainPillId) }
+        ensureMainTask()
         for def in catalog {
             // mainPillId always loads; activeIntegrations load
             let shouldLoad = def.id == mainPillId || activeIntegrations.contains(def.id)
@@ -698,7 +725,8 @@ final class AppState {
                                      state: .idle, steps: [], source: def.source, isIntegration: true)
                 tasks.append(task)
             }
-            if !shouldLoad && loaded {
+            // A pill with sessions stays: it goes with them (HookServer).
+            if !shouldLoad && loaded && !hasSessions(def.id) {
                 tasks.removeAll { $0.id == def.id }
             }
         }
@@ -731,24 +759,109 @@ final class AppState {
         syncMode()
     }
 
-    /// Sort tasks so catalog pills are in catalog order, undeclared pills sit right after
-    /// integration_claude (matching HookServer insertion behaviour), and the rest follows.
+    /// Sort tasks: the main pill first, then the pills the catalog doesn't declare (IDEs,
+    /// third-party agents: HookServer inserts them right after the main pill), then the
+    /// catalog's pills in catalog order. Writes `tasks` only when the order changes.
     private func sortTasksByCatalog() {
         let order = PillCatalog.available.enumerated()
             .reduce(into: [String: Int]()) { $0[$1.element.id] = $1.offset }
-        let catalogPills    = tasks.filter { order[$0.id] != nil }
-        let undeclaredPills = tasks.filter { order[$0.id] == nil }
-        let sortedCatalog   = catalogPills.sorted { (order[$0.id] ?? 0) < (order[$1.id] ?? 0) }
-        if let claudeIdx = sortedCatalog.firstIndex(where: { $0.id == "integration_claude" }) {
-            var result: [AgentTask] = Array(sortedCatalog[...claudeIdx])
-            result.append(contentsOf: undeclaredPills)
-            if claudeIdx + 1 < sortedCatalog.count {
-                result.append(contentsOf: sortedCatalog[(claudeIdx + 1)...])
-            }
-            tasks = result
-        } else {
-            tasks = undeclaredPills + sortedCatalog
+        let main            = tasks.filter { $0.id == mainPillId }
+        let others          = tasks.filter { $0.id != mainPillId }
+        let undeclaredPills = others.filter { order[$0.id] == nil }
+        let sortedCatalog   = others.filter { order[$0.id] != nil }
+            .sorted { (order[$0.id] ?? 0) < (order[$1.id] ?? 0) }
+        let result = main + undeclaredPills + sortedCatalog
+        if result.map(\.id) != tasks.map(\.id) { tasks = result }
+    }
+
+    // MARK: - Main pill (Auto)
+
+    /// The main pill for the current choice and the last active workspace pill.
+    private func resolveMainPill() -> String {
+        AutoMainPill.resolve(
+            explicit: mainPillChoice == PillCatalog.autoMainPillId ? nil : mainPillChoice,
+            lastActive: lastActiveWorkspacePill, lastActiveBundleId: lastActiveWorkspaceBundleId,
+            catalogWorkspaceIds: PillCatalog.workspaceIds, fallback: PillCatalog.defaultMainPillId)
+    }
+
+    /// A session event on a pill (HookServer): makes it the last active workspace pill when
+    /// AutoMainPill.shouldSwitch says so, which moves the Auto main there.
+    /// `hostBundleId`: the app the session runs in (an IDE pill needs it to be shown again).
+    func noteWorkspaceActivity(pillId: String, hostBundleId: String?, activity: AutoMainPill.Activity) {
+        guard AutoMainPill.isWorkspacePill(pillId, catalogWorkspaceIds: PillCatalog.workspaceIds) else { return }
+        let current = lastActiveWorkspacePill
+        let currentIsBusy = current.map { id in
+            sessionBooks[id]?.sessions.contains { $0.phase == .working || $0.phase.waitsOnUser } ?? false
+        } ?? false
+        guard AutoMainPill.shouldSwitch(current: current, to: pillId, activity: activity,
+                                        currentIsBusy: currentIsBusy) else { return }
+        var bundleId: String? = nil
+        if HostResolver.isIDEPill(pillId) {
+            guard let id = hostBundleId, !id.isEmpty, HostResolver.idePillId(bundleId: id) == pillId else { return }
+            bundleId = id
         }
+        lastActiveWorkspacePill = pillId
+        lastActiveWorkspaceBundleId = bundleId
+        let ud = UserDefaults.standard
+        ud.set(pillId, forKey: "lastActiveWorkspacePill")
+        if let bundleId { ud.set(bundleId, forKey: "lastActiveWorkspaceBundleId") }
+        else { ud.removeObject(forKey: "lastActiveWorkspaceBundleId") }
+        refreshMainPill()
+    }
+
+    /// Recomputes the main pill. When it moves, the new main's pill shows (created if
+    /// needed) and the former one leaves unless it is still declared or has sessions: no
+    /// pill is lost, none doubled. Not during the demo, which restores the island around the
+    /// main pill it started with (DemoEngine.stop calls this again).
+    func refreshMainPill() {
+        guard !DemoEngine.shared.isActive else { return }
+        let resolved = resolveMainPill()
+        guard resolved != mainPillId else { return }
+        let former = mainPillId
+        mainPillId = resolved
+        ensureMainTask()
+        if former != resolved, !activeIntegrations.contains(former), !hasSessions(former),
+           tasks.contains(where: { $0.id == former }) {
+            tasks.removeAll { $0.id == former }
+            if focusId == former { focusId = mainPillId }
+        }
+        sortTasksByCatalog()
+        if focusId == nil { focusId = mainPillId }
+        syncMode()
+    }
+
+    /// The main pill's name as Settings shows it ("Orca", "VS Code", "Claude Code"…).
+    var mainPillDisplayName: String {
+        let id = mainPillId
+        let task = tasks.first { $0.id == id }
+        if id == "integration_claude" {
+            return ClaudeHost.pillName(hostApp: task?.hostApp, sessionBundleId: task?.sessionBundleId)
+        }
+        if let def = PillCatalog.definition(for: id) { return def.name }
+        if let task, !task.name.isEmpty { return task.name }
+        return lastActiveWorkspaceBundleId.map(HostAppInfo.name(for:)) ?? id
+    }
+
+    /// Adds the main pill's task when it isn't on the island: a catalog pill from the
+    /// catalog, an IDE pill from its app (as HookServer creates it).
+    private func ensureMainTask() {
+        let id = mainPillId
+        guard !tasks.contains(where: { $0.id == id }) else { return }
+        if let def = PillCatalog.definition(for: id) {
+            tasks.append(AgentTask(id: def.id, name: def.name, color: def.color,
+                                   state: .idle, steps: [], source: def.source, isIntegration: true))
+        } else if HostResolver.isIDEPill(id), let bundleId = lastActiveWorkspaceBundleId, !bundleId.isEmpty {
+            var task = AgentTask(id: id, name: HostAppInfo.name(for: bundleId),
+                                 color: Self.pillColor(for: id, in: pillColors) ?? HookRouting.defaultIDEColor(pillId: id),
+                                 state: .idle, steps: [], source: .agent, isIntegration: true)
+            task.sessionBundleId = bundleId
+            tasks.append(task)
+        }
+    }
+
+    /// True when a pill's book holds sessions.
+    private func hasSessions(_ pillId: String) -> Bool {
+        !(sessionBooks[pillId]?.isEmpty ?? true)
     }
 
 }

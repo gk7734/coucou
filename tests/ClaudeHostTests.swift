@@ -43,8 +43,17 @@ enum ClaudeHostTests {
         check("Warp host", ClaudeHost.name(for: "dev.warp.Warp-Stable") == "Warp")
         check("unknown host = VS Code", ClaudeHost.name(for: "com.example.app") == "VS Code")
         check("Zed host is no terminal name", ClaudeHost.name(for: "dev.zed.Zed") == "VS Code")
-        check("editor session → VS Code", ClaudeHost.pillName(hostApp: nil) == "VS Code")
-        check("terminal session → Claude Code", ClaudeHost.pillName(hostApp: "dev.warp.Warp-Stable") == "Claude Code")
+        check("VS Code session → VS Code",
+              ClaudeHost.pillName(hostApp: nil, sessionBundleId: "com.microsoft.VSCode") == "VS Code")
+        check("VSCodium session → VS Code",
+              ClaudeHost.pillName(hostApp: nil, sessionBundleId: "com.vscodium") == "VS Code")
+        check("Warp session → Warp",
+              ClaudeHost.pillName(hostApp: "dev.warp.Warp-Stable", sessionBundleId: "dev.warp.Warp-Stable") == "Warp")
+        check("iTerm session → iTerm",
+              ClaudeHost.pillName(hostApp: "com.googlecode.iterm2", sessionBundleId: nil) == "iTerm")
+        check("no session yet → Claude Code", ClaudeHost.pillName(hostApp: nil, sessionBundleId: nil) == "Claude Code")
+        check("an app that isn't VS Code or a terminal → Claude Code",
+              ClaudeHost.pillName(hostApp: nil, sessionBundleId: "com.example.app") == "Claude Code")
 
         print("ClaudeHost.terminalCardsEnabled")
         UserDefaults.standard.removeObject(forKey: ClaudeHost.terminalCardsKey)

@@ -23,7 +23,7 @@ enum MochiChoice: String, AppEnum {
 
     static let caseDisplayRepresentations: [MochiChoice: DisplayRepresentation] = [
         .automatic: "Automatic",
-        .vscode: "VS Code",
+        .vscode: "Claude Code",
         .cursor: "Cursor",
         .codex: "Codex",
         .antigravity: "Antigravity",

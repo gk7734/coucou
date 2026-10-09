@@ -1791,7 +1791,13 @@ enum IntegrationSetupCache {
             return false
         #endif
         default:
-            return nil
+            // An IDE pill (the Auto main pill between sessions): Claude Code's or Codex's hooks.
+            guard HostResolver.isIDEPill(pillId) else { return nil }
+            #if !APPSTORE
+            return HookServer.claudeHooksInstalled() || HookServer.codexHooksInstalled()
+            #else
+            return HookServer.claudeHooksInstalled()
+            #endif
         }
     }
 }
@@ -1848,8 +1854,11 @@ struct IntegrationCardView: View {
 
     // Workspace/agent pill with active session: show ticker layout
     private var agentSessionActive: Bool {
-        // IDE pills only exist while an agent session runs in that IDE.
-        if HostResolver.isIDEPill(task.id) { return true }
+        // IDE pills exist while an agent session runs in that IDE, or as the Auto main pill:
+        // that one rests on the idle card once its sessions are gone.
+        if HostResolver.isIDEPill(task.id) {
+            return appState.sessionBook(for: task.id) != nil || task.state != .idle || !task.steps.isEmpty
+        }
         guard let def = PillCatalog.definition(for: task.id) else { return false }
         guard def.category == .workspace || def.category == .agent else { return false }
         return task.state != .idle || !task.steps.isEmpty
@@ -1952,6 +1961,7 @@ struct IntegrationCardView: View {
                    || task.id == "agent_codex"        || task.id == "agent_copilot"
                    || task.id == "agent_muse"         || task.id == "agent_opencode"
                    || task.id == "agent_amp"          || task.id == "agent_hermes"
+                   || HostResolver.isIDEPill(task.id)
         let isAI    = ChatProvider(pillID: task.id) != nil
         if isConfigured {
             if isHooks { return String(localized: "Hooks installed") }
@@ -2058,8 +2068,9 @@ struct IntegrationCardView: View {
                         .fill(Color(hex: task.color))
                         .frame(width: 7, height: 7)
                     PillAppIcon(task: task)
-                    Text(task.id == "integration_claude" ? ClaudeHost.pillName(hostApp: task.hostApp)
-                                                         : PillCatalog.definition(for: task.id)?.name ?? task.name)
+                    Text(task.id == "integration_claude"
+                         ? ClaudeHost.pillName(hostApp: task.hostApp, sessionBundleId: task.sessionBundleId)
+                         : PillCatalog.definition(for: task.id)?.name ?? task.name)
                         .font(.system(size: 12, weight: .semibold))
                         .foregroundColor(Color(hex: "#F5F6F8"))
                     Text(PillCatalog.definition(for: task.id)?.subtitle ?? "Integration")
@@ -2081,7 +2092,13 @@ struct IntegrationCardView: View {
                 .padding(.top, 2)
 
                 HStack(spacing: 8) {
-                    if task.id == "integration_claude", task.hostApp != nil {
+                    if let title = SessionHost.openButtonTitle(for: task) {
+                        // An IDE pill resting as the Auto main pill: "Open Orca".
+                        Button(title) { SessionHost.activate(task) }
+                            .font(.system(size: 11, weight: .medium))
+                            .foregroundColor(Color(hex: task.color).opacity(0.7))
+                            .buttonStyle(.plain)
+                    } else if task.id == "integration_claude", task.hostApp != nil {
                         Button("Open \(ClaudeHost.name(for: task.hostApp))") { ClaudeHost.activate(task.hostApp) }
                             .font(.system(size: 11, weight: .medium))
                             .foregroundColor(Color(hex: task.color).opacity(0.7))
@@ -2190,7 +2207,8 @@ struct IntegrationCardView: View {
                             switch PillCatalog.definition(for: task.id)?.category {
                             case .workspace, .agent: section = "agents"
                             case .ai:                section = "chat"
-                            default:                 section = "integrations"
+                            default:
+                                section = HostResolver.isIDEPill(task.id) ? "agents" : "integrations"
                             }
                             NotificationCenter.default.post(name: .openFullSettings, object: section)
                         }
@@ -4259,10 +4277,12 @@ struct AgentPill: View {
 
     private var effectiveColor: String { task.color }
 
-    // The Claude pill shows "VS Code" (or "Claude Code" for a terminal session) regardless of project name;
-    // an IDE pill shows its IDE ("WebStorm"), which is its task name.
+    // The Claude Code pill shows its session's app ("VS Code", "Warp"…, else "Claude Code")
+    // regardless of project name; an IDE pill shows its IDE ("WebStorm"), which is its task name.
     private var displayName: String {
-        task.id == "integration_claude" ? ClaudeHost.pillName(hostApp: task.hostApp) : task.name
+        task.id == "integration_claude"
+            ? ClaudeHost.pillName(hostApp: task.hostApp, sessionBundleId: task.sessionBundleId)
+            : task.name
     }
 
     var body: some View {

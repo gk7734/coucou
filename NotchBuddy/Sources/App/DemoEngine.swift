@@ -271,6 +271,9 @@ final class DemoEngine: ObservableObject {
         lastApprovalDecision = "allow"
         lastQuestionAnswer = nil
 
+        // The Auto main pill held still during the demo: catch up with the real sessions.
+        s.refreshMainPill()
+
         // Restore focus
         let fid = snap.focusId ?? s.mainPillId
         s.focusId = s.tasks.contains(where: { $0.id == fid }) ? fid : s.mainPillId

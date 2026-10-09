@@ -69,7 +69,9 @@ enum PillCatalog {
     // All declared pills in display order.
     static let all: [PillDefinition] = [
         // ── Where you code ───────────────────────────────────────────────────
-        .init(id: "integration_claude",  name: "VS Code",     color: "#F5F6F8",
+        // Claude Code in VS Code or a terminal (the island names the session's app when it
+        // knows it, see ClaudeHost.pillName). The id is a contract: it stays.
+        .init(id: "integration_claude",  name: "Claude Code", color: "#F5F6F8",
               category: .workspace, subtitle: "Integration",  source: .claudeCode),
         .init(id: "agent_cursor",        name: "Cursor",      color: "#C0C4CC",
               category: .workspace, subtitle: "Integration",  source: .agent),
@@ -135,8 +137,16 @@ enum PillCatalog {
         #endif
     }
 
-    /// Default ID for the always-on main workspace pill.
+    /// The main workspace pill before anything was active (the Auto main's fallback).
     static let defaultMainPillId = "integration_claude"
+
+    /// `mainPill` value for "Auto": the last workspace pill the user worked in (see
+    /// AutoMainPill on the Mac). Also what a missing `mainPill` means. Never a pill id.
+    static let autoMainPillId = "auto"
+
+    /// The "Where you code" pills of this build: the ones that can be the main pill.
+    static let workspaceIds: Set<String> =
+        Set(available.filter { $0.category == .workspace && !$0.comingSoon }.map(\.id))
 
     /// Looks up a definition by task ID (nil if not in catalog).
     static func definition(for id: String) -> PillDefinition? {

@@ -3,9 +3,10 @@ import AppKit
 // MARK: - ClaudeHost
 //
 // The terminal a Claude Code session on the `integration_claude` pill runs in. VS Code
-// sessions keep the original "VS Code" pill; sessions from a plain terminal route there too
-// and the pill says "Claude Code". Which apps are terminals is HostResolver's call (its
-// tables are the single source): IDEs, Zed included, have pills of their own.
+// sessions and sessions from a plain terminal share that pill ("Claude Code" in the
+// catalog); the pill names the session's app when it knows it ("VS Code", "Warp"…).
+// Which apps are terminals is HostResolver's call (its tables are the single source):
+// IDEs, Zed included, have pills of their own.
 
 struct ClaudeHost: Equatable {
     let bundleId: String
@@ -34,9 +35,16 @@ struct ClaudeHost: Equatable {
         return name
     }
 
-    /// Pill label for integration_claude: "VS Code" for editor sessions, "Claude Code" otherwise.
-    static func pillName(hostApp: String?) -> String {
-        hostApp == nil ? "VS Code" : "Claude Code"
+    /// Pill label for integration_claude: the app its session runs in when known ("Warp",
+    /// "iTerm"… for a terminal, "VS Code" for VS Code and its forks), else "Claude Code".
+    /// - hostApp: the task's terminal (`AgentTask.hostApp`).
+    /// - sessionBundleId: the app the session runs in (`AgentTask.sessionBundleId`).
+    static func pillName(hostApp: String?, sessionBundleId: String?) -> String {
+        if let id = hostApp, let name = HostResolver.terminals[id] { return name }
+        if let id = sessionBundleId, HostResolver.vscodeBundleIds.contains(id) {
+            return HostResolver.fallbackName(bundleId: id)
+        }
+        return "Claude Code"
     }
 
     /// Brings the session's terminal forward (launching it if needed). false when not a terminal host.
