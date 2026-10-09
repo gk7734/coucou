@@ -847,6 +847,14 @@ final class IslandWindowController: NSWindowController {
             }
         }
 
+        // The last approval / question card was answered (in the notch, from the iPhone…).
+        NotificationCenter.default.addObserver(forName: .heldCardClosed, object: nil, queue: .main) { [weak self] _ in
+            MainActor.assumeIsolated {
+                guard let self else { return }
+                self.fsm.heldCardClosed(pointerInside: self.wasInIsland)
+            }
+        }
+
         // Hook server compact reveal (non-alert work events: session start, tool use, etc.)
         NotificationCenter.default.addObserver(forName: .hookReveal, object: nil, queue: .main) { [weak self] _ in
             MainActor.assumeIsolated { self?.fsm.reveal() }

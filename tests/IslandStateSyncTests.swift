@@ -125,6 +125,27 @@ enum IslandStateSyncTests {
         let hovered = IslandStateMachine()
         hovered.openedByAlert(pointerInside: true)
         precondition(hovered.state == .home && hovered.countdown == nil)
+
+        // The approval is answered away from the island (iPhone): the island folds by itself.
+        var waiting = true
+        let answered = IslandStateMachine()
+        answered.homeToPetitDelay = 0.2
+        answered.isHeldOpen = { waiting }
+        answered.openedByAlert(pointerInside: false)
+        precondition(answered.countdown == nil)
+        answered.heldCardClosed(pointerInside: false)
+        precondition(answered.countdown == nil, "still held: no countdown")
+        waiting = false
+        answered.heldCardClosed(pointerInside: false)
+        precondition(answered.countdown != nil, "an answered card must start the auto-close")
+        try await Task.sleep(for: .milliseconds(700))
+        precondition(answered.state == .petit, "the island stayed open after the card was answered")
+
+        // Answered with the pointer on the island: the timer starts when it leaves, as before.
+        let clicked = IslandStateMachine()
+        clicked.openedByAlert(pointerInside: true)
+        clicked.heldCardClosed(pointerInside: true)
+        precondition(clicked.state == .home && clicked.countdown == nil)
     }
 
     // MARK: - Leaving an island the user opened

@@ -170,6 +170,16 @@ final class IslandStateMachine {
         if !pointerInside, isHeldOpen?() != true { scheduleHomeCollapse() }
     }
 
+    /// The last approval or question card left the open island (answered in the notch, from
+    /// the iPhone…): it no longer holds the island open, so the normal auto-close starts
+    /// unless the pointer is on it (then leaving starts it, as usual). No timer ran while
+    /// the card waited, and an island answered with the pointer elsewhere stayed open (and
+    /// drawing at full frame rate) for good.
+    func heldCardClosed(pointerInside: Bool) {
+        guard state == .home, !pointerInside, isHeldOpen?() != true, homeCollapseWork == nil else { return }
+        scheduleHomeCollapse()
+    }
+
     /// The app folded the island itself (Escape, Settings, OK button, auto-close).
     /// Move to `.petit` right away so hover and click keep working; waiting for the
     /// 15 s home timer left the island compact on screen while the FSM still said `.home`.

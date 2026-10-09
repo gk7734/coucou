@@ -229,6 +229,7 @@ final class HookServer: @unchecked Sendable {
             }
         } else {
             state.view = state.tasks.isEmpty ? .empty : .overview
+            NotificationCenter.default.post(name: .heldCardClosed, object: nil)
         }
     }
 
@@ -304,6 +305,7 @@ final class HookServer: @unchecked Sendable {
             }
         }
         state.view = state.tasks.isEmpty ? .empty : .overview
+        NotificationCenter.default.post(name: .heldCardClosed, object: nil)
     }
 
     /// Removes the question on screen from the queue, nil if there is none.
@@ -2265,4 +2267,6 @@ final class HookServer: @unchecked Sendable {
 
 extension Notification.Name {
     static let hookExpand = Notification.Name("notchBuddy.hookExpand")
+    /// The last approval / question card was answered: the island may auto-close again.
+    static let heldCardClosed = Notification.Name("notchBuddy.heldCardClosed")
 }
