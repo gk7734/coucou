@@ -1889,6 +1889,32 @@ final class HookServer: @unchecked Sendable {
     static func openCodePluginInstalled() -> Bool {
         guard let content = try? String(contentsOf: openCodePluginURL, encoding: .utf8) else { return false }
         return content.contains("nb-hook") && content.contains("opencode")
+            && content.contains(openCodePluginMarker)
+    }
+
+    /// OpenCode's major version from `opencode --version` ("opencode v2.0.24", "1.4.3"…),
+    /// nil when it can't be run. Decides which plugin API coucou.js is written for.
+    static func openCodeMajorVersion() -> Int? {
+        let candidates = ["/opt/homebrew/bin/opencode", "/usr/local/bin/opencode",
+                          home.appendingPathComponent(".opencode/bin/opencode").path,
+                          home.appendingPathComponent(".local/bin/opencode").path]
+        guard let exe = candidates.first(where: { FileManager.default.isExecutableFile(atPath: $0) }) else { return nil }
+        let task = Process(); let pipe = Pipe()
+        task.executableURL = URL(fileURLWithPath: exe)
+        task.arguments = ["--version"]
+        task.standardOutput = pipe; task.standardError = Pipe()
+        do { try task.run() } catch { return nil }
+        let deadline = Date().addingTimeInterval(3)
+        while task.isRunning && Date() < deadline { usleep(20_000) }
+        if task.isRunning { task.terminate(); return nil }
+        let out = String(data: pipe.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8) ?? ""
+        return openCodeMajor(fromVersionOutput: out)
+    }
+
+    /// "opencode v2.0.24" → 2, "1.4.3" → 1.
+    static func openCodeMajor(fromVersionOutput out: String) -> Int? {
+        guard let range = out.range(of: #"\d+\.\d+"#, options: .regularExpression) else { return nil }
+        return Int(out[range].split(separator: ".").first ?? "")
     }
 
     private var pendingOpenCode: PendingFileChange?
@@ -1896,7 +1922,8 @@ final class HookServer: @unchecked Sendable {
     func previewOpenCodePlugin(install: Bool) throws -> String {
         try previewGeneratedFile(&pendingOpenCode, url: Self.openCodePluginURL,
                                  label: "~/.config/opencode/plugins/coucou.js",
-                                 content: install ? openCodePluginSource(hookPath: Self.hookScriptPath) : nil,
+                                 content: install ? openCodePluginSource(hookPath: Self.hookScriptPath,
+                                                                          api: Self.openCodeMajorVersion() ?? 2) : nil,
                                  noop: "No OpenCode plugin to remove.")
     }
 
