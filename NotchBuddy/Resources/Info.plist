@@ -37,14 +37,14 @@
 	<key>LSUIElement</key>
 	<true/>
 	<key>NSAccessibilityUsageDescription</key>
-	<string>Pour lire le titre de la fenêtre active et l'attacher comme contexte.</string>
+	<string>Coucou reads the title of the window you attach as chat context, and what TIDAL is playing.</string>
 	<key>NSAppTransportSecurity</key>
 	<dict>
 		<key>NSAllowsLocalNetworking</key>
 		<true/>
 	</dict>
 	<key>NSAppleEventsUsageDescription</key>
-	<string>Pour sauter au terminal, envoyer des mails et piloter Musique et Spotify.</string>
+	<string>Coucou brings your terminal forward, sends mail, and controls Music and Spotify when you ask it to.</string>
 	<key>NSAudioCaptureUsageDescription</key>
 	<string>Coucou reads the level of the sound your Mac plays to draw the visualizer in the notch. Nothing is recorded or stored.</string>
 	<key>NSHighResolutionCapable</key>

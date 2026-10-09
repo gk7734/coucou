@@ -367,12 +367,14 @@ struct SettingsView: View {
                     .font(.system(size: 11))
                     .foregroundColor(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
+                #if !APPSTORE   // no audio capture in the sandboxed App Store build
                 Toggle("Sound visualizer in the notch", isOn: $visualizerEnabled)
                     .help("While music plays and no agent is at work, the folded island shows the sound's bars and the song.")
                 Text("macOS asks once for System Audio Recording permission, to draw the bars. Nothing is recorded or saved: only the sound's levels are read, while the bars are on screen.")
                     .font(.system(size: 11))
                     .foregroundColor(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
+                #endif
             }
             .padding(6)
             .onAppear { refreshConnectedScreens() }
