@@ -92,6 +92,68 @@ are installed (see Codex below).
 
 Claude Desktop (`agent_claude-desktop`, every build) is there as well. Claude Code sessions started from the Claude desktop app's Code tab carry `CLAUDE_CODE_ENTRYPOINT=claude-desktop`; the relay tags them `coucou_agent: claude-desktop` on its own (an explicit `--agent` still wins), so nothing extra is installed. Declare the pill to keep it after the session ends; the ↗ button opens the Claude app.
 
+## IDE detection
+
+> This describes the per-IDE pills being integrated on this branch; parts of it land in parallel.
+
+Coucou works out which app a Claude Code or Codex session runs in, and gives every IDE its own
+pill. There is no list of IDEs to register with: **any app is detected automatically**, including
+ones Coucou has never heard of. Nothing extra goes in your hook payload.
+
+Signals, strongest first:
+
+1. **The process tree.** When the relay connects, Coucou walks up from it to the nearest regular
+   app (skipping Coucou itself, Finder, the Dock…) and adds the bundle IDs it found to the payload
+   as `coucou_host_bundle_ids`, nearest first. This key is set by Coucou, never trusted from the
+   client.
+2. **`bundle_id`**, which the relay copies from `__CFBundleIdentifier` (inherited by the agent's
+   shell from the app it was started in).
+3. **`term_program`** (`TERM_PROGRAM`) and **`terminal_emulator`** (`TERMINAL_EMULATOR`), both added
+   by the relay. JetBrains terminals set `TERMINAL_EMULATOR=JetBrains-JediTerm`, which is how a
+   JetBrains IDE is still recognised when nothing else identifies it.
+
+Where the session goes:
+
+| Host | Claude Code | Codex |
+|---|---|---|
+| VS Code (and Insiders, VSCodium) | `integration_claude` | `integration_claude` |
+| Cursor | `agent_cursor` | `agent_cursor` |
+| Any other app: JetBrains IDEs, Zed, Xcode, Windsurf… | `ide_<slug>` | `ide_<slug>` |
+| A terminal (Terminal, iTerm, Warp, Ghostty, kitty…) | `integration_claude` | `agent_codex` |
+
+`<slug>` is the bundle ID lowercased, with every run of characters other than `a-z0-9` replaced by
+one `-`: WebStorm (`com.jetbrains.WebStorm`) gets `ide_com-jetbrains-webstorm`. The pill shows the
+app's own name and icon. Several sessions in the same app share its pill; the pill follows the
+most urgent one (waiting for approval, then waiting for an answer, then an error, then working).
+
+Third-party agents tagged with `coucou_agent` keep their own `agent_<name>` pill.
+
+### Forcing the host while testing
+
+When you send events yourself (a script, `nc -U`, `scripts/coucou-replay.py`), the process tree
+leads to your terminal, so the session lands on the terminal's pill. Add
+`coucou_host_override` with the bundle ID of the app you want to simulate:
+
+```json
+{
+  "hook_event_name": "SessionStart",
+  "session_id": "test-1",
+  "cwd": "/tmp/shop-front",
+  "coucou_host_override": "com.jetbrains.WebStorm"
+}
+```
+
+`coucou_host_override` is honoured by **DEBUG builds only** (built from Xcode or with
+`-configuration Debug`). Release builds ignore it, so no local process can pass itself off as
+another app. The replay tool adds it for you: `python3 scripts/coucou-replay.py webstorm-claude`
+(see `--list`, `--host <bundle id>` and the scenarios in `tests/replay/`).
+
+### `terminal_emulator`
+
+The relay now adds `terminal_emulator` (the agent's `TERMINAL_EMULATOR`, `""` when unset) next to
+`term_program` and `bundle_id`. If your tool talks to the socket directly and runs inside a
+terminal that sets it, forward it the same way.
+
 ## Real-world examples
 
 ### Codex (macOS, GitHub build)

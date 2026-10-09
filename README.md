@@ -33,6 +33,10 @@ Meet **Mochi**: a soft little squircle with big eyes that pops out of your notch
 
 - 🤖 **Claude Code, Cursor, Codex, Gemini CLI, Antigravity, Copilot CLI, Muse Code, OpenCode, Amp, Hermes, Claude Desktop and other agents, live** — see every session in your notch: what it reads, edits and runs, step by step. Tag a hook payload with `coucou_agent` to give any agent its own pill (see [`docs/AGENTS.md`](docs/AGENTS.md)). Finished? Mochi does a happy little jump.
 - See what Claude is editing, live in the notch: each file modification shows the file name and +N −M counts in the ticker, tap to read the full diff
+- 🧩 **A pill for every IDE** *(macOS)* — Claude Code and Codex sessions get the pill of the app they run in, with its real name and icon: WebStorm, PyCharm and the other JetBrains IDEs, Zed, Xcode, Windsurf… Any IDE is detected on its own, even one Coucou has never heard of. VS Code, Cursor and terminals keep their pills.
+- 🗂️ **Several sessions per pill** *(macOS)* — two Claude Code sessions in the same IDE no longer overwrite each other: the pill follows the one that needs you most (an approval, a question, an error) and lists the others.
+- 🔔 **macOS notifications** *(macOS)* — finished, failed, waiting for your OK or stalled: get a notification when you're looking elsewhere, and none when the session's app is already in front or the notch is showing it. Each kind can be turned off in Settings.
+- ⏳ **Stalled-session detection** *(macOS)* — a session that says it's working but has sent nothing for a few minutes (3 by default, adjustable) gets a badge and, if you want, a notification. Nothing runs in the background while no session works.
 - ✅ **Approve and answer from the notch** — Claude Code permission requests show up with **Allow / Deny / Always**; `AskUserQuestion` prompts show the choices right in the notch (single or multi-select, up to 4 questions). One click, or "Reply in terminal" to fall back to the CLI. Codex also gets Allow / Deny.
 - 🧑‍💻 **Jump to the right terminal** — open the exact terminal window of a session *(macOS)*.
 - 💬 **Chat with Claude, Gemini, OpenAI, or a local model (Ollama / LM Studio)** — click the model name above the chat box to switch provider and pick a model. Cloud providers use your own API key; local providers connect to a server running on your Mac. *(Gemini, OpenAI and local models: macOS)*
@@ -195,7 +199,7 @@ If Coucou isn't running, the hook exits immediately: **Claude Code is never bloc
 | Hermes | Plugin — **Settings → Agents → Hermes → Install** | Mac only |
 | Any other | `--agent <name>` flag; see [`docs/AGENTS.md`](docs/AGENTS.md) | No |
 
-OpenCode, Amp and Hermes use a plugin model rather than a hook command. Coucou installs the plugin file into `~/.config/opencode/plugins/`, `~/.config/amp/plugins/` and `~/.hermes/plugins/coucou/` respectively. On Windows and Linux the plugins start the `coucou-hook` relay directly — see [`windows/README.md`](windows/README.md#supported-agents).
+OpenCode, Amp and Hermes use a plugin model rather than a hook command. Coucou installs the plugin file into `~/.config/opencode/plugins/`, `~/.config/amp/plugins/` and `~/.hermes/plugins/coucou/` respectively.
 
 ## Things to try
 
