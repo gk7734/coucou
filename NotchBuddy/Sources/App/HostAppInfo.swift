@@ -39,14 +39,28 @@ enum HostAppInfo {
         NSWorkspace.shared.frontmostApplication?.bundleIdentifier == bundleId
     }
 
-    /// Brings the app forward, launching it if needed. false when it isn't installed.
+    /// Brings the app forward with its windows, launching it if needed, like clicking its Dock
+    /// icon. false when it can't be found.
+    ///
+    /// `NSRunningApplication.activate()` is not enough: since macOS 14 activation is
+    /// cooperative and a request from an app that isn't active itself (Coucou is an accessory
+    /// app behind a non-activating panel) can be ignored, and it never brings back a
+    /// minimised or hidden window. Opening the app through Launch Services activates it and
+    /// sends it the "reopen" event, which shows its window again.
     @discardableResult
     static func activate(_ bundleId: String) -> Bool {
-        if let running = NSWorkspace.shared.runningApplications.first(where: { $0.bundleIdentifier == bundleId }) {
-            return running.activate()
+        NSApp.yieldActivation(toApplicationWithBundleIdentifier: bundleId)
+        if let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleId) {
+            let configuration = NSWorkspace.OpenConfiguration()
+            configuration.activates = true
+            NSWorkspace.shared.openApplication(at: url, configuration: configuration, completionHandler: nil)
+            return true
         }
-        guard let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleId) else { return false }
-        NSWorkspace.shared.openApplication(at: url, configuration: .init(), completionHandler: nil)
-        return true
+        // Running from somewhere Launch Services doesn't index: ask it directly.
+        guard let running = NSRunningApplication.runningApplications(withBundleIdentifier: bundleId).first else {
+            return false
+        }
+        running.unhide()
+        return running.activate(from: .current, options: [.activateAllWindows])
     }
 }
