@@ -195,7 +195,7 @@ final class ClaudeService {
     private let systemPrompt = ClaudeService.makeSystemPrompt()
 
     /// Greets the user by their macOS first name when there is one worth using, and stays
-    /// neutral otherwise — same wording as the Windows build.
+    /// neutral otherwise.
     private nonisolated static func makeSystemPrompt() -> String {
         let opening = if let firstName = resolveUserFirstName() {
             "You are Mochi, \(firstName)'s personal AI assistant embedded in the notch of their Mac."

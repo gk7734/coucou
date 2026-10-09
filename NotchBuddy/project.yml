@@ -26,20 +26,26 @@ settings:
     CODE_SIGN_STYLE: Manual
     OTHER_SWIFT_FLAGS: "-strict-concurrency=complete"
   configs:
+    # Local development: signed with the developer's own Apple Development
+    # certificate, no provisioning profile (Debug has no iCloud/push entitlements).
+    # A stable signature keeps macOS permissions (Accessibility, Automation,
+    # Keychain) from resetting on every build.
     Debug:
-      CODE_SIGNING_REQUIRED: NO
-      CODE_SIGNING_ALLOWED: NO
+      CODE_SIGNING_REQUIRED: YES
+      CODE_SIGNING_ALLOWED: YES
+      CODE_SIGN_IDENTITY: "Apple Development"
+      DEVELOPMENT_TEAM: 6HBMRNDGYC
     DebugCloud:
       CODE_SIGNING_REQUIRED: YES
       CODE_SIGNING_ALLOWED: YES
       CODE_SIGN_STYLE: Automatic
       CODE_SIGN_IDENTITY: "Apple Development"
-      DEVELOPMENT_TEAM: 256AUJ9555
+      DEVELOPMENT_TEAM: 6HBMRNDGYC
     Release:
       CODE_SIGNING_REQUIRED: YES
       CODE_SIGNING_ALLOWED: YES
       CODE_SIGN_IDENTITY: "Developer ID Application"
-      DEVELOPMENT_TEAM: 256AUJ9555
+      DEVELOPMENT_TEAM: 6HBMRNDGYC
       OTHER_CODE_SIGN_FLAGS: "--timestamp"
       CODE_SIGN_INJECT_BASE_ENTITLEMENTS: NO
       CODE_SIGN_ENTITLEMENTS: Resources/Coucou.entitlements
@@ -47,7 +53,7 @@ settings:
       CODE_SIGNING_REQUIRED: YES
       CODE_SIGNING_ALLOWED: YES
       CODE_SIGN_IDENTITY: "Developer ID Application"
-      DEVELOPMENT_TEAM: 256AUJ9555
+      DEVELOPMENT_TEAM: 6HBMRNDGYC
       OTHER_CODE_SIGN_FLAGS: "--timestamp"
       CODE_SIGN_INJECT_BASE_ENTITLEMENTS: NO
 
@@ -227,7 +233,7 @@ targets:
         CODE_SIGN_STYLE: Automatic
         CODE_SIGN_IDENTITY: "Apple Development"
         CODE_SIGN_ENTITLEMENTS: Resources/CoucouAppStore.entitlements
-        DEVELOPMENT_TEAM: 256AUJ9555
+        DEVELOPMENT_TEAM: 6HBMRNDGYC
         SWIFT_ACTIVE_COMPILATION_CONDITIONS: APPSTORE
         CODE_SIGNING_ALLOWED: YES
       configs:
@@ -317,7 +323,7 @@ targets:
         CODE_SIGN_STYLE: Automatic
         CODE_SIGN_IDENTITY: "Apple Development"
         CODE_SIGN_ENTITLEMENTS: Resources/CoucouPhone.entitlements
-        DEVELOPMENT_TEAM: 256AUJ9555
+        DEVELOPMENT_TEAM: 6HBMRNDGYC
         CODE_SIGNING_REQUIRED: YES
         CODE_SIGNING_ALLOWED: YES
         ENABLE_HARDENED_RUNTIME: NO
@@ -368,7 +374,7 @@ targets:
         CODE_SIGN_STYLE: Automatic
         CODE_SIGN_IDENTITY: "Apple Development"
         CODE_SIGN_ENTITLEMENTS: Resources/CoucouWidgets.entitlements
-        DEVELOPMENT_TEAM: 256AUJ9555
+        DEVELOPMENT_TEAM: 6HBMRNDGYC
         CODE_SIGNING_REQUIRED: YES
         CODE_SIGNING_ALLOWED: YES
         ENABLE_HARDENED_RUNTIME: NO
@@ -414,7 +420,7 @@ targets:
         SUPPORTS_MACCATALYST: NO
         CODE_SIGN_STYLE: Automatic
         CODE_SIGN_IDENTITY: "Apple Development"
-        DEVELOPMENT_TEAM: 256AUJ9555
+        DEVELOPMENT_TEAM: 6HBMRNDGYC
         CODE_SIGNING_REQUIRED: YES
         CODE_SIGNING_ALLOWED: YES
         ENABLE_HARDENED_RUNTIME: NO

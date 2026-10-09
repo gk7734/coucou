@@ -146,9 +146,7 @@ $CHANGES
 
 1. Download Coucou.zip below and unzip it.
 2. Move Coucou.app to your Applications folder, replacing the old one if you have it.
-3. Launch it, and click Open when macOS asks you to confirm.
-
-Linux and Windows: see the [README](https://github.com/Louis-CFM/coucou#readme)."
+3. Launch it, and click Open when macOS asks you to confirm."
 
 echo
 echo "──────── Release notes ────────"

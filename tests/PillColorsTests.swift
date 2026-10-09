@@ -1,8 +1,6 @@
 import Foundation
 
 // A colour of the user's own for each pill's Mochi (CoucouKit/PillColors.swift).
-// Mirrors windows/tests/pill-colors.test.mjs so every platform reads the same
-// preference the same way.
 
 @main
 enum PillColorsTests {
@@ -27,8 +25,8 @@ enum PillColorsTests {
         }
         check("nil → nil", PillColors.normalized(nil) == nil)
 
-        print("PillColors.palette — the ten colours Windows and Linux offer too")
-        check("same list as PILL_PALETTE", PillColors.palette == [
+        print("PillColors.palette — the ten colours the palette offers")
+        check("fixed ten-colour list", PillColors.palette == [
             "#F5F6F8", "#F4505E", "#F29B38", "#FACC15", "#4ADE80",
             "#2DD4BF", "#38BDF8", "#818CF8", "#C084FC", "#E879F9",
         ])
