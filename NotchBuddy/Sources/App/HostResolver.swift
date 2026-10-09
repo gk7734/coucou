@@ -62,7 +62,6 @@ enum HostResolver {
         "com.github.wez.wezterm": "WezTerm",
         "co.zeit.hyper":          "Hyper",
         "com.cmuxterm.app":       "cmux",
-        "com.stablyai.orca":      "Orca",
     ]
 
     /// TERM_PROGRAM (lowercased) → bundle id, for hooks that run without __CFBundleIdentifier.

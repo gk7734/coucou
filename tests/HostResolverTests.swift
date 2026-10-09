@@ -27,6 +27,7 @@ enum HostResolverTests {
         check("Zed is an IDE now", HostResolver.kind(of: "dev.zed.Zed") == .ide)
         check("WebStorm is an IDE", HostResolver.kind(of: "com.jetbrains.WebStorm") == .ide)
         check("an editor never seen before is an IDE", HostResolver.kind(of: "app.gram.Gram") == .ide)
+        check("Orca (agent workspace) is an IDE", HostResolver.kind(of: "com.stablyai.orca") == .ide)
 
         print("HostResolver.resolve — signal order")
         check("process tree wins over the inherited bundle id",
