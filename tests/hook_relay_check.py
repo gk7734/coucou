@@ -131,4 +131,78 @@ try:
 except Exception:
     checks += 1
 
+# ── Payload fields: a fake Coucou socket records what the relay sends ─────────────
+# The socket path must fit in sun_path (104 bytes): a short HOME under /tmp.
+import shutil
+import socket
+import tempfile
+import threading
+
+short_home = tempfile.mkdtemp(prefix='ccr', dir='/tmp')
+sock_dir = os.path.join(short_home, 'Library', 'Application Support', 'NotchBuddy')
+os.makedirs(sock_dir)
+received = []
+server = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+server.bind(os.path.join(sock_dir, 'nb.sock'))
+server.listen(8)
+
+
+def serve():
+    while True:
+        try:
+            conn, _ = server.accept()
+        except OSError:
+            return
+        with conn:
+            data = b''
+            while b'\n' not in data:
+                chunk = conn.recv(65536)
+                if not chunk:
+                    break
+                data += chunk
+            if data.strip():
+                received.append(json.loads(data.split(b'\n')[0]))
+            try:
+                conn.sendall(b'{"permissionDecision":"ask"}\n')
+            except OSError:
+                pass
+
+
+threading.Thread(target=serve, daemon=True).start()
+
+
+def sent(args, payload, extra_env):
+    del received[:]
+    env = dict(ENV, HOME=short_home, **extra_env)
+    r = relay(args, json.dumps(payload), env=env)
+    check(r.returncode == 0, 'relay exits 0 with Coucou answering')
+    for _ in range(100):
+        if received:
+            break
+        threading.Event().wait(0.02)
+    check(len(received) == 1, 'payload reached the socket for %r' % args)
+    return received[0]
+
+
+try:
+    jb = {'TERMINAL_EMULATOR': 'JetBrains-JediTerm'}
+    p = sent([], {'hook_event_name': 'PreToolUse', 'session_id': 's'}, jb)
+    check(p.get('terminal_emulator') == 'JetBrains-JediTerm', 'Claude event carries terminal_emulator: %r' % p)
+    check('term_program' in p and 'bundle_id' in p, 'next to term_program and bundle_id')
+    p = sent(['--agent', 'codex'], {'hook_event_name': 'PreToolUse'}, jb)
+    check(p.get('terminal_emulator') == 'JetBrains-JediTerm' and p.get('coucou_agent') == 'codex',
+          'Codex event carries terminal_emulator: %r' % p)
+    p = sent(['--agent', 'gemini', 'BeforeTool'], {}, jb)
+    check(p.get('terminal_emulator') == 'JetBrains-JediTerm', 'third-party event carries terminal_emulator')
+    p = sent(['--ask'], {'tool_name': 'AskUserQuestion', 'tool_input': {'questions': []}}, jb)
+    check(p.get('terminal_emulator') == 'JetBrains-JediTerm' and p.get('coucou_kind') == 'ask_user_question',
+          'question carries terminal_emulator: %r' % p)
+    p = sent([], {'hook_event_name': 'Stop'}, {})
+    check(p.get('terminal_emulator') == '', 'empty when not in a JetBrains terminal')
+    p = sent([], {'hook_event_name': 'Stop', 'terminal_emulator': 'kept'}, jb)
+    check(p.get('terminal_emulator') == 'kept', 'an agent-provided value is kept')
+finally:
+    server.close()
+    shutil.rmtree(short_home, ignore_errors=True)
+
 print('Hook relay (Python): %d checks passed' % checks)

@@ -32,6 +32,10 @@ enum HookRelayScriptsTests {
         check(nbHookPythonGitHub.hasPrefix("#!/usr/bin/env python3\n"), "shebang")
         check(!nbHookPythonGitHub.contains("\\("), "no Swift interpolation left in the relay")
 
+        // Every payload carries the JetBrains terminal hint, for every agent and the --ask hook.
+        let emulatorLine = "payload.setdefault('terminal_emulator', env.get('TERMINAL_EMULATOR', ''))"
+        check(nbHookPythonGitHub.components(separatedBy: emulatorLine).count == 3, "terminal_emulator in both payload paths")
+
         // The wrapper never blocks: it always ends with exit 0.
         check(nbHookShellWrapper.hasPrefix("#!/bin/sh\n"), "wrapper shebang")
         check(nbHookShellWrapper.hasSuffix("exit 0"), "wrapper exits 0")

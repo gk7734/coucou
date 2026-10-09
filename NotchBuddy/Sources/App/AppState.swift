@@ -86,9 +86,9 @@ final class AppState: ObservableObject {
             var repainted = tasks
             var changed = false
             for i in repainted.indices {
-                guard let def = PillCatalog.definition(for: repainted[i].id),
-                      repainted[i].color != def.color else { continue }
-                repainted[i].color = def.color
+                guard let color = Self.pillColor(for: repainted[i].id, in: pillColors),
+                      repainted[i].color != color else { continue }
+                repainted[i].color = color
                 changed = true
             }
             if changed { tasks = repainted }
@@ -96,8 +96,19 @@ final class AppState: ObservableObject {
     }
     /// Picks a colour for a pill's Mochi; nil, or the pill's own catalog colour, goes back to the default.
     func setPillColor(_ id: String, _ hex: String?) {
-        guard let def = PillCatalog.definition(for: id) else { return }
-        pillColors = PillColors.picking(hex, for: id, catalogColor: def.defaultColor, in: pillColors)
+        guard let defaultColor = Self.defaultPillColor(for: id) else { return }
+        pillColors = PillColors.picking(hex, for: id, catalogColor: defaultColor, in: pillColors)
+    }
+    /// A pill's colour before the user picks one: the catalog's, or for an IDE pill (`ide_…`,
+    /// not in the catalog) a stable palette colour. nil for other undeclared pills.
+    static func defaultPillColor(for id: String) -> String? {
+        if let def = PillCatalog.definition(for: id) { return def.defaultColor }
+        if HostResolver.isIDEPill(id) { return HookRouting.defaultIDEColor(pillId: id) }
+        return nil
+    }
+    /// The colour a pill is painted with, given the user's choices.
+    static func pillColor(for id: String, in colors: [String: String]) -> String? {
+        defaultPillColor(for: id).map { PillColors.color(for: id, catalogColor: $0, in: colors) }
     }
     // Transient: outfit preview while hovering in wardrobe (overrides resolvedOutfit in BotCanvasView)
     var wardrobePreviewOutfit: Outfit? = nil

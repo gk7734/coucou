@@ -44,6 +44,7 @@ final class DemoEngine: ObservableObject {
 
     private struct Snapshot {
         var tasks: [AgentTask]
+        var sessionBooks: [String: SessionBook]
         var focusId: String?
         var chatHistory: [ChatMessage]
         var stateOverride: BotState?
@@ -91,6 +92,7 @@ final class DemoEngine: ObservableObject {
 
         snapshot = Snapshot(
             tasks:               s.tasks,
+            sessionBooks:        s.sessionBooks,
             focusId:             s.focusId,
             chatHistory:         s.chatHistory,
             stateOverride:       s.stateOverride,
@@ -120,6 +122,8 @@ final class DemoEngine: ObservableObject {
         // Hide all real pills — show only main during demo (integration + Codex added progressively).
         let mainTask = s.tasks.first(where: { $0.id == s.mainPillId })
         s.tasks = mainTask.map { [$0] } ?? []
+        // The demo shows no real sessions; real events during the demo still land in the books.
+        s.sessionBooks = [:]
 
         // Weekly recap: available immediately so the reviewer can share it
         RecapStore.shared.demoSummaryOverride = demoWeeklySummary()
@@ -243,6 +247,17 @@ final class DemoEngine: ObservableObject {
             return snapTask
         }
         s.tasks = restoredSnapTasks + realNewTasks
+
+        // Session books: what the demo started with, updated by the real events that arrived
+        // during it (those sessions come first, as the most recent).
+        var books = snap.sessionBooks
+        for (pillId, current) in s.sessionBooks {
+            let kept = (books[pillId]?.sessions ?? []).filter { old in !current.sessions.contains { $0.id == old.id } }
+            var merged = SessionBook(sessions: current.sessions + kept)
+            merged.trim(now: Date())
+            books[pillId] = merged.isEmpty ? nil : merged
+        }
+        s.sessionBooks = books
 
         // Remove only demo diffs; leave real diffs untouched
         for (pillId, ids) in demoDiffIds {

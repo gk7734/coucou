@@ -61,6 +61,7 @@
 		273FC0FA14AAF6CE62FD14AE /* DesktopMochi.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1DDC96E7967032F5D0BD585 /* DesktopMochi.swift */; };
 		27CAA2593D35ABDF14E085BF /* HermesConfigMerger.swift in Sources */ = {isa = PBXBuildFile; fileRef = FB6A710FB73B8217484DA7A6 /* HermesConfigMerger.swift */; };
 		2875610F701376BD65573386 /* WindowContextCapture.swift in Sources */ = {isa = PBXBuildFile; fileRef = E91B733ADC638E14E9BB6EFA /* WindowContextCapture.swift */; };
+		2927988989262E121F361173 /* HookRouting.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1FB81C29474C0CD72289CE68 /* HookRouting.swift */; };
 		295F8FE5A9E2E8F1A6389DEE /* HomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B53E4CAD2BCC77B280689B0F /* HomeView.swift */; };
 		2A30FA2F046492E22A1C5719 /* ServiceDetail.swift in Sources */ = {isa = PBXBuildFile; fileRef = 65F64746B2740D5FE26B7E5A /* ServiceDetail.swift */; };
 		2C798C3837A63B9BB561A1A0 /* HookServer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 79D8DD79C3DD9BBC584B3CB2 /* HookServer.swift */; };
@@ -84,6 +85,7 @@
 		4778852A12726803BCF8B357 /* SessionDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A27178AA6007F7B56901750 /* SessionDetailView.swift */; };
 		4976F8BF814D6F817370F1D8 /* ChatMarkdownView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BFE88A53AEAA637F866D479D /* ChatMarkdownView.swift */; };
 		4A32FB2EA69E8BA70EBEA8A7 /* ServiceLiveDetail.swift in Sources */ = {isa = PBXBuildFile; fileRef = 21B710512DB99390EC564487 /* ServiceLiveDetail.swift */; };
+		4ABDDE677A7BCC0DB327D073 /* HookRouting.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1FB81C29474C0CD72289CE68 /* HookRouting.swift */; };
 		4B6AC00F22EC75E90E0157D5 /* AppLog.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9F6D7015D6A77AA59323C0E7 /* AppLog.swift */; };
 		4B83070258D5AAAC8FCEB15F /* MochiOutfitDrawing.swift in Sources */ = {isa = PBXBuildFile; fileRef = E84E5D91129352E8A1D32AA4 /* MochiOutfitDrawing.swift */; };
 		4B99E2AD54926078AB087B43 /* SpotifyViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 914A792788D403F836BEB570 /* SpotifyViews.swift */; };
@@ -287,10 +289,12 @@
 		F1EE04000665E204E02DC5AC /* DenyApprovalIntent.swift in Sources */ = {isa = PBXBuildFile; fileRef = D849B1A27AD17AEE1C7FFD1A /* DenyApprovalIntent.swift */; };
 		F25EB7EF3662AFF99AA1C8A1 /* TeamConfiguration.swift in Sources */ = {isa = PBXBuildFile; fileRef = D8C1BB0DF7770A6B263995E6 /* TeamConfiguration.swift */; };
 		F28275101D83F121E582B1B1 /* LiveActivityRelay.swift in Sources */ = {isa = PBXBuildFile; fileRef = 136626568FF0C3EAB1D08067 /* LiveActivityRelay.swift */; };
+		F2E27CA7B109652996A6A38E /* ProcessAncestry.swift in Sources */ = {isa = PBXBuildFile; fileRef = DE1A6E4C24A8F95F561609C0 /* ProcessAncestry.swift */; };
 		F4307DDA86D8E1C38F11DF73 /* SessionAlert.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5C3D369A09970350F6CCBC5F /* SessionAlert.swift */; };
 		F5D6F8E2CA65AB16B487DDD0 /* IslandScreenGeometry.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9466FDE02C9B3FB4EF01DFF8 /* IslandScreenGeometry.swift */; };
 		F6CA56F362902839EF9A3E2E /* PhoneAssets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 60401D1023D17C3FD30D7113 /* PhoneAssets.xcassets */; };
 		F6D57EEBD7E937EFD2B715CF /* ClaudeHost.swift in Sources */ = {isa = PBXBuildFile; fileRef = D0F0D0F67E7C56B9E37E7648 /* ClaudeHost.swift */; };
+		F8BBF82147AC0E79E035845A /* ProcessAncestry.swift in Sources */ = {isa = PBXBuildFile; fileRef = DE1A6E4C24A8F95F561609C0 /* ProcessAncestry.swift */; };
 		F8F95EAD88F70E0A147D1662 /* MacDictation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6544ED02D945CF9F00647AD1 /* MacDictation.swift */; };
 		F9445A71BBF9E4D20224238E /* QuestionPayload.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6C6993B34A0FFF8E3D454ADC /* QuestionPayload.swift */; };
 		F9915D1B6A25AC29DD8945E5 /* HookRelayScripts.swift in Sources */ = {isa = PBXBuildFile; fileRef = 76F27AAF61FFAE44E4209B51 /* HookRelayScripts.swift */; };
@@ -356,6 +360,7 @@
 		1BE21C2B315D37AA70ED45E9 /* SoundEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SoundEngine.swift; sourceTree = "<group>"; };
 		1CD2B28985A5D4E8676D6237 /* HostAppInfo.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HostAppInfo.swift; sourceTree = "<group>"; };
 		1EA7D927F6BB2667D37AA963 /* ClaudeHookDetection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClaudeHookDetection.swift; sourceTree = "<group>"; };
+		1FB81C29474C0CD72289CE68 /* HookRouting.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HookRouting.swift; sourceTree = "<group>"; };
 		21B710512DB99390EC564487 /* ServiceLiveDetail.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ServiceLiveDetail.swift; sourceTree = "<group>"; };
 		244A7909EEDA4BFF4C2EA9B5 /* TerminalTarget+AppKit.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "TerminalTarget+AppKit.swift"; sourceTree = "<group>"; };
 		265262A422C270C1798F4A80 /* MochiLive.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MochiLive.swift; sourceTree = "<group>"; };
@@ -462,6 +467,7 @@
 		DD426E81DF79CA79888059D9 /* ApprovalRelay.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ApprovalRelay.swift; sourceTree = "<group>"; };
 		DDB831F5623E699A2506698E /* NotificationViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotificationViewController.swift; sourceTree = "<group>"; };
 		DE18399D1CD69468CCF57966 /* MochiActivityState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MochiActivityState.swift; sourceTree = "<group>"; };
+		DE1A6E4C24A8F95F561609C0 /* ProcessAncestry.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProcessAncestry.swift; sourceTree = "<group>"; };
 		E18E74B3586BC0861C69E70A /* InstructionComposer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InstructionComposer.swift; sourceTree = "<group>"; };
 		E2A7CF50FD64BC80F35D69C8 /* SessionBook.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionBook.swift; sourceTree = "<group>"; };
 		E6AAC67875F84A862BC2A9AF /* ServiceDetailRunner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ServiceDetailRunner.swift; sourceTree = "<group>"; };
@@ -524,6 +530,7 @@
 				C581F7B1A9F14B281B60063E /* GreetingCanvasView.swift */,
 				FB6A710FB73B8217484DA7A6 /* HermesConfigMerger.swift */,
 				76F27AAF61FFAE44E4209B51 /* HookRelayScripts.swift */,
+				1FB81C29474C0CD72289CE68 /* HookRouting.swift */,
 				79D8DD79C3DD9BBC584B3CB2 /* HookServer.swift */,
 				1CD2B28985A5D4E8676D6237 /* HostAppInfo.swift */,
 				3FB897CD268F47C14E0B214C /* HostResolver.swift */,
@@ -544,6 +551,7 @@
 				BE03E03D1804B0B92C5C2DAD /* NotionPoller.swift */,
 				F56C7E1EBC74664A7F1689CF /* NowPlayingViews.swift */,
 				501DFE8274B5D5F1F86F716A /* PendingRequestQueue.swift */,
+				DE1A6E4C24A8F95F561609C0 /* ProcessAncestry.swift */,
 				78FB882D49084DEA6A10DB4D /* RecapStore.swift */,
 				61B5FDDE03F5F711146937E2 /* ResendPoller.swift */,
 				B2FDED98F7F6C755A72C97A3 /* SafeWebURL.swift */,
@@ -933,6 +941,7 @@
 				8C32A0C3EAF536D3836F61D5 /* GreetingCanvasView.swift in Sources */,
 				27CAA2593D35ABDF14E085BF /* HermesConfigMerger.swift in Sources */,
 				F9915D1B6A25AC29DD8945E5 /* HookRelayScripts.swift in Sources */,
+				4ABDDE677A7BCC0DB327D073 /* HookRouting.swift in Sources */,
 				2C798C3837A63B9BB561A1A0 /* HookServer.swift in Sources */,
 				B6B69C96325CA2ACEB3A5475 /* HostAppInfo.swift in Sources */,
 				C5A7EE3DBB5B52F420F42831 /* HostResolver.swift in Sources */,
@@ -963,6 +972,7 @@
 				D8F3654C8DB6A5823016BF42 /* PendingRequestQueue.swift in Sources */,
 				BDD8A210DD6D9DA2D15BC5EE /* PillCatalog.swift in Sources */,
 				07EC91820A69E8BF11EC778D /* PillColors.swift in Sources */,
+				F8BBF82147AC0E79E035845A /* ProcessAncestry.swift in Sources */,
 				CD05A497A7D0B3D723D92C06 /* QuestionPayload.swift in Sources */,
 				93AB64BF47D6D1EE7DB4C22B /* QuestionRelay.swift in Sources */,
 				7A449E237CAAB62758508C7C /* RecapStore.swift in Sources */,
@@ -1115,6 +1125,7 @@
 				C0E18D0F6F5F6D131E6066B8 /* GreetingCanvasView.swift in Sources */,
 				8520F8ACCDC2689F665CC8AD /* HermesConfigMerger.swift in Sources */,
 				58A38FB29F85A95744B208EF /* HookRelayScripts.swift in Sources */,
+				2927988989262E121F361173 /* HookRouting.swift in Sources */,
 				9DD56C95ECABDDCE23652D50 /* HookServer.swift in Sources */,
 				430586177AB25FAAB28FC808 /* HostAppInfo.swift in Sources */,
 				5B1D797F940ED559CDAC9423 /* HostResolver.swift in Sources */,
@@ -1145,6 +1156,7 @@
 				B31955759E2DA9879547E71B /* PendingRequestQueue.swift in Sources */,
 				13663D98590927AF71C17628 /* PillCatalog.swift in Sources */,
 				40F7576FC56ED7BC1D2B717E /* PillColors.swift in Sources */,
+				F2E27CA7B109652996A6A38E /* ProcessAncestry.swift in Sources */,
 				535EC818E1DAF0FA588545D8 /* QuestionPayload.swift in Sources */,
 				9AEFD05D0A39D4AF3C091B3A /* QuestionRelay.swift in Sources */,
 				B69DE31E2B0C2E35594CAA87 /* RecapStore.swift in Sources */,
