@@ -32,6 +32,11 @@ final class SystemAudioCapture: @unchecked Sendable {
     private var bandCount = 12   // AudioSpectrum.bandCount, read on the main actor at start
     private var outputDevice = AudioObjectID(kAudioObjectUnknown)
     private var publishedAudible: Bool?
+    private var publishedApps: [String] = []
+    /// A sound must last this long before it counts: alert sounds and clicks don't show the
+    /// visualizer, music and videos do. Silence counts at once.
+    private static let audibleDelay: TimeInterval = 2
+    private var pendingAudible: DispatchWorkItem?
     private var defaultDeviceListener: AudioObjectPropertyListenerBlock?
     private var deviceRunningListener: AudioObjectPropertyListenerBlock?
     private var processListListener: AudioObjectPropertyListenerBlock?
@@ -150,7 +155,7 @@ final class SystemAudioCapture: @unchecked Sendable {
         processListListener = nil
         processRunningListener = nil
         deviceRunningListener = nil
-        publishAudible(false)
+        publishAudible(false, apps: [])
     }
 
     private func followDefaultDevice() {
@@ -193,20 +198,36 @@ final class SystemAudioCapture: @unchecked Sendable {
         let deviceRunning = outputDevice != kAudioObjectUnknown
             && Self.read(outputDevice, kAudioDevicePropertyDeviceIsRunningSomewhere, into: &running)
             && running != 0
-        publishAudible(deviceRunning && othersPlay())
+        guard deviceRunning, let apps = appsPlaying() else {
+            publishAudible(false, apps: [])
+            return
+        }
+        // The process list couldn't be read: trust the device alone (no app names).
+        publishAudible(true, apps: apps)
     }
 
-    /// True when a process other than Coucou is sending sound out. If the process list can't
-    /// be read, trust the device alone.
-    private func othersPlay() -> Bool {
-        guard let processes = Self.processObjects() else { return true }
+    /// Bundle ids of the processes other than Coucou sending sound out ("" for one without a
+    /// bundle id); nil when no other process plays. If the process list can't be read, [] —
+    /// "something plays, but we don't know what".
+    private func appsPlaying() -> [String]? {
+        guard let processes = Self.processObjects() else { return [] }
+        var apps: [String] = []
         for process in processes {
             var output: UInt32 = 0
-            guard Self.read(process, kAudioProcessPropertyIsRunningOutput, into: &output), output != 0
-            else { continue }
-            if pid(of: process) != ownPID { return true }
+            guard Self.read(process, kAudioProcessPropertyIsRunningOutput, into: &output), output != 0,
+                  pid(of: process) != ownPID else { continue }
+            apps.append(Self.bundleId(of: process) ?? "")
         }
-        return false
+        return apps.isEmpty ? nil : apps
+    }
+
+    private static func bundleId(of process: AudioObjectID) -> String? {
+        var address = address(kAudioProcessPropertyBundleID)
+        var value: Unmanaged<CFString>?
+        var size = UInt32(MemoryLayout<Unmanaged<CFString>?>.size)
+        guard AudioObjectGetPropertyData(process, &address, 0, nil, &size, &value) == noErr,
+              let string = value?.takeRetainedValue() as String?, !string.isEmpty else { return nil }
+        return string
     }
 
     private func otherProcesses() -> [AudioObjectID] {
@@ -223,11 +244,47 @@ final class SystemAudioCapture: @unchecked Sendable {
         return pid
     }
 
-    private func publishAudible(_ audible: Bool) {
-        guard audible != publishedAudible else { return }
+    /// Publishes silence at once, sound only once it has lasted `audibleDelay` (re-checked
+    /// then), with the apps making it.
+    private func publishAudible(_ audible: Bool, apps: [String]) {
+        guard audible else {
+            pendingAudible?.cancel(); pendingAudible = nil
+            send(false, apps: [])
+            return
+        }
+        if publishedAudible == true {
+            send(true, apps: apps)   // already audible: just follow which apps play
+            return
+        }
+        guard pendingAudible == nil else { return }
+        let item = DispatchWorkItem { [weak self] in
+            guard let self else { return }
+            self.pendingAudible = nil
+            // Still playing after the delay?
+            if self.enabled, self.deviceIsRunning(), let apps = self.appsPlaying() {
+                self.send(true, apps: apps)
+            }
+        }
+        pendingAudible = item
+        queue.asyncAfter(deadline: .now() + Self.audibleDelay, execute: item)
+    }
+
+    private func deviceIsRunning() -> Bool {
+        var running: UInt32 = 0
+        return outputDevice != kAudioObjectUnknown
+            && Self.read(outputDevice, kAudioDevicePropertyDeviceIsRunningSomewhere, into: &running)
+            && running != 0
+    }
+
+    private func send(_ audible: Bool, apps: [String]) {
+        guard audible != publishedAudible || apps != publishedApps else { return }
         publishedAudible = audible
+        publishedApps = apps
         DispatchQueue.main.async {
-            MainActor.assumeIsolated { AudioSpectrum.shared.isAudible = audible }
+            MainActor.assumeIsolated {
+                AudioSpectrum.shared.isAudible = audible
+                AudioSpectrum.shared.audibleBundleIds = apps
+            }
         }
     }
 

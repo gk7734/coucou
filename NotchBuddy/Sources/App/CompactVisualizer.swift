@@ -10,15 +10,19 @@ import CoreGraphics
 
 /// The music the visualizer is about: what its title line says, and the pill a click opens.
 struct CompactMusicLine: Equatable, Sendable {
-    var source: NowPlayingSource
-    /// The title, or the source's name ("TIDAL") when no title is known. Shortened.
+    /// The music app Coucou reads, nil for any other app making sound (a video, a call…).
+    var source: NowPlayingSource?
+    /// The title, or the app's name ("TIDAL", "Safari") when no title is known. Shortened.
     var headline: String
     /// The artist, shortened; empty when unknown.
     var subline: String
+    /// The app making the sound when no music feed knows it (a click brings it forward).
+    var appBundleId: String? = nil
 
     /// "Title · Artist", "Title", or "TIDAL".
     var text: String { subline.isEmpty ? headline : headline + " · " + subline }
-    var pillId: String { CompactVisualizer.pillId(for: source) }
+    /// The music pill a click opens, nil for an app without one.
+    var pillId: String? { source.map(CompactVisualizer.pillId(for:)) }
 }
 
 /// What the compact island's slot (right of the notch, or after Mochi on a bar) shows.
@@ -82,9 +86,18 @@ enum CompactVisualizer {
 
     // MARK: Title line
 
-    /// The line for what plays, nil when nothing plays.
-    static func musicLine(_ info: NowPlayingInfo?) -> CompactMusicLine? {
-        guard let info, info.isPlaying else { return nil }
+    /// The line for what plays, nil when nothing plays. A music feed (Music, Spotify, TIDAL)
+    /// gives the title; otherwise any other app's sound that lasted (AudioSpectrum.isAudible)
+    /// shows under that app's name — the visualizer works for any app, with or without a feed.
+    static func musicLine(_ info: NowPlayingInfo?,
+                          audibleApp: (bundleId: String, name: String)? = nil) -> CompactMusicLine? {
+        guard let info, info.isPlaying else {
+            guard let app = audibleApp else { return nil }
+            let known = NowPlayingSource.allCases.first { $0.bundleId == app.bundleId }
+            return CompactMusicLine(source: known,
+                                    headline: CompactStatus.truncateTail(CompactStatus.oneLine(app.name), max: maxTitleLength),
+                                    subline: "", appBundleId: app.bundleId.isEmpty ? nil : app.bundleId)
+        }
         let title = CompactStatus.oneLine(info.title)
         let artist = CompactStatus.truncateTail(CompactStatus.oneLine(info.artist), max: maxArtistLength)
         if title.isEmpty {

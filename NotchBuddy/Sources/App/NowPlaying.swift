@@ -104,6 +104,8 @@ final class AudioSpectrum {
     /// True while the default output device is running for some process (something plays).
     /// Comes from a Core Audio property listener, not from capture: free to keep on.
     var isAudible = false
+    /// Bundle ids of the apps making the sound while `isAudible` ("" when unknown).
+    var audibleBundleIds: [String] = []
 
     /// Capture runs only while someone wants the levels (the compact island showing the
     /// visualizer): 0 % CPU otherwise. Implemented by the audio capture feature.

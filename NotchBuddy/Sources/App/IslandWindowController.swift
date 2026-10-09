@@ -696,7 +696,11 @@ final class IslandWindowController: NSWindowController {
             if line.activity.kind.waitsOnUser, openPendingAlert() { return }
             focusFromCompact(line.pillId)
         case .music(let music)?:
-            focusFromCompact(music.pillId)
+            if let pillId = music.pillId, AppState.shared.tasks.contains(where: { $0.id == pillId }) {
+                focusFromCompact(pillId)
+            } else if let app = music.appBundleId ?? music.source?.bundleId {
+                HostAppInfo.activate(app)   // no music pill: bring the app making the sound
+            }
         case .mini(let id)?:
             focusFromCompact(id)
         case nil:

@@ -156,9 +156,22 @@ final class CompactStatusModel {
         let slot = CompactVisualizer.slot(
             line: statusLine(s),
             agentsBusy: CompactVisualizer.agentsBusy(books: s.sessionBooks),
-            music: CompactVisualizer.musicLine(NowPlayingCenter.shared.current),
+            music: CompactVisualizer.musicLine(NowPlayingCenter.shared.current, audibleApp: audibleApp()),
             visualizerEnabled: CompactStatusModel.shared.visualizerEnabled)
         return Target(slot: slot, hasMinis: hasMinis)
+    }
+
+    /// The app making sound when no music feed reports a track: the first one with a bundle
+    /// id that isn't a system sound daemon ("Sound" when none is named).
+    private static func audibleApp() -> (bundleId: String, name: String)? {
+        let spectrum = AudioSpectrum.shared
+        guard spectrum.isAudible else { return nil }
+        let ignored: Set<String> = ["com.apple.systemsoundserverd", "com.apple.coreaudiod",
+                                    "com.apple.audio.SandboxHelper"]
+        if let id = spectrum.audibleBundleIds.first(where: { !$0.isEmpty && !ignored.contains($0) }) {
+            return (id, HostAppInfo.name(for: id))
+        }
+        return spectrum.audibleBundleIds.isEmpty ? ("", String(localized: "Sound")) : nil
     }
 
     private static func statusLine(_ s: AppState) -> CompactStatusLine? {

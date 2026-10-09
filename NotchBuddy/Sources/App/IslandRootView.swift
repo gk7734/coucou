@@ -725,7 +725,7 @@ struct CompactStatusOverlay: View {
     /// A new identity for each new thing said: the old line fades out as the new one fades in
     /// (the status line and the visualizer cross-fade the same way).
     private func identity(_ line: CompactStatusLine?, _ music: CompactMusicLine?) -> String {
-        if let music { return "♪\u{1F}\(music.source.rawValue)\u{1F}\(music.text)" }
+        if let music { return "♪\u{1F}\(music.source?.rawValue ?? music.appBundleId ?? "")\u{1F}\(music.text)" }
         guard let line else { return "" }
         return "\(line.pillId)\u{1F}\(line.activity.kind.rawValue)\u{1F}\(line.text)\u{1F}\(line.pillName)\u{1F}\(line.turnStartedAt != nil)"
     }
@@ -772,11 +772,12 @@ struct CompactVisualizerView: View {
 
     /// The music pill's colour (the user's own if they picked one), else the source's.
     private var accent: Color {
-        if let def = PillCatalog.definition(for: music.pillId) { return Color(hex: def.color) }
+        if let id = music.pillId, let def = PillCatalog.definition(for: id) { return Color(hex: def.color) }
         switch music.source {
-        case .music:   return Color(hex: "#FA2D48")
-        case .spotify: return Color(hex: "#1DB954")
-        case .tidal:   return Color(hex: "#E6E8EB")
+        case .music?:   return Color(hex: "#FA2D48")
+        case .spotify?: return Color(hex: "#1DB954")
+        case .tidal?:   return Color(hex: "#E6E8EB")
+        case nil:       return Color(hex: "#A78BFA")
         }
     }
 

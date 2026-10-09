@@ -80,6 +80,13 @@ enum CompactVisualizerTests {
         print("title line")
         check("paused: no line", CompactVisualizer.musicLine(info(playing: false)) == nil)
         check("nothing: no line", CompactVisualizer.musicLine(nil) == nil)
+        let safari = CompactVisualizer.musicLine(nil, audibleApp: (bundleId: "com.apple.Safari", name: "Safari"))
+        check("any app's sound: its name, no pill", safari?.text == "Safari" && safari?.pillId == nil
+              && safari?.appBundleId == "com.apple.Safari")
+        let tidalApp = CompactVisualizer.musicLine(nil, audibleApp: (bundleId: "com.tidal.desktop", name: "TIDAL"))
+        check("TIDAL heard without its feed: TIDAL's pill", tidalApp?.text == "TIDAL" && tidalApp?.pillId == "integration_tidal")
+        check("a feed's track wins over the app's name",
+              CompactVisualizer.musicLine(info(.spotify, "Song", "Band"), audibleApp: (bundleId: "com.apple.Safari", name: "Safari"))?.text == "Song · Band")
         check("title · artist", music.text == "One More Time · Daft Punk")
         check("title only", CompactVisualizer.musicLine(info(.music, "Clair de lune", ""))?.text == "Clair de lune")
         check("no title: the source's name", CompactVisualizer.musicLine(info(.tidal, "", ""))?.text == "TIDAL")
