@@ -10,6 +10,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationWillTerminate(_ notification: Notification) {
         DemoEngine.shared.stop()
         HotKeyCenter.shared.unregisterAll()
+        AppLog.shared.flush()   // the last log lines, still on the log queue
     }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
