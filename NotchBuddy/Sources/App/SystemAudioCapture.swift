@@ -89,14 +89,16 @@ final class SystemAudioCapture: @unchecked Sendable {
     }
 
     /// Brings the listeners and the capture in line with the setting and `wanted`.
+    /// The "something plays" listeners stay on whatever the setting: they capture nothing,
+    /// and the TIDAL feed reads the player only while the Mac is audible (with them off,
+    /// turning the visualizer off froze TIDAL's track). The setting gates the capture.
     private func refresh() {
-        let shouldEnable = Self.settingEnabled()
-        if shouldEnable != enabled {
-            enabled = shouldEnable
-            if enabled { installListeners() } else { removeListeners() }
+        if !enabled {
+            enabled = true
+            installListeners()
         }
         #if !APPSTORE
-        let shouldCapture = enabled && wanted
+        let shouldCapture = Self.settingEnabled() && wanted
         if shouldCapture, session == nil, !captureTried {
             captureTried = true
             session = TapSession.start(excluding: ownProcessObject(), bandCount: bandCount, queue: queue)
