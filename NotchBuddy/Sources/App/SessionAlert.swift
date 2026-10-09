@@ -27,8 +27,14 @@ final class SessionAlertCenter {
     static let shared = SessionAlertCenter()
     private init() {}
 
-    /// Called on the main actor for every alert-worthy session event.
+    /// Where alerts go. MacNotifier installs itself at launch (AppDelegate); kept as a
+    /// closure so this file stays Foundation only and the policy tests can compile it.
+    var deliver: ((SessionAlert) -> Void)?
+
+    /// Called on the main actor for every alert-worthy session event. Record the event in
+    /// the pill's SessionBook first: banners that wait on the user are cleared once the
+    /// book shows the session has moved on.
     func post(_ alert: SessionAlert) {
-        // Implemented by the macOS notifications feature.
+        deliver?(alert)
     }
 }

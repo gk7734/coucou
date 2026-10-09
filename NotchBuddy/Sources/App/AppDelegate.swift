@@ -19,6 +19,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         _ = KeychainStore.shared
         NSApp.setActivationPolicy(.accessory)
         setupMenuBarItem()
+        // Before the island (and its hook server): banners for session alerts, stall watch.
+        MacNotifier.shared.start()
+        StallMonitor.shared.start()
         setupIsland()
         #if DEBUG
         let debugMenu = NSMenu(title: "Debug")
