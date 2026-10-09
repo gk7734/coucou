@@ -1932,7 +1932,8 @@ final class HookServer: @unchecked Sendable {
         let task = Process(); let pipe = Pipe()
         task.executableURL = URL(fileURLWithPath: exe)
         task.arguments = ["--version"]
-        task.standardOutput = pipe; task.standardError = Pipe()
+        // stderr goes nowhere: an unread pipe that fills up would hold the process until the timeout.
+        task.standardOutput = pipe; task.standardError = FileHandle.nullDevice
         do { try task.run() } catch { return nil }
         let deadline = Date().addingTimeInterval(3)
         while task.isRunning && Date() < deadline { usleep(20_000) }
