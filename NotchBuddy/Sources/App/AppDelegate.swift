@@ -237,6 +237,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         #if !APPSTORE
         _ = MusicController.shared
         _ = SpotifyController.shared
+        TidalController.shared.start()
         #endif
     }
 }
