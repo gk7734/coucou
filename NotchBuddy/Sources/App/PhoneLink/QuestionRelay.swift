@@ -1,7 +1,6 @@
 #if PHONE_LINK
 import AppKit
 import CloudKit
-import Combine
 
 // MARK: - Answer Claude's questions from the iPhone
 //
@@ -20,24 +19,22 @@ final class QuestionRelay {
     private var database: CKDatabase { container.privateCloudDatabase }
     private var zoneID: CKRecordZone.ID { SessionSnapshot.zoneID }
 
-    private var cancellable: AnyCancellable?
+    private var observer: ChangeObserver<QuestionPayload?>?
     private var current: (fingerprint: String, since: Date)?
     private var pollTask: Task<Void, Never>?
     private var changeToken: CKServerChangeToken?
 
     func start() {
-        guard cancellable == nil else { return }
-        // @Published sends the new value before the property changes: use the value passed along.
-        cancellable = AppState.shared.$pendingQuestion
-            .map { $0.map(QuestionPayload.init(ask:)) }
-            .removeDuplicates()
-            .sink { [weak self] payload in
-                MainActor.assumeIsolated { self?.pendingChanged(to: payload) }
-            }
+        guard observer == nil else { return }
+        // The waiting question now, then each time it changes (once per main-queue turn).
+        observer = ChangeObserver({ AppState.shared.pendingQuestion.map(QuestionPayload.init(ask:)) },
+                                     initial: true, removeDuplicates: true) { [weak self] payload in
+            self?.pendingChanged(to: payload)
+        }
     }
 
     func stop() {
-        cancellable = nil
+        observer = nil
         pendingChanged(to: nil)
     }
 

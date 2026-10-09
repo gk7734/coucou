@@ -1,5 +1,4 @@
 import Foundation
-import Combine
 
 // MARK: - StallMonitor
 //
@@ -14,16 +13,16 @@ final class StallMonitor {
 
     private var tracker = StallTracker()
     private var books: [String: SessionBook] = [:]
-    private var observer: AnyCancellable?
+    private var observer: ChangeObserver<[String: SessionBook]>?
     private var timer: DispatchWorkItem?
 
     private init() {}
 
     func start() {
         guard observer == nil else { return }
-        // @Published emits before the property changes: work on the value it hands over.
-        observer = AppState.shared.$sessionBooks.sink { [weak self] books in
-            MainActor.assumeIsolated { self?.check(books) }
+        // Checked now, then once per main-queue turn in which the books changed.
+        observer = ChangeObserver({ AppState.shared.sessionBooks }, initial: true) { [weak self] books in
+            self?.check(books)
         }
     }
 

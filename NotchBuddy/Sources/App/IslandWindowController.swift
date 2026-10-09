@@ -1,5 +1,4 @@
 import AppKit
-import Combine
 import SwiftUI
 
 @MainActor
@@ -14,12 +13,10 @@ final class IslandWindowController: NSWindowController {
     private var wasInIsland = false
     private var frameTimer: Timer?
     private var keyMonitor: Any?
-    private var viewSubscription: AnyCancellable?
-    private var displaySubscription: AnyCancellable?
-    private var autoCloseSubscription: AnyCancellable?
-    private var openOnHoverSubscription: AnyCancellable?
-    private var absenceSubscription: AnyCancellable?
-    private var modeSubscription: AnyCancellable?
+    private var displayObserver: ChangeObserver<IslandDisplayChoice>?
+    private var autoCloseObserver: ChangeObserver<TimeInterval>?
+    private var openOnHoverObserver: ChangeObserver<Bool>?
+    private var absenceObserver: ChangeObserver<TimeInterval>?
 
     // Confused recovery timer (set by handleDizzy)
     private var confusedRecoveryTimer: DispatchWorkItem?
@@ -100,7 +97,7 @@ final class IslandWindowController: NSWindowController {
         container.autoresizingMask = [.width, .height]
 
         let hosting = NSHostingView(rootView: IslandRootView()
-            .environmentObject(AppState.shared)
+            .environment(AppState.shared)
             .environment(\.layoutDirection, .leftToRight))
         hosting.frame = NSRect(origin: .zero, size: contentSize)
         hosting.autoresizingMask = [.width, .height]
@@ -152,22 +149,18 @@ final class IslandWindowController: NSWindowController {
 
         // Make panel key whenever the prompt/chat view becomes active
         // (nonactivatingPanel never auto-becomes key, but TextField needs it)
-        viewSubscription = state.$view
-            .receive(on: DispatchQueue.main)
-            .sink { [weak self] newView in
-                guard let self else { return }
-                if newView == .prompt {
-                    self.islandPanel.makeKey()
-                }
+        // On every assignment, the same view included, on the next turn of the main queue.
+        state.viewDidSet = { [weak self] newView in
+            guard newView == .prompt else { return }
+            DispatchQueue.main.async { [weak self] in
+                self?.islandPanel.makeKey()
             }
+        }
 
         // Screen choice changed in Settings: move right away (explicit user action).
-        displaySubscription = state.$islandDisplay
-            .dropFirst()
-            .receive(on: DispatchQueue.main)
-            .sink { [weak self] choice in
-                self?.moveToTargetScreen(choice: choice)
-            }
+        displayObserver = ChangeObserver({ AppState.shared.islandDisplay }) { [weak self] choice in
+            self?.moveToTargetScreen(choice: choice)
+        }
 
         // Screen plugged/unplugged, lid closed, arrangement or resolution changed.
         NotificationCenter.default.addObserver(
@@ -210,9 +203,9 @@ final class IslandWindowController: NSWindowController {
         let size = panel.frame.size
         panel.setFrame(NSRect(x: sf.midX - size.width/2, y: sf.maxY - size.height,
                               width: size.width, height: size.height), display: true)
-        // notchWidth/hasNotch are not @Published: tell the views to resize the island.
+        // The island's size is @State in IslandContainer: tell it to resize. Views that read
+        // notchWidth/notchHeight/hasNotch follow on their own (observed properties).
         NotificationCenter.default.post(name: .islandScreenChanged, object: nil)
-        state.objectWillChange.send()
     }
 
     /// Follow-the-mouse mode: hop to the cursor's screen while the island is not open,
@@ -230,13 +223,13 @@ final class IslandWindowController: NSWindowController {
 
     private func wireFSM() {
         // Apply the persisted preference immediately and keep live edits in sync.
-        autoCloseSubscription = state.$autoCloseInterval.sink { [weak self] delay in
+        autoCloseObserver = ChangeObserver({ AppState.shared.autoCloseInterval }, initial: true) { [weak self] delay in
             self?.fsm.homeToPetitDelay = delay
         }
-        openOnHoverSubscription = state.$openOnHover.sink { [weak self] on in
+        openOnHoverObserver = ChangeObserver({ AppState.shared.openOnHover }, initial: true) { [weak self] on in
             self?.fsm.openOnHover = on
         }
-        absenceSubscription = state.$absenceInterval.sink { [weak self] interval in
+        absenceObserver = ChangeObserver({ AppState.shared.absenceInterval }, initial: true) { [weak self] interval in
             self?.fsm.absenceInterval = interval
         }
         fsm.onPresenceChange = { present in
@@ -251,7 +244,8 @@ final class IslandWindowController: NSWindowController {
         // opened from a hotkey, the menu or the desktop Mochi, the demo restoring its snapshot).
         // Mirror every change so the FSM's hover, click and timers match what is on screen.
         // The FSM's own transitions come back here too and are no-ops.
-        modeSubscription = state.$mode.sink { [weak self] mode in
+        // Synchronous, before the new mode is stored, like the @Published sink it replaces.
+        let modeWillSet: @MainActor (IslandMode) -> Void = { [weak self] mode in
             guard let self else { return }
             let shown: IslandStateMachine.Shown
             switch mode {
@@ -262,6 +256,8 @@ final class IslandWindowController: NSWindowController {
             if mode == .expanded { IntegrationSetupCache.invalidate() }
             self.fsm.displayed(shown, pointerInside: self.wasInIsland)
         }
+        state.modeWillSet = modeWillSet
+        modeWillSet(state.mode)   // a Combine sink is handed the current value too
 
         fsm.onTransition = { [weak self] from, to in
             guard let self else { return }

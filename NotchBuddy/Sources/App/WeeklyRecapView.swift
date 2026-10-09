@@ -4,7 +4,7 @@ import SwiftUI
 // MARK: - Notch card
 
 struct WeeklyRecapCardView: View {
-    @ObservedObject var state: AppState
+    var state: AppState
     @State private var summary: WeeklySummary? = nil
 
     var body: some View {

@@ -21,7 +21,7 @@ final class DesktopBotViewState: ObservableObject {
 
 /// Full Mochi character rendered inside the desktop floating panel.
 struct DesktopBotView: View {
-    @ObservedObject var appState: AppState
+    var appState: AppState
     /// Engine owned by DesktopMochiController; controller calls methods on it directly.
     let engine: BotEngine
     @ObservedObject var viewState: DesktopBotViewState
@@ -133,10 +133,10 @@ final class DesktopMochiController {
     // Screen sleep / lock
     private var screenSleeping = false
 
-    // Lifecycle subscriptions (cleared on retractForAlert + fullTearDown)
-    private var cancellables: Set<AnyCancellable> = []
-    // Alert subscription — permanent, only released with the singleton
-    private var alertSubscription: AnyCancellable?
+    // Lifecycle observer (cleared on retractForAlert + fullTearDown)
+    private var lifecycleObserver: ChangeObserver<BotState>?
+    // Alert observer — permanent, only released with the singleton
+    private var alertObserver: ChangeObserver<Bool>?
 
     // Event monitors
     private var mouseDownMonitor:    Any?
@@ -328,7 +328,7 @@ final class DesktopMochiController {
         pendingSlapWorkItem?.cancel()
         stopPolling()
         removeEventMonitors()
-        cancellables.removeAll()
+        lifecycleObserver = nil
         isSleeping = false
         let s = DesktopMochiController.panelSize
         let screen = IslandWindowController.islandScreen()
@@ -354,7 +354,7 @@ final class DesktopMochiController {
         guard let p = panel else { return }
         stopPolling()
         removeEventMonitors()
-        cancellables.removeAll()
+        lifecycleObserver = nil
         pendingSlapWorkItem?.cancel()
         isSleeping = false
 
@@ -395,7 +395,7 @@ final class DesktopMochiController {
 
     private func fullTearDown() {
         phase = .home
-        cancellables.removeAll()
+        lifecycleObserver = nil
         pendingSlapWorkItem?.cancel()
         panel?.close()
         panel = nil
@@ -422,35 +422,24 @@ final class DesktopMochiController {
     // MARK: - Lifecycle observation (active while panel is live on desktop)
 
     private func observeLifecycle() {
-        cancellables.removeAll()
+        lifecycleObserver = nil
 
         // effectiveState → .finished: joy jump (only when on desktop, not retracting)
-        Publishers.CombineLatest(AppState.shared.$stateOverride, AppState.shared.$tasks)
-            .map { _, _ in AppState.shared.effectiveState }
-            .removeDuplicates()
-            .dropFirst()
-            .receive(on: DispatchQueue.main)
-            .sink { [weak self] newState in
-                guard let self, self.phase == .onDesktop else { return }
-                if newState == .finished {
-                    self.engine?.triggerEmote(.happy, duration: 1.2, silent: true)
-                }
+        lifecycleObserver = ChangeObserver({ AppState.shared.effectiveState },
+                                           removeDuplicates: true) { [weak self] newState in
+            guard let self, self.phase == .onDesktop else { return }
+            if newState == .finished {
+                self.engine?.triggerEmote(.happy, duration: 1.2, silent: true)
             }
-            .store(in: &cancellables)
+        }
     }
 
     // MARK: - Alert observation (permanent — installed once at init)
 
     private func observeAlerts() {
-        alertSubscription = Publishers.CombineLatest(
-            AppState.shared.$pendingApproval,
-            AppState.shared.$pendingQuestion
-        )
-        .map { a, q in a != nil || q != nil }
-        .removeDuplicates()
-        .dropFirst()
-        .receive(on: DispatchQueue.main)
-        .sink { [weak self] alertActive in
+        alertObserver = ChangeObserver({
+            AppState.shared.pendingApproval != nil || AppState.shared.pendingQuestion != nil
+        }, removeDuplicates: true) { [weak self] alertActive in
             guard let self else { return }
 
             if alertActive {

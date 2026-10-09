@@ -16,7 +16,7 @@ final class MusicController: ObservableObject {
     @Published var album: String?
 
     private var notifTokens: [Any] = []
-    private var cancellables = Set<AnyCancellable>()
+    private var integrationsObserver: ChangeObserver<Set<String>>?
     private let queue = DispatchQueue(label: "fr.louisraille.coucou.music")
 
     private var isPillActive: Bool {
@@ -74,19 +74,17 @@ final class MusicController: ObservableObject {
         notifTokens.append(tok3)
 
         // Observe activeIntegrations — pill activated → initial read; deactivated → clear
-        AppState.shared.$activeIntegrations
-            .sink { [weak self] integrations in
-                guard let self else { return }
-                if integrations.contains("integration_music") {
-                    if self.isMusicRunning(),
-                       UserDefaults.standard.bool(forKey: "coucou.musicAutomationGranted") {
-                        self.fetchAndApply()
-                    }
-                } else {
-                    self.clearState()
+        integrationsObserver = ChangeObserver({ AppState.shared.activeIntegrations }, initial: true) { [weak self] integrations in
+            guard let self else { return }
+            if integrations.contains("integration_music") {
+                if self.isMusicRunning(),
+                   UserDefaults.standard.bool(forKey: "coucou.musicAutomationGranted") {
+                    self.fetchAndApply()
                 }
+            } else {
+                self.clearState()
             }
-            .store(in: &cancellables)
+        }
     }
 
     // MARK: - Private helpers

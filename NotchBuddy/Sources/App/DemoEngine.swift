@@ -22,7 +22,7 @@ final class DemoEngine: ObservableObject {
     // MARK: Private state
 
     private var demoTask: Task<Void, Never>? = nil
-    private var modeCancellable: AnyCancellable? = nil
+    private var modeObserver: ChangeObserver<IslandMode>? = nil
 
     private var visibilityContinuation: CheckedContinuation<Void, Never>? = nil
     private var approvalContinuation: CheckedContinuation<String, Never>? = nil
@@ -142,16 +142,12 @@ final class DemoEngine: ObservableObject {
         injectIntegrationData()
 
         // Observe mode changes to unblock waitUntilVisible()
-        modeCancellable = s.$mode
-            .dropFirst()
-            .sink { [weak self] mode in
-                MainActor.assumeIsolated {
-                    if mode != .hidden, let cont = self?.visibilityContinuation {
-                        self?.visibilityContinuation = nil
-                        cont.resume()
-                    }
-                }
+        modeObserver = ChangeObserver({ AppState.shared.mode }) { [weak self] mode in
+            if mode != .hidden, let cont = self?.visibilityContinuation {
+                self?.visibilityContinuation = nil
+                cont.resume()
             }
+        }
 
         // Open island immediately on the demo session
         NotificationCenter.default.post(name: .hookExpand, object: IslandView.overview)
@@ -172,7 +168,7 @@ final class DemoEngine: ObservableObject {
 
         demoTask?.cancel()
         demoTask = nil
-        modeCancellable = nil
+        modeObserver = nil
 
         // Unblock any waiting continuations so the loop exits cleanly
         let vc = visibilityContinuation; visibilityContinuation = nil; vc?.resume()
@@ -691,7 +687,7 @@ final class DemoEngine: ObservableObject {
     }
 
     /// Pauses until the island is visible (not hidden), or demo is stopped.
-    /// Observed via Combine publisher — no polling.
+    /// Observed with a ChangeObserver — no polling.
     private func waitUntilVisible() async {
         guard isActive, AppState.shared.mode == .hidden else { return }
         await withCheckedContinuation { (cont: CheckedContinuation<Void, Never>) in

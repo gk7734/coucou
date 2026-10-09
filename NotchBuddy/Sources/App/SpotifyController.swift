@@ -48,7 +48,7 @@ final class SpotifyController: ObservableObject {
     nonisolated private static let grantedKey = "coucou.spotifyAutomationGranted"
 
     private var notifTokens: [Any] = []
-    private var cancellables = Set<AnyCancellable>()
+    private var integrationsObserver: ChangeObserver<Set<String>>?
     private let queue = DispatchQueue(label: "fr.louisraille.coucou.spotify")
     private var artworkCache: [String: NSImage] = [:]
     private var artworkCacheOrder: [String] = []
@@ -136,19 +136,17 @@ final class SpotifyController: ObservableObject {
         // Pill turned on → read the current track (this is when macOS asks for Automation, right
         // after the user's own click). At launch, only if already granted. Pill turned off → clear.
         var wasActive: Bool? = nil
-        AppState.shared.$activeIntegrations
-            .sink { [weak self] integrations in
-                guard let self else { return }
-                let active = integrations.contains(Self.pillId)
-                defer { wasActive = active }
-                guard active else { self.clearState(); return }
-                guard wasActive != true else { return }
-                if wasActive == false || self.automationGranted {
-                    // The publisher fires before the property is set: read once it is
-                    Task { @MainActor [weak self] in self?.refresh() }
-                }
+        integrationsObserver = ChangeObserver({ AppState.shared.activeIntegrations }, initial: true) { [weak self] integrations in
+            guard let self else { return }
+            let active = integrations.contains(Self.pillId)
+            defer { wasActive = active }
+            guard active else { self.clearState(); return }
+            guard wasActive != true else { return }
+            if wasActive == false || self.automationGranted {
+                // As when a publisher fired this before the property was set: read on the next turn
+                Task { @MainActor [weak self] in self?.refresh() }
             }
-            .store(in: &cancellables)
+        }
     }
 
     // MARK: - State

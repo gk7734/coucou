@@ -1,7 +1,6 @@
 #if PHONE_LINK
 import AppKit
 import CloudKit
-import Combine
 import CryptoKit
 
 // MARK: - iPhone plan, step 7: approve or deny from the iPhone
@@ -25,7 +24,7 @@ final class ApprovalRelay {
     private var database: CKDatabase { container.privateCloudDatabase }
     private var zoneID: CKRecordZone.ID { SessionSnapshot.zoneID }
 
-    private var cancellable: AnyCancellable?
+    private var observer: ChangeObserver<ApprovalInfo?>?
     private var current: (fingerprint: String, since: Date)?
     private var pollTask: Task<Void, Never>?
     private var changeToken: CKServerChangeToken?
@@ -38,19 +37,17 @@ final class ApprovalRelay {
     }
 
     func start() {
-        guard cancellable == nil else { return }
-        // @Published sends the new value before the property changes, so the
-        // value is passed along rather than read back from AppState.
-        cancellable = AppState.shared.$pendingApproval
-            .removeDuplicates { $0.map(Self.fingerprint) == $1.map(Self.fingerprint) }
-            .sink { [weak self] approval in
-                MainActor.assumeIsolated { self?.pendingChanged(to: approval) }
-            }
+        guard observer == nil else { return }
+        // The pending approval now, then each time it changes (once per main-queue turn).
+        observer = ChangeObserver({ AppState.shared.pendingApproval }, initial: true,
+                                     removeDuplicates: { $0.map(Self.fingerprint) == $1.map(Self.fingerprint) }) { [weak self] approval in
+            self?.pendingChanged(to: approval)
+        }
         log("relay on")
     }
 
     func stop() {
-        cancellable = nil
+        observer = nil
         pendingChanged(to: nil)
     }
 

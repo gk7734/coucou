@@ -1,7 +1,6 @@
 #if PHONE_LINK
 import AppKit
 import CloudKit
-import Combine
 
 // MARK: - iPhone plan, step 4: publish agent sessions to iCloud
 //
@@ -20,7 +19,7 @@ final class SessionPublisher {
 
     private let container = CKContainer(identifier: CloudSchema.containerID)
     private var database: CKDatabase { container.privateCloudDatabase }
-    private var cancellable: AnyCancellable?
+    private var observer: ChangeObserver<[String: SessionSnapshot]>?
 
     /// What was last written to iCloud, by pill ID.
     private var published: [String: SessionSnapshot] = [:]
@@ -31,7 +30,7 @@ final class SessionPublisher {
 
     /// Stops publishing and deletes this Mac's sessions from iCloud.
     func stop() {
-        cancellable = nil
+        observer = nil
         pending = nil
         Task {
             do {
@@ -52,18 +51,13 @@ final class SessionPublisher {
     }
 
     func start() {
-        guard cancellable == nil else { return }
+        guard observer == nil else { return }
         let state = AppState.shared
-        cancellable = state.$tasks
-            .combineLatest(state.$pendingApproval, state.$pendingQuestion)
-            .map { tasks, approval, question in
-                SessionSnapshot.all(tasks: tasks, approval: approval, question: question)
-            }
-            .removeDuplicates()
-            .debounce(for: .milliseconds(500), scheduler: RunLoop.main)
-            .sink { [weak self] snapshots in
-                MainActor.assumeIsolated { self?.publish(snapshots) }
-            }
+        observer = ChangeObserver({
+            SessionSnapshot.all(tasks: state.tasks, approval: state.pendingApproval, question: state.pendingQuestion)
+        }, initial: true, debounce: 0.5, removeDuplicates: true) { [weak self] snapshots in
+            self?.publish(snapshots)
+        }
         log("session publisher on")
     }
 

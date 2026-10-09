@@ -632,7 +632,7 @@ private func drawGreeting(_ ctx: CGContext, size: CGSize, t: Double,
 // MARK: - SwiftUI View
 
 struct GreetingCanvasView: View {
-    @ObservedObject var state: AppState
+    var state: AppState
 
     @State private var startDate = Date()
     @State private var tc: Double = .infinity

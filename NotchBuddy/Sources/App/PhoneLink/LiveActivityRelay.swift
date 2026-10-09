@@ -1,7 +1,6 @@
 #if PHONE_LINK
 import AppKit
 import CloudKit
-import Combine
 
 // MARK: - iPhone plan, step 8: Mochi leaves for the iPhone
 //
@@ -38,7 +37,7 @@ final class LiveActivityRelay {
 
     private var database: CKDatabase { CKContainer(identifier: CloudProbe.containerID).privateCloudDatabase }
     private var observers: [NSObjectProtocol] = []
-    private var cancellable: AnyCancellable?
+    private var stateObserver: ChangeObserver<MochiActivityState?>?
     private var phones: [String: Phone] = [:]
     private var changeToken: CKServerChangeToken?
 
@@ -81,7 +80,7 @@ final class LiveActivityRelay {
     }
 
     func start() {
-        guard cancellable == nil else { return }
+        guard stateObserver == nil else { return }
         let center = DistributedNotificationCenter.default()
         observers = [
             center.addObserver(forName: NSNotification.Name("com.apple.screenIsLocked"), object: nil, queue: .main) { [weak self] _ in
@@ -92,22 +91,18 @@ final class LiveActivityRelay {
             },
         ]
         let state = AppState.shared
-        cancellable = state.$tasks
-            .combineLatest(state.$pendingApproval)
-            .map { tasks, approval in Self.leadState(tasks: tasks, approval: approval) }
-            .removeDuplicates()
-            .debounce(for: .seconds(1), scheduler: RunLoop.main)
-            .sink { [weak self] lead in
-                MainActor.assumeIsolated { self?.stateChanged(lead) }
-            }
+        stateObserver = ChangeObserver({ Self.leadState(tasks: state.tasks, approval: state.pendingApproval) },
+                                     initial: true, debounce: 1, removeDuplicates: true) { [weak self] lead in
+            self?.stateChanged(lead)
+        }
         log(relayURL == nil ? "on, but no relay address yet (relay/README.md)" : "on")
     }
 
     func stop() {
-        guard cancellable != nil else { return }
+        guard stateObserver != nil else { return }
         observers.forEach { DistributedNotificationCenter.default().removeObserver($0) }
         observers = []
-        cancellable = nil
+        stateObserver = nil
         lockTask?.cancel(); lockTask = nil
         unlockTask?.cancel(); unlockTask = nil
         if startedAt != nil { finish(dismissAfter: 0) }

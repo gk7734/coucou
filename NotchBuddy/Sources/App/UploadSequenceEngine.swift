@@ -1,4 +1,5 @@
 import Foundation
+import Observation
 import CoreGraphics
 
 // ============================================================
@@ -149,28 +150,32 @@ struct USFrame {
 // ENGINE
 // ============================================================
 
+// Observable for `isActive` only: IslandContainer shows the upload canvas while it is set,
+// and a drag can start on an island already open on the upload view (no AppState change
+// then redraws it). Everything else is read per frame inside the canvas's TimelineView.
 @MainActor
+@Observable
 final class UploadSequenceEngine {
     static let shared = UploadSequenceEngine()
 
-    var uploadDuration: Double = 2.4
+    @ObservationIgnored var uploadDuration: Double = 2.4
     var progEnd:   Double { USC.T_PROG_START + uploadDuration }
     var growStart: Double { progEnd + 0.25 }
     var growEnd:   Double { progEnd + 0.70 }
 
     private(set) var isActive: Bool = false
-    private var entryWallTime: Double = 0   // Date().timeIntervalSinceReferenceDate at entry
-    private var dropWallTime:  Double? = nil
+    @ObservationIgnored private var entryWallTime: Double = 0   // Date().timeIntervalSinceReferenceDate at entry
+    @ObservationIgnored private var dropWallTime:  Double? = nil
 
-    private var sim = USSimState()
+    @ObservationIgnored private var sim = USSimState()
 
     // Real cursor in island coords
-    var cursorX: Double = 600
-    var cursorY: Double = 280
-    private var prevCursorX:  Double = 600
-    private var prevCursorY:  Double = 280
-    private var prevCursorTime: Double = 0
-    private var cursorSpeed: Double = 0
+    @ObservationIgnored var cursorX: Double = 600
+    @ObservationIgnored var cursorY: Double = 280
+    @ObservationIgnored private var prevCursorX:  Double = 600
+    @ObservationIgnored private var prevCursorY:  Double = 280
+    @ObservationIgnored private var prevCursorTime: Double = 0
+    @ObservationIgnored private var cursorSpeed: Double = 0
 
     // MARK: - Session lifecycle
 

@@ -3,7 +3,7 @@ import ServiceManagement
 import AppKit
 
 struct SettingsView: View {
-    @ObservedObject private var state = AppState.shared
+    @Bindable private var state = AppState.shared
     @ObservedObject private var demoEngine = DemoEngine.shared
     @State private var apiKey: String = KeychainStore.shared.get("anthropic-api-key") ?? ""
 

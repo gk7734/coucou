@@ -23,7 +23,7 @@ final class MacNotifier: NSObject, ObservableObject {
     private var ledger = NotificationLedger()
     /// Banners on screen that can go out of date, by request identifier.
     private var delivered: [String: NotificationPolicy.Delivered] = [:]
-    private var booksObserver: AnyCancellable?
+    private var booksObserver: ChangeObserver<[String: SessionBook]>?
     private var started = false
 
     private var center: UNUserNotificationCenter { .current() }
@@ -38,8 +38,8 @@ final class MacNotifier: NSObject, ObservableObject {
         center.delegate = self
         SessionAlertCenter.shared.deliver = { [weak self] alert in self?.handle(alert) }
         refreshAuthorization()
-        booksObserver = AppState.shared.$sessionBooks.sink { [weak self] books in
-            MainActor.assumeIsolated { self?.removeOutdated(books: books) }
+        booksObserver = ChangeObserver({ AppState.shared.sessionBooks }, initial: true) { [weak self] books in
+            self?.removeOutdated(books: books)
         }
     }
 

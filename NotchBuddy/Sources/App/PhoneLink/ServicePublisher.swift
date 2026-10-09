@@ -1,7 +1,6 @@
 #if PHONE_LINK
 import AppKit
 import CloudKit
-import Combine
 
 // MARK: - Services on the iPhone
 //
@@ -18,40 +17,29 @@ final class ServicePublisher {
 
     private let container = CKContainer(identifier: CloudProbe.containerID)
     private var database: CKDatabase { container.privateCloudDatabase }
-    private var cancellable: AnyCancellable?
+    private var observer: ChangeObserver<Void>?
     private var published: [String: ServiceSnapshot] = [:]
     private var cleanedUp = false
     private var writing = false
     private var again = false
 
     func start() {
-        guard cancellable == nil else { return }
+        guard observer == nil else { return }
         let s = AppState.shared
-        let changes: [AnyPublisher<Void, Never>] = [
-            s.$stripePayments.map { _ in () }.eraseToAnyPublisher(),
-            s.$stripeBalance.map { _ in () }.eraseToAnyPublisher(),
-            s.$stripeError.map { _ in () }.eraseToAnyPublisher(),
-            s.$githubPulse.map { _ in () }.eraseToAnyPublisher(),
-            s.$githubActivity.map { _ in () }.eraseToAnyPublisher(),
-            s.$vercelDeployments.map { _ in () }.eraseToAnyPublisher(),
-            s.$resendEmails.map { _ in () }.eraseToAnyPublisher(),
-            s.$calcomBookings.map { _ in () }.eraseToAnyPublisher(),
-            s.$calcomError.map { _ in () }.eraseToAnyPublisher(),
-            s.$notionPages.map { _ in () }.eraseToAnyPublisher(),
-            s.$notionError.map { _ in () }.eraseToAnyPublisher(),
-            s.$n8nRuns.map { _ in () }.eraseToAnyPublisher(),
-        ]
-        cancellable = Publishers.MergeMany(changes)
-            .debounce(for: .seconds(2), scheduler: RunLoop.main)
-            .sink { [weak self] in
-                MainActor.assumeIsolated { self?.publish() }
-            }
+        // Reads (so watches) what the snapshots are built from; publish() builds them.
+        observer = ChangeObserver({
+            _ = (s.stripePayments, s.stripeBalance, s.stripeError,
+                 s.githubPulse, s.githubActivity, s.vercelDeployments, s.resendEmails,
+                 s.calcomBookings, s.calcomError, s.notionPages, s.notionError, s.n8nRuns)
+        }, initial: true, debounce: 2) { [weak self] in
+            self?.publish()
+        }
         log("service publisher on")
     }
 
     /// Stops and deletes this Mac's services from iCloud.
     func stop() {
-        cancellable = nil
+        observer = nil
         let ids = PillCatalog.phoneServices.map {
             CKRecord.ID(recordName: ServiceSnapshot.recordName(for: $0), zoneID: SessionSnapshot.zoneID)
         }
@@ -65,7 +53,7 @@ final class ServicePublisher {
     private func publish() {
         // A write that was queued behind one in flight when the sync was turned off
         // must not save every service again after stop() deleted them.
-        guard cancellable != nil else { return }
+        guard observer != nil else { return }
         guard !writing else { again = true; return }
         writing = true
         let snapshots = ServiceSnapshots.all(from: AppState.shared)

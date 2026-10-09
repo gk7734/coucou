@@ -5,7 +5,7 @@ import AppKit
 // Replaces the header + content area when the upload engine is active.
 
 struct UploadCanvasView: View {
-    @ObservedObject var state: AppState
+    var state: AppState
     @State private var fileIcon: NSImage? = nil
 
     private var engine: UploadSequenceEngine { .shared }

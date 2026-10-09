@@ -4,7 +4,7 @@ import SwiftUI
 
 struct IslandViewContent: View {
     let view: IslandView
-    @ObservedObject var state: AppState
+    var state: AppState
 
     var body: some View {
         switch view {
@@ -34,7 +34,7 @@ struct IslandViewContent: View {
 // MARK: - Overview
 
 struct OverviewView: View {
-    @ObservedObject var state: AppState
+    var state: AppState
     @State private var showingN8nDetail = false
     @State private var activeDiffId: Int? = nil
 
@@ -273,7 +273,7 @@ struct OverviewView: View {
 // MARK: - Empty
 
 struct EmptyStateView: View {
-    @ObservedObject var state: AppState
+    var state: AppState
 
     var body: some View {
         ZStack {
@@ -300,14 +300,14 @@ struct EmptyStateView: View {
 // MARK: - Approval
 
 struct ApprovalView: View {
-    @ObservedObject var state: AppState
+    var state: AppState
 
     var approval: ApprovalInfo? { state.pendingApproval }
 
     /// The session asking, from the approval's pill book (nil without one).
     private var who: SessionWho? {
         let pillId = approval?.pillId ?? state.focusId ?? ""
-        let session = SessionCardText.session(in: state.sessionBooks[pillId], id: approval?.sessionId,
+        let session = SessionCardText.session(in: state.sessionBook(for: pillId), id: approval?.sessionId,
                                               phase: .waitingApproval)
         return SessionWho(task: state.focusTask, session: session)
     }
@@ -356,7 +356,7 @@ struct ApprovalView: View {
 // MARK: - Question
 
 struct QuestionView: View {
-    @ObservedObject var state: AppState
+    var state: AppState
     @State private var questionIndex = 0
     // Per-question selected labels (empty = none chosen yet)
     @State private var selections: [[String]] = []
@@ -371,7 +371,7 @@ struct QuestionView: View {
     /// "Claude Code is asking" (translated key), or "Codex in WebStorm is asking" from the
     /// focused pill's session waiting on an answer (the question's pill takes the focus).
     private var askingLabel: (text: String, verbatim: Bool) {
-        let session = SessionCardText.session(in: state.sessionBooks[state.focusId ?? ""],
+        let session = SessionCardText.session(in: state.sessionBook(for: state.focusId ?? ""),
                                               phase: .waitingAnswer)
         guard let who = SessionWho(task: state.focusTask, session: session), !who.isClaudeCode else {
             return ("Claude Code is asking", false)
@@ -589,7 +589,7 @@ struct QuestionView: View {
 // MARK: - Error
 
 struct ErrorView: View {
-    @ObservedObject var state: AppState
+    var state: AppState
 
     var body: some View {
         ZStack {
@@ -626,11 +626,11 @@ private func openClaudeDesktopApp() {
 // MARK: - Finished
 
 struct FinishedView: View {
-    @ObservedObject var state: AppState
+    var state: AppState
 
     /// The session that just finished on the focused pill (nil without a session book).
     private var who: SessionWho? {
-        let session = SessionCardText.session(in: state.sessionBooks[state.focusId ?? ""], phase: .finished)
+        let session = SessionCardText.session(in: state.sessionBook(for: state.focusId ?? ""), phase: .finished)
         return SessionWho(task: state.focusTask, session: session)
     }
 
@@ -847,7 +847,7 @@ struct ConfusedView: View {
 // MARK: - Upload (drop zone)
 
 struct UploadView: View {
-    @ObservedObject var state: AppState
+    var state: AppState
     @State private var dashPhase: CGFloat = 0
     @State private var breathAngle: Double = 0
     // Timer only runs while this is the active tab — killed on deactivation
@@ -922,7 +922,7 @@ struct UploadView: View {
 // MARK: - Uploading
 
 struct UploadingView: View {
-    @ObservedObject var state: AppState
+    var state: AppState
     @Environment(\.islandViewActive) private var isActive
 
     // Bar geometry in content coords (content has 10pt H padding each side).
@@ -1021,7 +1021,7 @@ struct UploadingView: View {
 // MARK: - Choose
 
 struct ChooseView: View {
-    @ObservedObject var state: AppState
+    var state: AppState
 
     var body: some View {
         ZStack(alignment: .leading) {
@@ -1045,7 +1045,7 @@ struct ChooseView: View {
 // MARK: - Mail
 
 struct MailView: View {
-    @ObservedObject var state: AppState
+    var state: AppState
     @State private var to: String = ""
     @State private var subject: String = ""
     @State private var bodyText: String = ""
@@ -1262,7 +1262,7 @@ private struct DictationLanguageMenu: View {
 #endif
 
 struct PromptView: View {
-    @ObservedObject var state: AppState
+    var state: AppState
     @State private var text: String = ""
     @FocusState private var focused: Bool
     @State private var showModelPicker = false
@@ -1475,7 +1475,7 @@ struct ChipFlowLayout: Layout {
 }
 
 struct ModelPickerView: View {
-    @ObservedObject var state: AppState
+    var state: AppState
     @Binding var isPresented: Bool
 
     var body: some View {
@@ -1652,7 +1652,7 @@ struct TypingDotsView: View {
 // MARK: - Searching
 
 struct SearchingView: View {
-    @ObservedObject var state: AppState
+    var state: AppState
 
     var label: String {
         switch state.promptContext {
@@ -1682,7 +1682,7 @@ struct SearchingView: View {
 // MARK: - Result
 
 struct ResultView: View {
-    @ObservedObject var state: AppState
+    var state: AppState
 
     var body: some View {
         ZStack(alignment: .leading) {
@@ -1737,7 +1737,7 @@ struct ResultView: View {
 // MARK: - Note (short message, auto-closes)
 
 struct NoteView: View {
-    @ObservedObject var state: AppState
+    var state: AppState
 
     var body: some View {
         ZStack(alignment: .leading) {
@@ -1800,7 +1800,7 @@ struct IntegrationCardView: View {
     let task: AgentTask
     @Binding var showingDetail: Bool
     var onDiffTap: ((Int) -> Void)? = nil
-    @ObservedObject private var appState = AppState.shared
+    private var appState: AppState { .shared }
     @State private var githubDetailSection: GitHubDetailSection = .myPRs
 
     private var isConfigured: Bool {
@@ -2246,7 +2246,7 @@ struct IntegrationCardView: View {
 struct AgentSessionCard: View {
     let task: AgentTask
     var onDiffTap: ((Int) -> Void)? = nil
-    @ObservedObject private var appState = AppState.shared
+    private var appState: AppState { .shared }
     @Environment(\.islandViewActive) private var isActive
     /// Session opened from the list, nil = the list (or the only session).
     @State private var pickedId: String? = nil
@@ -2257,7 +2257,7 @@ struct AgentSessionCard: View {
     private static let rowSpacing: CGFloat = 3
 
     var body: some View {
-        let book = appState.sessionBooks[task.id]
+        let book = appState.sessionBook(for: task.id)
         let several = (book?.count ?? 0) > 1
         let picked = pickedId.flatMap { book?.session($0) }
         if several, let book, picked == nil {
@@ -3020,7 +3020,7 @@ struct GitHubDetailView: View {
     let activity: GitHubActivity?
     let stats: GitHubStats?
     let onBack: () -> Void
-    @ObservedObject private var appState = AppState.shared
+    private var appState: AppState { .shared }
 
     private var title: String {
         switch section {
@@ -3459,7 +3459,7 @@ private struct StatRow: View {
 // MARK: - Stripe Card View
 
 struct StripeCardView: View {
-    @ObservedObject private var appState = AppState.shared
+    private var appState: AppState { .shared }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -3548,7 +3548,7 @@ private struct StripePaymentRow: View {
 // MARK: - Cal.com Card View
 
 struct CalcomCardView: View {
-    @ObservedObject private var appState = AppState.shared
+    private var appState: AppState { .shared }
     @State private var selectedDate: Date? = nil
     @State private var selectedBooking: CalcomBooking? = nil
     @State private var displayMonth: Date = Date()
@@ -3842,7 +3842,7 @@ private struct CalcomDetailRow: View {
 // MARK: - Notion Card View
 
 struct NotionCardView: View {
-    @ObservedObject private var appState = AppState.shared
+    private var appState: AppState { .shared }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -4189,7 +4189,7 @@ struct TickerShimmerText: View {
 // MARK: - Agent pills (overview right card)
 
 struct AgentPillsView: View {
-    @ObservedObject var state: AppState
+    var state: AppState
     @State private var swapping = false
 
     private var others: [AgentTask] {
@@ -4252,7 +4252,7 @@ struct AgentPillsView: View {
 
 struct AgentPill: View {
     let task: AgentTask
-    @ObservedObject var state: AppState
+    var state: AppState
     @Binding var swapping: Bool
     let onTap: () -> Void
     @State private var isHovered = false
@@ -4321,7 +4321,7 @@ struct AgentPill: View {
 #if !APPSTORE
 struct MusicPill: View {
     let task: AgentTask
-    @ObservedObject var state: AppState
+    var state: AppState
     @Binding var swapping: Bool
     let onTap: () -> Void
     @State private var isHovered = false
@@ -4430,7 +4430,7 @@ struct MusicControlButton: View {
 #if !APPSTORE
 struct MusicCardView: View {
     @ObservedObject private var controller = MusicController.shared
-    @ObservedObject private var appState = AppState.shared
+    private var appState: AppState { .shared }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
@@ -4560,7 +4560,7 @@ struct PillBadgeView: View {
 // MARK: - Wardrobe
 
 struct WardrobeView: View {
-    @ObservedObject var state: AppState
+    var state: AppState
     @State private var hoveredOutfit: Outfit? = nil
 
     private let columns = Array(repeating: GridItem(.fixed(30), spacing: 5), count: 14)
@@ -5171,7 +5171,7 @@ struct SendButtonStyle: ButtonStyle {
 // MARK: - Settings island view (Point 7)
 
 struct SettingsIslandView: View {
-    @ObservedObject var state: AppState
+    @Bindable var state: AppState
 
     private var claudeConnected: Bool {
         let url = FileManager.default.homeDirectoryForCurrentUser

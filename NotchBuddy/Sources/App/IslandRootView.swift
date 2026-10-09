@@ -5,7 +5,7 @@ import SwiftUI
 /// Note: drag-drop is handled at the AppKit level in IslandWindowController (FileDropNSView),
 /// not in SwiftUI, to avoid interfering with SwiftUI hit-testing.
 struct IslandRootView: View {
-    @EnvironmentObject var state: AppState
+    @Environment(AppState.self) private var state
 
     var body: some View {
         ZStack(alignment: .top) {
@@ -21,7 +21,7 @@ struct IslandRootView: View {
 // MARK: - Island container
 
 struct IslandContainer: View {
-    @ObservedObject var state: AppState
+    var state: AppState
     @ObservedObject private var demoEngine = DemoEngine.shared
     @State private var islandWidth:  CGFloat = IslandConst.notchWidth
     @State private var islandHeight: CGFloat = IslandConst.notchHeight
@@ -276,7 +276,7 @@ struct IslandShape: Shape {
 // MARK: - Bot placement helper
 
 struct BotPlacement: View {
-    @ObservedObject var state: AppState
+    var state: AppState
     let islandW: CGFloat
     let islandH: CGFloat
 
@@ -415,7 +415,7 @@ final class IslandAutoCloseCountdown: ObservableObject {
 /// island really folds. Driven by the FSM's timer: no countdown (pointer on the island,
 /// opened by an alert, hover grace) means no bar, and it redraws only inside its window.
 struct CountdownBar: View {
-    @ObservedObject var state: AppState
+    var state: AppState
     let islandW: CGFloat
     @ObservedObject private var autoClose = IslandAutoCloseCountdown.shared
 
@@ -458,7 +458,7 @@ extension EnvironmentValues {
 // MARK: - Island content (header + views, only in expanded mode)
 
 struct IslandContentView: View {
-    @ObservedObject var state: AppState
+    var state: AppState
 
     var body: some View {
         VStack(spacing: 0) {
@@ -500,7 +500,7 @@ struct IslandContentView: View {
 // MARK: - Island header (tabs + icons)
 
 struct IslandHeader: View {
-    @ObservedObject var state: AppState
+    var state: AppState
 
     // Claude + Codex pills together: tighten the right side so it clears the notch
     private var bothPlans: Bool {
@@ -568,7 +568,7 @@ struct IslandHeader: View {
 struct TabButton: View {
     let icon: String
     let view: IslandView
-    @ObservedObject var state: AppState
+    var state: AppState
     var preAction: (() -> Void)? = nil
     @State private var isHovered = false
 
@@ -603,7 +603,7 @@ struct TabButton: View {
 
 #if !APPSTORE
 struct ClaudePlanHeaderPill: View {
-    @ObservedObject var state: AppState
+    var state: AppState
     var codex: Bool = false
     @State private var isHovered = false
 
@@ -668,7 +668,7 @@ struct ClaudePlanHeaderPill: View {
 // MARK: - Compact mini mochi grid (2×2 to the right of the notch)
 
 struct CompactMiniGrid: View {
-    @ObservedObject var state: AppState
+    var state: AppState
 
     private var others: [AgentTask] {
         Array(state.tasks.filter { $0.id != state.focusId }.prefix(4))

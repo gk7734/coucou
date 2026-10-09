@@ -1,86 +1,113 @@
 import Foundation
+import Observation
 import SwiftUI
-import Combine
 
+// Observation (not ObservableObject): a view redraws only when a property it read changes,
+// so a hook event that touches `tasks` no longer re-evaluates every island view. Code that
+// is not a view follows changes with ChangeObserver, or with the two hooks below.
+// Fields marked @ObservationIgnored never redraw anything: per-frame values read inside
+// TimelineViews/Canvases, and bookkeeping no view shows.
+// Unlike a plain class's, an @Observable's property observers also run for assignments in
+// init: init writes the persisted values to their backing storage (`_name`) to skip them.
 
 @MainActor
-final class AppState: ObservableObject {
+@Observable
+final class AppState {
     static let shared = AppState()
 
     // Island state
-    @Published var mode: IslandMode = .hidden
-    @Published var view: IslandView = .overview
+    var mode: IslandMode = .hidden {
+        willSet { modeWillSet?(newValue) }
+    }
+    var view: IslandView = .overview {
+        didSet { viewDidSet?(view) }
+    }
+    /// Called synchronously on every assignment of `mode`, before it is stored (as the
+    /// @Published sink was): IslandWindowController keeps its state machine in step.
+    @ObservationIgnored var modeWillSet: (@MainActor (IslandMode) -> Void)?
+    /// Called on every assignment of `view`, the same value included (Observation skips
+    /// those): IslandWindowController makes the panel key for the chat.
+    @ObservationIgnored var viewDidSet: (@MainActor (IslandView) -> Void)?
 
     // Tasks
-    @Published var tasks: [AgentTask] = []
+    var tasks: [AgentTask] = [] {
+        didSet { refreshFocus() }
+    }
     /// The sessions behind each pill, by pill id (see SessionBook). A pill's own name, state
     /// and steps mirror its book's lead session, so views that predate the book keep working.
-    @Published var sessionBooks: [String: SessionBook] = [:]
-    @Published var focusId: String? = nil
+    var sessionBooks: [String: SessionBook] = [:] {
+        didSet { refreshFocusBook() }
+    }
+    var focusId: String? = nil {
+        didSet { refreshFocus(); refreshFocusBook() }
+    }
 
     // Bot state override
-    @Published var stateOverride: BotState? = nil
+    var stateOverride: BotState? = nil {
+        didSet { refreshFocus() }
+    }
 
-    // Real notch dimensions (set by IslandWindowController on launch)
+    // Real notch dimensions (set by IslandWindowController on launch and when the island
+    // changes screen). Observed: the views that place Mochi follow a new screen.
     var notchWidth:  CGFloat = IslandConst.notchWidth
     var notchHeight: CGFloat = IslandConst.notchHeight
     var hasNotch = true
 
-    // Last app active before NotchBuddy (for window context capture)
-    var lastExternalApp: NSRunningApplication? = nil
+    // Last app active before NotchBuddy (for window context capture). Read on click only.
+    @ObservationIgnored var lastExternalApp: NSRunningApplication? = nil
 
     // Bot drag-attach state (hides original bot while ghost follows cursor)
-    @Published var isDraggingBot: Bool = false
+    var isDraggingBot: Bool = false
 
     // Desktop Mochi: true while Mochi lives on the desktop instead of the notch
-    @Published var mochiOnDesktop: Bool = false
+    var mochiOnDesktop: Bool = false
 
-    // Mouse tracking
-    var mousePosition: CGPoint = .zero
+    // Mouse tracking — written 60 times a second, read inside the bots' TimelineViews.
+    @ObservationIgnored var mousePosition: CGPoint = .zero
     /// False once the pointer has not moved for `absenceInterval` (IslandStateMachine):
     /// work events then leave the island hidden, alerts still open it (SPEC §3 rules 6–7).
-    var isPresent: Bool = true
+    @ObservationIgnored var isPresent: Bool = true
 
-    // Pinned (alerts that stay open, never auto-close)
+    // Pinned (alerts that stay open, never auto-close). Observed: the countdown bar hides.
     var isPinned: Bool = false
 
     // Keyboard navigation — index of the selected item within the current card's list (nil = none)
-    @Published var cardSelection: Int? = nil
+    var cardSelection: Int? = nil
     // Number of navigable items in the card currently on screen (0 = no list)
-    @Published var cardItemCount: Int = 0
+    var cardItemCount: Int = 0
 
     // Upload progress (0-1) — set to 1.0 only at completion; animation is time-based
-    @Published var uploadProgress: Double = 0
+    var uploadProgress: Double = 0
 
-    // Upload animation timing (non-published — TimelineViews read these directly)
-    var uploadStartTime: Date?
-    var uploadDuration: Double = 2.4
+    // Upload animation timing (not observed — TimelineViews read these directly)
+    @ObservationIgnored var uploadStartTime: Date?
+    @ObservationIgnored var uploadDuration: Double = 2.4
 
     // File drag-over state (mailbox morph glow + mouth spring)
-    @Published var fileDragOver: Bool = false
+    var fileDragOver: Bool = false
 
     // Sound enabled — persisted
-    @Published var soundEnabled: Bool = true {
+    var soundEnabled: Bool = true {
         didSet { UserDefaults.standard.set(soundEnabled, forKey: "soundEnabled") }
     }
 
     // Weekly recap — persisted
-    @Published var recapEnabled: Bool = (UserDefaults.standard.object(forKey: "recapEnabled") as? Bool) ?? true {
+    var recapEnabled: Bool = (UserDefaults.standard.object(forKey: "recapEnabled") as? Bool) ?? true {
         didSet { UserDefaults.standard.set(recapEnabled, forKey: "recapEnabled") }
     }
-    @Published var recapHideProjects: Bool = UserDefaults.standard.bool(forKey: "recapHideProjects") {
+    var recapHideProjects: Bool = UserDefaults.standard.bool(forKey: "recapHideProjects") {
         didSet { UserDefaults.standard.set(recapHideProjects, forKey: "recapHideProjects") }
     }
 
     // Mochi outfit selection — persisted
-    @Published var mochiOutfitSelection: Outfit = .auto {
+    var mochiOutfitSelection: Outfit = .auto {
         didSet { Outfit.stored = mochiOutfitSelection }
     }
     // A colour of the user's own for each pill's Mochi (pill id → "#RRGGBB") — persisted.
     // Empty means the catalog's colours. PillDefinition.color reads the stored value, so
     // what is built from the catalog follows on its own; the tasks already on the island
     // hold a copy of their colour and are repainted here.
-    @Published var pillColors: [String: String] = [:] {
+    var pillColors: [String: String] = [:] {
         didSet {
             PillColors.stored = pillColors
             var repainted = tasks
@@ -110,10 +137,12 @@ final class AppState: ObservableObject {
     static func pillColor(for id: String, in colors: [String: String]) -> String? {
         defaultPillColor(for: id).map { PillColors.color(for: id, catalogColor: $0, in: colors) }
     }
-    // Transient: outfit preview while hovering in wardrobe (overrides resolvedOutfit in BotCanvasView)
-    var wardrobePreviewOutfit: Outfit? = nil
-    // Per-day seasonal cache — avoids recomputing Easter and date math on every frame
-    private var _seasonalCache: (dayOfYear: Int, year: Int, outfit: Outfit)?
+    // Transient: outfit preview while hovering in wardrobe (overrides resolvedOutfit in
+    // BotCanvasView, which reads it every frame)
+    @ObservationIgnored var wardrobePreviewOutfit: Outfit? = nil
+    // Per-day seasonal cache — avoids recomputing Easter and date math on every frame.
+    // Written while a view draws: must never be observed.
+    @ObservationIgnored private var _seasonalCache: (dayOfYear: Int, year: Int, outfit: Outfit)?
     var resolvedOutfit: Outfit {
         if let preview = wardrobePreviewOutfit { return preview }
         guard mochiOutfitSelection == .auto else { return mochiOutfitSelection }
@@ -129,42 +158,42 @@ final class AppState: ObservableObject {
 
     // Claude model used by the chat and the search — persisted
     static let defaultClaudeModel = "claude-sonnet-4-6"
-    @Published var claudeModel: String = AppState.defaultClaudeModel {
+    var claudeModel: String = AppState.defaultClaudeModel {
         didSet { UserDefaults.standard.set(claudeModel, forKey: "claudeModel") }
     }
 
     // In-chat provider + model — picked via the model selector in the prompt view
-    @Published var chatProvider: ChatProvider = .anthropic {
+    var chatProvider: ChatProvider = .anthropic {
         didSet { UserDefaults.standard.set(chatProvider.rawValue, forKey: "chatProvider") }
     }
-    @Published var googleChatModel: String = ChatProvider.google.defaultModel {
+    var googleChatModel: String = ChatProvider.google.defaultModel {
         didSet { UserDefaults.standard.set(googleChatModel, forKey: "googleChatModel") }
     }
-    @Published var openAIChatModel: String = ChatProvider.openai.defaultModel {
+    var openAIChatModel: String = ChatProvider.openai.defaultModel {
         didSet { UserDefaults.standard.set(openAIChatModel, forKey: "openAIChatModel") }
     }
-    @Published var ollamaChatModel: String = ChatProvider.ollama.defaultModel {
+    var ollamaChatModel: String = ChatProvider.ollama.defaultModel {
         didSet { UserDefaults.standard.set(ollamaChatModel, forKey: "ollamaChatModel") }
     }
-    @Published var lmstudioChatModel: String = ChatProvider.lmstudio.defaultModel {
+    var lmstudioChatModel: String = ChatProvider.lmstudio.defaultModel {
         didSet { UserDefaults.standard.set(lmstudioChatModel, forKey: "lmstudioChatModel") }
     }
-    @Published var ollamaServerURL: String = "" {
+    var ollamaServerURL: String = "" {
         didSet { UserDefaults.standard.set(ollamaServerURL, forKey: "ollamaServerURL") }
     }
-    @Published var lmstudioServerURL: String = "" {
+    var lmstudioServerURL: String = "" {
         didSet { UserDefaults.standard.set(lmstudioServerURL, forKey: "lmstudioServerURL") }
     }
 
     // The always-on workspace pill (default: VS Code). Persisted.
-    @Published var mainPillId: String = PillCatalog.defaultMainPillId {
+    var mainPillId: String = PillCatalog.defaultMainPillId {
         didSet { UserDefaults.standard.set(mainPillId, forKey: "mainPill") }
     }
 
     // Dynamically fetched model lists for the in-chat picker (keyed by provider)
-    @Published var fetchedProviderModels: [ChatProvider: [(id: String, label: String)]] = [:]
-    @Published var providerModelFetchError: [ChatProvider: String] = [:]
-    @Published var loadingProviderModels: Set<ChatProvider> = []
+    var fetchedProviderModels: [ChatProvider: [(id: String, label: String)]] = [:]
+    var providerModelFetchError: [ChatProvider: String] = [:]
+    var loadingProviderModels: Set<ChatProvider> = []
 
     /// Fetches models for `provider` if not already loaded or loading.
     /// Sets `providerModelFetchError` if the key is absent or the request fails.
@@ -256,7 +285,7 @@ final class AppState: ObservableObject {
     }
 
     // Sound volume (0–0.2) — persisted, synced to SoundEngine
-    @Published var soundVolume: Double = 0.12 {
+    var soundVolume: Double = 0.12 {
         didSet {
             UserDefaults.standard.set(soundVolume, forKey: "soundVolume")
             SoundEngine.shared.volume = Float(soundVolume)
@@ -264,37 +293,37 @@ final class AppState: ObservableObject {
     }
 
     // Selected app language ("" = System, else BCP-47 code e.g. "fr")
-    @Published var appLanguage: String = {
+    var appLanguage: String = {
         let bundleId = Bundle.main.bundleIdentifier ?? "fr.louisraille.NotchBuddy"
         let langs = UserDefaults.standard.persistentDomain(forName: bundleId)?["AppleLanguages"] as? [String]
         return langs?.first ?? ""
     }()
 
     // Context for prompt (window attach / file)
-    @Published var promptContext: PromptContext? = nil
+    var promptContext: PromptContext? = nil
 
     // Dropped file (set during upload flow)
-    @Published var droppedFile: DroppedFile? = nil
+    var droppedFile: DroppedFile? = nil
 
     // Short note message (shown in NoteView)
-    @Published var noteMessage: String? = nil
+    var noteMessage: String? = nil
 
     // Auto-close delay — persisted
     // Hovering the island opens it (folds shortly after the pointer leaves) — persisted, off by default
-    @Published var openOnHover: Bool = false {
+    var openOnHover: Bool = false {
         didSet { UserDefaults.standard.set(openOnHover, forKey: "openOnHover") }
     }
-    @Published var autoCloseInterval: TimeInterval = 15 {
+    var autoCloseInterval: TimeInterval = 15 {
         didSet { UserDefaults.standard.set(autoCloseInterval, forKey: "autoCloseInterval") }
     }
 
     // No pointer movement for this long hides the compact island (SPEC §3 rule 6) — persisted
-    @Published var absenceInterval: TimeInterval = 3 * 60 {
+    var absenceInterval: TimeInterval = 3 * 60 {
         didSet { UserDefaults.standard.set(absenceInterval, forKey: "absenceInterval") }
     }
 
     // Hotkey to show island (e.g. ⌘⇧N)
-    @Published var hotkeyEnabled: Bool = false {
+    var hotkeyEnabled: Bool = false {
         didSet { UserDefaults.standard.set(hotkeyEnabled, forKey: "hotkeyEnabled") }
     }
     var hotkeyFlags: UInt = NSEvent.ModifierFlags([.command, .shift]).rawValue {
@@ -305,12 +334,12 @@ final class AppState: ObservableObject {
     }
 
     // Screen hosting the island (notch screen by default) — persisted
-    @Published var islandDisplay: IslandDisplayChoice = .notch {
+    var islandDisplay: IslandDisplayChoice = .notch {
         didSet { UserDefaults.standard.set(islandDisplay.storageValue, forKey: "islandDisplay") }
     }
 
     // Vercel project filter — empty = watch all projects
-    @Published var vercelProjectFilter: Set<String> = [] {
+    var vercelProjectFilter: Set<String> = [] {
         didSet {
             if let data = try? JSONEncoder().encode(Array(vercelProjectFilter)) {
                 UserDefaults.standard.set(data, forKey: "vercelProjectFilter")
@@ -319,7 +348,7 @@ final class AppState: ObservableObject {
     }
 
     // n8n workflow filter — empty = watch all workflows
-    @Published var n8nWorkflowFilter: Set<String> = [] {
+    var n8nWorkflowFilter: Set<String> = [] {
         didSet {
             if let data = try? JSONEncoder().encode(Array(n8nWorkflowFilter)) {
                 UserDefaults.standard.set(data, forKey: "n8nWorkflowFilter")
@@ -328,7 +357,7 @@ final class AppState: ObservableObject {
     }
 
     // Active integration pills (main workspace pill excluded). Max 4.
-    @Published var activeIntegrations: Set<String> = ["integration_resend", "integration_n8n", "integration_vercel", "integration_github"] {
+    var activeIntegrations: Set<String> = ["integration_resend", "integration_n8n", "integration_vercel", "integration_github"] {
         didSet {
             if let data = try? JSONEncoder().encode(Array(activeIntegrations)) {
                 UserDefaults.standard.set(data, forKey: "activeIntegrations")
@@ -342,58 +371,58 @@ final class AppState: ObservableObject {
     }
 
     // Pending API result
-    @Published var searchResult: SearchResult? = nil
+    var searchResult: SearchResult? = nil
 
     // Vercel deployments (populated by VercelPoller)
-    @Published var vercelDeployments: [VercelDeployment] = []
+    var vercelDeployments: [VercelDeployment] = []
 
     // Resend emails (populated by ResendPoller)
-    @Published var resendEmails: [ResendEmail] = []
-    @Published var resendTotal: Int? = nil
+    var resendEmails: [ResendEmail] = []
+    var resendTotal: Int? = nil
 
     // GitHub stats + pulse + activity (populated by GithubPoller)
-    @Published var githubStats: GitHubStats? = nil
-    @Published var githubPulse: GitHubPulse? = nil
-    @Published var githubActivity: GitHubActivity? = nil
+    var githubStats: GitHubStats? = nil
+    var githubPulse: GitHubPulse? = nil
+    var githubActivity: GitHubActivity? = nil
 
     // Stripe (populated by StripePoller)
-    @Published var stripePayments: [StripePayment] = []
-    @Published var stripeBalance: Int = 0           // raw balance in cents
-    @Published var stripeDisplayBalance: Int = 0    // animated balance target
-    @Published var stripeCurrency: String = "eur"
-    @Published var stripeLoaded: Bool = false       // true after first successful poll
-    @Published var stripeError: String? = nil      // last API error (nil = ok)
+    var stripePayments: [StripePayment] = []
+    var stripeBalance: Int = 0           // raw balance in cents
+    var stripeDisplayBalance: Int = 0    // animated balance target
+    var stripeCurrency: String = "eur"
+    var stripeLoaded: Bool = false       // true after first successful poll
+    var stripeError: String? = nil      // last API error (nil = ok)
 
     // Cal.com (populated by CalcomPoller)
-    @Published var calcomBookings: [CalcomBooking] = []
-    @Published var calcomLoaded: Bool = false
-    @Published var calcomError: String? = nil
+    var calcomBookings: [CalcomBooking] = []
+    var calcomLoaded: Bool = false
+    var calcomError: String? = nil
 
     // Notion (populated by NotionPoller)
-    @Published var notionPages: [NotionPage] = []
-    @Published var notionLoaded: Bool = false
-    @Published var notionError: String? = nil
+    var notionPages: [NotionPage] = []
+    var notionLoaded: Bool = false
+    var notionError: String? = nil
 
     // n8n — the last executions, newest first (for the iPhone; the notch shows only the latest)
-    @Published var n8nRuns: [N8nRun] = []
+    var n8nRuns: [N8nRun] = []
 
     // Chat conversation history
-    @Published var chatHistory: [ChatMessage] = []
+    var chatHistory: [ChatMessage] = []
 
     // Pending approval request from Claude Code hook
-    @Published var pendingApproval: ApprovalInfo? = nil
+    var pendingApproval: ApprovalInfo? = nil
 
     // Pending AskUserQuestion from Claude Code hook
-    @Published var pendingQuestion: AskQuestion? = nil {
+    var pendingQuestion: AskQuestion? = nil {
         didSet { QuestionLayout.height = pendingQuestion?.estimatedIslandHeight }
     }
 
     // Per-pill flat list of FileDiffs, in order of reception.
-    // Not @Published — steps[] changes already trigger redraws.
-    var sessionDiffs: [String: [FileDiff]] = [:]
-    private var sessionDiffTimers: [String: DispatchWorkItem] = [:]
+    // Not observed — the steps[] change that comes with each diff already redraws.
+    @ObservationIgnored var sessionDiffs: [String: [FileDiff]] = [:]
+    @ObservationIgnored private var sessionDiffTimers: [String: DispatchWorkItem] = [:]
     // Monotonically increasing — never reset, not even in clearSessionDiffs.
-    private var nextDiffId: Int = 0
+    @ObservationIgnored private var nextDiffId: Int = 0
 
     @discardableResult
     func appendSessionDiff(_ diff: FileDiff, for pillId: String) -> Int {
@@ -429,12 +458,12 @@ final class AppState: ObservableObject {
     }
 
     #if !APPSTORE
-    @Published var musicPlaying: Bool = false
-    @Published var musicAutomationDenied: Bool = false
+    var musicPlaying: Bool = false
+    var musicAutomationDenied: Bool = false
     #endif
 
     // Claude plan gauge (from statusline hook)
-    @Published var claudePlanUsage: PlanUsage? = nil {
+    var claudePlanUsage: PlanUsage? = nil {
         didSet {
             if let u = claudePlanUsage,
                let data = try? JSONEncoder().encode(u) {
@@ -445,23 +474,23 @@ final class AppState: ObservableObject {
 
     // Plan gauge: show pill in notch header — persisted
     #if !APPSTORE
-    @Published var showPlanInNotch: Bool = false {
+    var showPlanInNotch: Bool = false {
         didSet { UserDefaults.standard.set(showPlanInNotch, forKey: "showPlanInNotch") }
     }
     // In-memory plan usage override for demo mode. Never persisted. Set by DemoEngine.
-    @Published var demoPlanUsageOverride: PlanUsage? = nil
+    var demoPlanUsageOverride: PlanUsage? = nil
     // Cached relay-installed state — updated at launch, after install/uninstall, on Settings open
-    @Published var planRelayInstalled: Bool = false
+    var planRelayInstalled: Bool = false
     // Transient — reset when island closes or view changes
-    @Published var showingPlanDetail: Bool = false
+    var showingPlanDetail: Bool = false
 
     // Codex plan gauge (from `codex app-server`) — fetched when the pill shows
-    @Published var showCodexPlanInNotch: Bool = false {
+    var showCodexPlanInNotch: Bool = false {
         didSet { UserDefaults.standard.set(showCodexPlanInNotch, forKey: "showCodexPlanInNotch") }
     }
-    @Published var codexPlanUsage: CodexPlanUsage? = nil
+    var codexPlanUsage: CodexPlanUsage? = nil
     // Which card showingPlanDetail opens
-    @Published var planDetailIsCodex: Bool = false
+    var planDetailIsCodex: Bool = false
 
     func refreshCodexPlanUsage() {
         if let u = codexPlanUsage, Date().timeIntervalSince(u.updatedAt) < 60 { return }
@@ -480,45 +509,45 @@ final class AppState: ObservableObject {
     private init() {
         let ud = UserDefaults.standard
 
-        if let v = ud.object(forKey: "soundEnabled") as? Bool   { soundEnabled = v }
-        if let v = ud.object(forKey: "soundVolume")  as? Double { soundVolume  = v }
-        mochiOutfitSelection = Outfit.stored
-        pillColors = PillColors.stored
+        if let v = ud.object(forKey: "soundEnabled") as? Bool   { _soundEnabled = v }
+        if let v = ud.object(forKey: "soundVolume")  as? Double { _soundVolume  = v }
+        _mochiOutfitSelection = Outfit.stored
+        _pillColors = PillColors.stored
         if let v = ud.string(forKey: "claudeModel"),
-           !v.trimmingCharacters(in: .whitespaces).isEmpty { claudeModel = v }
-        if let v = ud.string(forKey: "chatProvider"), let p = ChatProvider(rawValue: v) { chatProvider = p }
-        if let v = ud.string(forKey: "googleChatModel"), !v.isEmpty { googleChatModel = v }
-        if let v = ud.string(forKey: "openAIChatModel"), !v.isEmpty { openAIChatModel = v }
-        if let v = ud.string(forKey: "ollamaChatModel"), !v.isEmpty { ollamaChatModel = v }
-        if let v = ud.string(forKey: "lmstudioChatModel"), !v.isEmpty { lmstudioChatModel = v }
-        if let v = ud.string(forKey: "ollamaServerURL"), !v.isEmpty { ollamaServerURL = v }
-        if let v = ud.string(forKey: "lmstudioServerURL"), !v.isEmpty { lmstudioServerURL = v }
+           !v.trimmingCharacters(in: .whitespaces).isEmpty { _claudeModel = v }
+        if let v = ud.string(forKey: "chatProvider"), let p = ChatProvider(rawValue: v) { _chatProvider = p }
+        if let v = ud.string(forKey: "googleChatModel"), !v.isEmpty { _googleChatModel = v }
+        if let v = ud.string(forKey: "openAIChatModel"), !v.isEmpty { _openAIChatModel = v }
+        if let v = ud.string(forKey: "ollamaChatModel"), !v.isEmpty { _ollamaChatModel = v }
+        if let v = ud.string(forKey: "lmstudioChatModel"), !v.isEmpty { _lmstudioChatModel = v }
+        if let v = ud.string(forKey: "ollamaServerURL"), !v.isEmpty { _ollamaServerURL = v }
+        if let v = ud.string(forKey: "lmstudioServerURL"), !v.isEmpty { _lmstudioServerURL = v }
         // Migrate old 60s default → 15s
-        if let v = ud.object(forKey: "openOnHover") as? Bool { openOnHover = v }
+        if let v = ud.object(forKey: "openOnHover") as? Bool { _openOnHover = v }
         if let v = ud.object(forKey: "autoCloseInterval") as? Double {
-            autoCloseInterval = (v == 60) ? 15 : v
+            _autoCloseInterval = (v == 60) ? 15 : v
         }
-        if let v = ud.object(forKey: "absenceInterval")   as? Double { absenceInterval   = v }
-        if let v = ud.object(forKey: "hotkeyEnabled") as? Bool  { hotkeyEnabled = v }
-        if let v = ud.object(forKey: "hotkeyFlags")   as? Int   { hotkeyFlags = UInt(v) }
-        if let v = ud.object(forKey: "hotkeyCode")    as? Int   { hotkeyCode = UInt16(v) }
-        if let v = ud.string(forKey: "islandDisplay") { islandDisplay = IslandDisplayChoice(storageValue: v) }
+        if let v = ud.object(forKey: "absenceInterval")   as? Double { _absenceInterval   = v }
+        if let v = ud.object(forKey: "hotkeyEnabled") as? Bool  { _hotkeyEnabled = v }
+        if let v = ud.object(forKey: "hotkeyFlags")   as? Int   { _hotkeyFlags = UInt(v) }
+        if let v = ud.object(forKey: "hotkeyCode")    as? Int   { _hotkeyCode = UInt16(v) }
+        if let v = ud.string(forKey: "islandDisplay") { _islandDisplay = IslandDisplayChoice(storageValue: v) }
         if let d = ud.data(forKey: "vercelProjectFilter"),
-           let a = try? JSONDecoder().decode([String].self, from: d) { vercelProjectFilter = Set(a) }
+           let a = try? JSONDecoder().decode([String].self, from: d) { _vercelProjectFilter = Set(a) }
         if let d = ud.data(forKey: "n8nWorkflowFilter"),
-           let a = try? JSONDecoder().decode([String].self, from: d) { n8nWorkflowFilter = Set(a) }
+           let a = try? JSONDecoder().decode([String].self, from: d) { _n8nWorkflowFilter = Set(a) }
         if let d = ud.data(forKey: "activeIntegrations"),
-           let a = try? JSONDecoder().decode([String].self, from: d) { activeIntegrations = Set(a) }
+           let a = try? JSONDecoder().decode([String].self, from: d) { _activeIntegrations = Set(a) }
         if let v = ud.string(forKey: "mainPill"), !v.isEmpty,
            PillCatalog.available.contains(where: { $0.id == v && $0.category == .workspace && !$0.comingSoon }) {
-            mainPillId = v
+            _mainPillId = v
         }
         if let d = ud.data(forKey: "claudePlanUsage"),
-           let u = try? JSONDecoder().decode(PlanUsage.self, from: d) { claudePlanUsage = u }
+           let u = try? JSONDecoder().decode(PlanUsage.self, from: d) { _claudePlanUsage = u }
         #if !APPSTORE
-        if let v = ud.object(forKey: "showPlanInNotch") as? Bool { showPlanInNotch = v }
-        if let v = ud.object(forKey: "showCodexPlanInNotch") as? Bool { showCodexPlanInNotch = v }
-        planRelayInstalled = HookServer.statusLineInstalled()
+        if let v = ud.object(forKey: "showPlanInNotch") as? Bool { _showPlanInNotch = v }
+        if let v = ud.object(forKey: "showCodexPlanInNotch") as? Bool { _showCodexPlanInNotch = v }
+        _planRelayInstalled = HookServer.statusLineInstalled()
         #endif
 
         // Sync SoundEngine volume on launch
@@ -528,14 +557,38 @@ final class AppState: ObservableObject {
         loadIntegrationTasks()
     }
 
-    // MARK: - Computed
+    // MARK: - Focus (derived, stored)
 
-    var focusTask: AgentTask? {
-        tasks.first { $0.id == focusId } ?? tasks.first
+    /// The focused pill's task (the first one when none is focused). Stored, and reassigned
+    /// only when it changes: views that show the focused pill don't redraw for every event
+    /// of the other pills.
+    private(set) var focusTask: AgentTask?
+
+    /// What the main Mochi shows: the override, else the focused pill's state. Stored like
+    /// focusTask, so Mochi's views redraw when the state changes, not on every step.
+    private(set) var effectiveState: BotState = .idle
+
+    /// The focused pill's session book, `sessionBooks[focusId]`. Stored like focusTask.
+    private(set) var focusBook: SessionBook?
+
+    /// A pill's session book. The focused pill's is read from focusBook, so a view showing
+    /// it only redraws when that book changes, not when another pill's does.
+    func sessionBook(for pillId: String) -> SessionBook? {
+        pillId == focusId ? focusBook : sessionBooks[pillId]
     }
 
-    var effectiveState: BotState {
-        stateOverride ?? focusTask?.state ?? .idle
+    /// Keeps focusTask and effectiveState in step with tasks, focusId and stateOverride.
+    private func refreshFocus() {
+        let task = tasks.first { $0.id == focusId } ?? tasks.first
+        if task != focusTask { focusTask = task }
+        let state = stateOverride ?? task?.state ?? .idle
+        if state != effectiveState { effectiveState = state }
+    }
+
+    /// Keeps focusBook in step with sessionBooks and focusId.
+    private func refreshFocusBook() {
+        let book = focusId.flatMap { sessionBooks[$0] }
+        if book != focusBook { focusBook = book }
     }
 
     // MARK: - Task management

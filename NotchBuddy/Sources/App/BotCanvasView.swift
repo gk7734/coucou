@@ -3,7 +3,7 @@ import SwiftUI
 /// SwiftUI wrapper: TimelineView drives a Canvas that calls BotEngine.draw().
 /// Uses a shared engine per-task; the main bot uses AppState's shared engine.
 struct BotCanvasView: View {
-    @ObservedObject var state: AppState
+    var state: AppState
     var particleOverhang: CGFloat = 0
     /// When set, overrides island-based eye-tracking (used by desktop Mochi).
     /// CGPoint in the same coord space as state.mousePosition (DesktopSpace, y-down).

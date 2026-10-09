@@ -1,4 +1,3 @@
-import Combine
 import Foundation
 
 // MARK: - ServicePollGate
@@ -23,7 +22,7 @@ final class ServicePollGate: @unchecked Sendable {
     private var pollAgain = false
     private var pollQueued = false
     private var generation = 0
-    private var pillObserver: AnyCancellable?
+    private var pillObserver: ChangeObserver<Bool>?
     private var keyObserver: NSObjectProtocol?
 
     init(pillId: String, keychainKeys: Set<String>) {
@@ -61,17 +60,13 @@ final class ServicePollGate: @unchecked Sendable {
         t.resume()
         timer = t
 
-        // @Published sends the new value before it is stored: queuePoll checks
-        // isWanted on the next turn of the main queue, once it is.
+        // Pill turned on: poll now. ChangeObserver delivers once the change is stored;
+        // queuePoll checks isWanted on the next turn of the main queue anyway.
         let pillId = pillId
-        pillObserver = AppState.shared.$activeIntegrations
-            .map { $0.contains(pillId) }
-            .removeDuplicates()
-            .dropFirst()
-            .filter { $0 }
-            .sink { [weak self] _ in
-                MainActor.assumeIsolated { self?.queuePoll() }
-            }
+        pillObserver = ChangeObserver({ AppState.shared.activeIntegrations.contains(pillId) },
+                                      removeDuplicates: true) { [weak self] on in
+            if on { self?.queuePoll() }
+        }
 
         let keys = keychainKeys
         keyObserver = NotificationCenter.default.addObserver(
