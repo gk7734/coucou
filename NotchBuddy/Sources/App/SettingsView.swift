@@ -1364,20 +1364,27 @@ struct SettingsView: View {
 
     private func confirmInstall() {
         do {
+            let installing = HookServer.shared.pendingClaudeHooksInstall
             try HookServer.shared.writeClaudeHooks()
             showDiff = false
-            statusMessage = String(localized: "status.hooks-installed-settings")
+            statusMessage = installing
+                ? String(localized: "status.hooks-installed-settings")
+                : String(localized: "status.hooks-removed")
             pendingHookJSON = ""
-            hookNeedsUpdate = false
+            hookNeedsUpdate = HookServer.hooksNeedUpdate()
         } catch {
             statusMessage = "❌ Write error: \(error.localizedDescription)"
         }
     }
 
+    /// Removing goes through the same preview and confirmation as installing.
     private func uninstallHooks() {
         do {
-            try HookServer.shared.uninstallClaudeHooks()
-            statusMessage = String(localized: "status.hooks-removed")
+            pendingHookJSON = try HookServer.shared.previewClaudeHooks(install: false)
+            showDiff = true
+            statusMessage = String(localized: "hooks.review-json")
+        } catch let e as NSError where e.domain == "CoucouNoop" {
+            statusMessage = e.localizedDescription
         } catch {
             statusMessage = "❌ \(error.localizedDescription)"
         }

@@ -1,10 +1,16 @@
 import Foundation
 
 // MARK: - ClaudeSettingsFile
-// Reads and rewrites a settings file Coucou does not own (~/.claude/settings.json).
+// Reads and rewrites a settings file Coucou does not own: ~/.claude/settings.json,
+// and every other agent file the installers touch (Gemini, Antigravity, Codex,
+// Copilot, Muse settings, the OpenCode/Amp/Hermes plugins, Hermes' config.yaml).
 // The rules are the ones in CLAUDE.md: never start from an empty object when the
 // file is there but unusable, always take a backup, and only ever write over the
 // exact bytes the user was shown.
+//
+// `name` / `label` is how the file is named in error messages: the file name by
+// default, or a path such as "~/.gemini/settings.json" when the name alone is
+// ambiguous.
 
 enum ClaudeSettingsFile {
 
@@ -50,14 +56,23 @@ enum ClaudeSettingsFile {
         return groups
     }
 
+    /// The raw bytes of a file. Absent file → nil.
+    /// Present but unreadable → throws: not knowing what is in there is not the same as empty.
+    static func readBytes(at url: URL, label: String? = nil) throws -> Data? {
+        guard FileManager.default.fileExists(atPath: url.path) else { return nil }
+        guard let bytes = try? Data(contentsOf: url) else {
+            throw Failure.unreadable(label ?? url.lastPathComponent)
+        }
+        return bytes
+    }
+
     /// The settings object and the bytes it was parsed from.
     /// Absent file → empty object and nil bytes. An empty file is an empty object.
     /// Present but unreadable, or anything that is not a JSON object → throws:
     /// not knowing what is in there is not the same as empty.
-    static func read(at url: URL) throws -> (object: [String: Any], bytes: Data?) {
-        guard FileManager.default.fileExists(atPath: url.path) else { return ([:], nil) }
-        let name = url.lastPathComponent
-        guard let bytes = try? Data(contentsOf: url) else { throw Failure.unreadable(name) }
+    static func read(at url: URL, label: String? = nil) throws -> (object: [String: Any], bytes: Data?) {
+        let name = label ?? url.lastPathComponent
+        guard let bytes = try readBytes(at: url, label: name) else { return ([:], nil) }
         if bytes.allSatisfy({ $0 == 0x20 || $0 == 0x09 || $0 == 0x0A || $0 == 0x0D }) {
             return ([:], bytes)
         }
@@ -72,18 +87,15 @@ enum ClaudeSettingsFile {
     /// `original` is what `read` returned when `data` was computed. If the file
     /// holds anything else by now — another tool, the user's own editor — nothing
     /// is written. Returns the backup, or nil when there was no file to back up.
+    /// A file that did not exist is created with `newFileMode`; an existing one
+    /// keeps its permissions.
     @discardableResult
-    static func write(_ data: Data, to url: URL, expecting original: Data?) throws -> URL? {
+    static func write(_ data: Data, to url: URL, expecting original: Data?,
+                      label: String? = nil, newFileMode: Int = 0o600) throws -> URL? {
         let fm = FileManager.default
-        let name = url.lastPathComponent
-        let exists = fm.fileExists(atPath: url.path)
-
-        var current: Data? = nil
-        if exists {
-            guard let bytes = try? Data(contentsOf: url) else { throw Failure.unreadable(name) }
-            current = bytes
-        }
-        guard current == original else { throw Failure.changed(name) }
+        let name = label ?? url.lastPathComponent
+        try requireUnchanged(url, expecting: original, name: name)
+        let exists = original != nil
 
         // A dotfiles setup often makes settings.json a symlink: write to the file
         // it points at, so the link survives the rename below.
@@ -91,12 +103,11 @@ enum ClaudeSettingsFile {
 
         var backupURL: URL? = nil
         // settings.json can hold API keys in its `env` block: a new file is ours
-        // only, and a rewrite keeps the permissions the original had.
-        var mode = 0o600
+        // only (unless the caller says otherwise), and a rewrite keeps the
+        // permissions the original had.
+        var mode = newFileMode
         if exists {
-            let backup = freeBackupURL(for: url)
-            do { try fm.copyItem(at: target, to: backup) } catch { throw Failure.backupFailed(name) }
-            backupURL = backup
+            backupURL = try backup(url, target: target, name: name)
             if let found = (try? fm.attributesOfItem(atPath: target.path))?[.posixPermissions] as? NSNumber {
                 mode = found.intValue & 0o777
             }
@@ -124,6 +135,33 @@ enum ClaudeSettingsFile {
             throw Failure.writeFailed(name)
         }
         return backupURL
+    }
+
+    /// Deletes the file, after a dated backup beside it.
+    ///
+    /// Same contract as `write`: refused unless the file still holds exactly
+    /// `original`, the bytes the user was shown. A symlink is removed, not the
+    /// file it points at. Returns the backup, or nil when there was no file.
+    @discardableResult
+    static func remove(at url: URL, expecting original: Data?, label: String? = nil) throws -> URL? {
+        let name = label ?? url.lastPathComponent
+        try requireUnchanged(url, expecting: original, name: name)
+        guard original != nil else { return nil }
+        let backupURL = try backup(url, target: url.resolvingSymlinksInPath(), name: name)
+        do { try FileManager.default.removeItem(at: url) } catch { throw Failure.writeFailed(name) }
+        return backupURL
+    }
+
+    /// Throws `.changed` unless the file holds exactly `original` (nil = absent).
+    private static func requireUnchanged(_ url: URL, expecting original: Data?, name: String) throws {
+        let current = try readBytes(at: url, label: name)
+        guard current == original else { throw Failure.changed(name) }
+    }
+
+    private static func backup(_ url: URL, target: URL, name: String) throws -> URL {
+        let backup = freeBackupURL(for: url)
+        do { try FileManager.default.copyItem(at: target, to: backup) } catch { throw Failure.backupFailed(name) }
+        return backup
     }
 
     /// Down to the second, and never an existing name: installing then
