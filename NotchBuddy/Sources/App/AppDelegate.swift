@@ -16,8 +16,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
         // Ignore SIGPIPE — prevents crash when nb-hook closes socket before we write response
         signal(SIGPIPE, SIG_IGN)
-        // Warm up Keychain cache on main thread BEFORE any poller or view touches it
-        _ = KeychainStore.shared
+        // No Keychain warm-up: KeychainStore reads each key the first time it is needed.
         NSApp.setActivationPolicy(.accessory)
         setupMenuBarItem()
         // Before the island (and its hook server): banners for session alerts, stall watch.

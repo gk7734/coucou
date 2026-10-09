@@ -70,6 +70,7 @@
 		2DC8BC5E46C2A2827DBF0FFB /* CloudSchema.swift in Sources */ = {isa = PBXBuildFile; fileRef = 977A280276BC2C882FD7C13E /* CloudSchema.swift */; };
 		2DEB459FBD0BA3CEAAA5FDE9 /* ClaudeService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A83D5410BD030B243ADDCFF4 /* ClaudeService.swift */; };
 		2F36E3C6C073E968A682AFA4 /* NotionPoller.swift in Sources */ = {isa = PBXBuildFile; fileRef = BE03E03D1804B0B92C5C2DAD /* NotionPoller.swift */; };
+		3683033CAD931EDFEACDC39F /* KeychainStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = D2562AA78A6A7866122B10DF /* KeychainStore.swift */; };
 		3756B7E1A55D9CEC8C4D34A4 /* IslandStateMachine.swift in Sources */ = {isa = PBXBuildFile; fileRef = D8212018F09EA1E96FBD63CD /* IslandStateMachine.swift */; };
 		38EEB2D3A6EC538958D92575 /* GitHubPulse.swift in Sources */ = {isa = PBXBuildFile; fileRef = F8D3AD61802A32C4833F3EDA /* GitHubPulse.swift */; };
 		3984EAC8A755AF7984370DAB /* SessionBook.swift in Sources */ = {isa = PBXBuildFile; fileRef = E2A7CF50FD64BC80F35D69C8 /* SessionBook.swift */; };
@@ -129,6 +130,7 @@
 		6D158183870434FEDF07E050 /* LocalChat.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8790ACE9F73BD74640A0F20C /* LocalChat.swift */; };
 		6D71A1FA10C766E465F326D4 /* BotEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 66E6F5FC81429871B6F766A8 /* BotEngine.swift */; };
 		6DDBB5EDE6BEFD4225238C28 /* approval.wav in Resources */ = {isa = PBXBuildFile; fileRef = 11FCBBE20532B1F0A184EA06 /* approval.wav */; };
+		6F31F225939A8EF163DBCBC4 /* KeychainStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = D2562AA78A6A7866122B10DF /* KeychainStore.swift */; };
 		6FC65C190ED614C664C9BC17 /* SafeWebURL.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2FDED98F7F6C755A72C97A3 /* SafeWebURL.swift */; };
 		71CBD1D39A6668BF454CA1C5 /* IslandTypes.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0365DDE3C554F5E8570055F4 /* IslandTypes.swift */; };
 		724E602A05FE5A6D58218E27 /* CoucouControl.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5C406C508A86E215B3CBE3FC /* CoucouControl.swift */; };
@@ -467,6 +469,7 @@
 		C581F7B1A9F14B281B60063E /* GreetingCanvasView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GreetingCanvasView.swift; sourceTree = "<group>"; };
 		D0F0D0F67E7C56B9E37E7648 /* ClaudeHost.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClaudeHost.swift; sourceTree = "<group>"; };
 		D1D96E57E8DADE6B82628E3E /* OpenLeadMochiIntent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OpenLeadMochiIntent.swift; sourceTree = "<group>"; };
+		D2562AA78A6A7866122B10DF /* KeychainStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeychainStore.swift; sourceTree = "<group>"; };
 		D6DF93125491729E14636AD8 /* CoucouNotificationContent.appex */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = "wrapper.app-extension"; path = CoucouNotificationContent.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		D710BD7834228045869D0184 /* IslandWindowController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IslandWindowController.swift; sourceTree = "<group>"; };
 		D797CC384B5BC70D34F121BC /* ChatMarkdown.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatMarkdown.swift; sourceTree = "<group>"; };
@@ -551,6 +554,7 @@
 				D8212018F09EA1E96FBD63CD /* IslandStateMachine.swift */,
 				FA02B08886939FF6FE0475DD /* IslandViewContent.swift */,
 				D710BD7834228045869D0184 /* IslandWindowController.swift */,
+				D2562AA78A6A7866122B10DF /* KeychainStore.swift */,
 				8790ACE9F73BD74640A0F20C /* LocalChat.swift */,
 				6544ED02D945CF9F00647AD1 /* MacDictation.swift */,
 				79AA0D778C7CF56AD600FB4B /* MacNotifier.swift */,
@@ -968,6 +972,7 @@
 				A7733EE60694EA3E2A86C37A /* IslandTypes.swift in Sources */,
 				065FCE817315454DE3F85F25 /* IslandViewContent.swift in Sources */,
 				091EC3B2F1060D7EE1317E4E /* IslandWindowController.swift in Sources */,
+				6F31F225939A8EF163DBCBC4 /* KeychainStore.swift in Sources */,
 				C3ECA730677F467D28910AF6 /* LiveActivityRelay.swift in Sources */,
 				6D158183870434FEDF07E050 /* LocalChat.swift in Sources */,
 				F8F95EAD88F70E0A147D1662 /* MacDictation.swift in Sources */,
@@ -1155,6 +1160,7 @@
 				0685C3D47D27D06FCB6E4AD1 /* IslandTypes.swift in Sources */,
 				68A950E3C23FD612639D9776 /* IslandViewContent.swift in Sources */,
 				C61DDE2EC5FDDB39E4AA3B34 /* IslandWindowController.swift in Sources */,
+				3683033CAD931EDFEACDC39F /* KeychainStore.swift in Sources */,
 				F28275101D83F121E582B1B1 /* LiveActivityRelay.swift in Sources */,
 				E81575CE4433C6F88E424A8F /* LocalChat.swift in Sources */,
 				3CF69605BB03E567C2DB0935 /* MacDictation.swift in Sources */,
