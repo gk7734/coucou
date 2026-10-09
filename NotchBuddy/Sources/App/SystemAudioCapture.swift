@@ -1,3 +1,4 @@
+import AppKit
 import CoreAudio
 import Foundation
 
@@ -214,11 +215,28 @@ final class SystemAudioCapture: @unchecked Sendable {
         var apps: [String] = []
         for process in processes {
             var output: UInt32 = 0
+            let processPID = pid(of: process)
             guard Self.read(process, kAudioProcessPropertyIsRunningOutput, into: &output), output != 0,
-                  pid(of: process) != ownPID else { continue }
-            apps.append(Self.bundleId(of: process) ?? "")
+                  processPID != ownPID else { continue }
+            let id = Self.owningAppBundleId(pid: processPID, bundleId: Self.bundleId(of: process)) ?? ""
+            if !apps.contains(id) { apps.append(id) }
         }
         return apps.isEmpty ? nil : apps
+    }
+
+    /// The app the user knows for a sound-making process: helpers play the sound for many
+    /// apps (TIDAL's "TIDALPlayer", browsers' and Electron apps' helpers). The process itself
+    /// when it is a regular app, else the nearest regular app above it, else a running
+    /// regular app whose bundle id prefixes the helper's ("com.tidal.desktop.player").
+    private static func owningAppBundleId(pid: pid_t, bundleId: String?) -> String? {
+        let chain = pid > 0 ? ProcessAncestry.pidChain(from: pid) : []
+        if let id = ProcessAncestry.regularAppBundleIds(pids: chain, limit: 1).first,
+           !id.hasPrefix("fr.louisraille.") { return id }
+        guard let bundleId else { return nil }
+        let regular = NSWorkspace.shared.runningApplications
+            .filter { $0.activationPolicy == .regular }
+            .compactMap(\.bundleIdentifier)
+        return regular.filter { bundleId.hasPrefix($0 + ".") }.max { $0.count < $1.count } ?? bundleId
     }
 
     private static func bundleId(of process: AudioObjectID) -> String? {

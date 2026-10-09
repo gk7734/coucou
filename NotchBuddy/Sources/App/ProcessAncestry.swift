@@ -48,6 +48,11 @@ enum ProcessAncestry {
         return [peer] + ProcessTree.ancestors(of: peer, maxDepth: 24, parent: parentPid(of:))
     }
 
+    /// `pid` followed by its ancestors, nearest first (launchd excluded).
+    static func pidChain(from pid: pid_t) -> [pid_t] {
+        [pid] + ProcessTree.ancestors(of: pid, maxDepth: 24, parent: parentPid(of:))
+    }
+
     /// Bundle ids of the regular apps among `pids`, nearest first, without duplicates.
     /// Stops after `limit` apps: HostResolver only needs the nearest ones.
     static func regularAppBundleIds(pids: [pid_t], limit: Int = 4) -> [String] {
