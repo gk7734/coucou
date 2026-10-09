@@ -535,8 +535,10 @@ function forward(event_name: string, fields: Record<string, unknown>): void {
 export default function (amp: any): void {
   amp.on('session.start', (e: any) => { forward('SessionStart',     { session_id: e.thread?.id ?? '' }); });
   amp.on('agent.start',   (e: any) => { forward('UserPromptSubmit', { session_id: e.thread?.id ?? '' }); });
-  amp.on('tool.call',     (e: any) => { try { forward('PreToolUse', { session_id: e.thread?.id ?? '', tool_name: typeof e.tool === 'string' ? e.tool : '' }); } finally { return { action: 'allow' }; } });
-  amp.on('tool.result',   (e: any) => { forward('PostToolUse',      { session_id: e.thread?.id ?? '' }); });
+  // No tool.call handler: in Amp's plugin API it is a request whose result decides whether
+  // the tool runs ({ action: 'allow' } = run it), so answering it could override the user's
+  // own permission plugin. Coucou only displays; the tool shows once it has run.
+  amp.on('tool.result',   (e: any) => { forward('PostToolUse',      { session_id: e.thread?.id ?? '', tool_name: typeof e.tool === 'string' ? e.tool : '' }); });
   amp.on('agent.end',     (e: any) => { forward('Stop',             { session_id: e.thread?.id ?? '' }); });
 }
 """

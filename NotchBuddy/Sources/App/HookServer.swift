@@ -1965,7 +1965,9 @@ final class HookServer: @unchecked Sendable {
 
     static func ampPluginInstalled() -> Bool {
         guard let content = try? String(contentsOf: ampPluginURL, encoding: .utf8) else { return false }
-        return content.contains("nb-hook") && content.contains("'amp'")
+        // A plugin from before the fix answered tool.call with "allow": count it as not
+        // installed so Settings offers the safe one.
+        return content.contains("nb-hook") && content.contains("'amp'") && !content.contains("action: 'allow'")
     }
 
     private var pendingAmp: PendingFileChange?
