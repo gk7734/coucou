@@ -187,6 +187,15 @@ def main():
           "--host none sends no override")
     check(all("coucou_agent" not in p for p in server.payloads()), "no coucou_agent without --agent")
 
+    # --host "": the empty override ("no app"), so the app falls back to bundle_id / term_program.
+    server.reset()
+    res = run([scenario, "--socket", sock_path, "--host", "", "-q"], home)
+    got = server.payloads()
+    check(res.returncode == 0 and got, "--host '' run exits 0")
+    check([p.get("coucou_host_override") for p in got[:-1]] == [""] * (len(got) - 1),
+          "--host '' sends an empty override")
+    check(got and got[0].get("bundle_id") == "", "${HOST} is empty with the empty override")
+
     # Rate and --parallel: 2 workers x 21 events, 20 ms apart = ~100 events/s.
     rate_scn = os.path.join(tmp, "rate.jsonl")
     with open(rate_scn, "w") as f:

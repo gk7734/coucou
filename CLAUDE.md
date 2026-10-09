@@ -40,7 +40,7 @@ bash scripts/render-outfits.sh       # /tmp/coucou-outfits.png
 cd relay && npm install && npm run typecheck
 ```
 
-**기준선 (2026-10-10, Xcode 27.0 / Swift 6.4, 커밋 289ae73):** `NotchBuddy` Debug 빌드 성공, Swift 경고 0개(처음 40개 → 3098a64에서 8개 → 289ae73에서 0개. 남는 건 `appintentsmetadataprocessor`의 "no AppIntents.framework" 안내 1줄). `test-all.sh` 30개 스크립트 전부 통과. 리팩터링 중 이 기준보다 나빠지면 안 된다.
+**기준선 (2026-10-10, Xcode 27.0 / Swift 6.4, 커밋 289ae73):** `NotchBuddy` Debug 빌드 성공, Swift 경고 0개(처음 40개 → 3098a64에서 8개 → 289ae73에서 0개. 남는 건 `appintentsmetadataprocessor`의 "no AppIntents.framework" 안내 1줄). `test-all.sh` 30개 스크립트 전부 통과(289ae73 + `test-replay`. 훅 라우팅·세션 카드 통합으로 `test-hook-routing`, `test-session-card-text`가 더해져 32개). 리팩터링 중 이 기준보다 나빠지면 안 된다.
 
 > `project.yml`을 바꾸거나 파일을 추가·이동하면 **항상 `xcodegen` 후 생성물(`project.pbxproj`, `Resources/Info*.plist`)까지 커밋**한다(과거에 커밋된 `project.pbxproj`가 `project.yml`보다 뒤처져 파일이 누락된 적이 있다).
 
@@ -77,10 +77,16 @@ cd relay && npm install && npm run typecheck
 | `AgentHookConfig.swift` | 순수. Claude·Gemini·Antigravity·Codex·Copilot·Muse 설정 JSON 병합/제거 |
 | `HermesConfigMerger.swift` | 순수. `~/.hermes/config.yaml` 줄 단위 병합 |
 | `ClaudeSettingsFile.swift` | 모든 에이전트 설정 파일 쓰기(미리보기 바이트 비교, 고유 백업, temp→rename, 권한 유지, 심볼릭 링크 추적) |
-| `ClaudeHost.swift` | 알려진 터미널 판별(현행 라우팅) |
+| `ClaudeHost.swift` | 터미널 이름·표시 (289ae73까지의 라우팅. `test-claude-host`) |
 | `HostResolver.swift` | 순수. 호스트 앱 판별과 pill 매핑, `ProcessTree.ancestors` (§12) |
+| `ProcessAncestry.swift` | `accept()` 직후 피어 프로세스의 부모 사슬을 잡아 `coucou_host_bundle_ids`를 만든다 (§12) |
+| `HookRouting.swift` | 순수. 이벤트 → 호스트 → pill 라우팅 결정 (`test-hook-routing`) (§12) |
 | `SessionBook.swift` | 순수. pill 하나 뒤의 세션 목록, 긴급도, 보관, 정지 감지 (§12) |
-| `SessionAlert.swift` | `SessionAlert` + `SessionAlertCenter`(macOS 알림 결정, 현재 스텁) (§12) |
+| `SessionCardText.swift` | 순수. 카드의 세션 목록 문구 (`test-session-card-text`) |
+| `SessionAlert.swift` | `SessionAlert` + `SessionAlertCenter`(알림 진입점) (§12) |
+| `NotificationPolicy.swift`, `MacNotifier.swift` | 알림을 띄울지 결정(토글·억제) / 무음 macOS 배너 (§12) |
+| `StallMonitor.swift` | 정지 감지. 예약된 검사 하나 (§12) |
+| `NotificationsSettingsView.swift` | 설정의 알림·정지 임계값 화면 |
 | `HostAppInfo.swift` | 임의 앱의 이름·아이콘·frontmost·활성화 (AppKit) |
 | `ServicePollGate.swift` | 서비스 폴러 공통 스케줄·가드 (§5) |
 | `CoucouKit/CloudSchema.swift` | CloudKit 컨테이너·존·레코드 타입 이름의 단일 정의 (§6) |
@@ -182,15 +188,15 @@ UI 상태, `[AgentTask]`, `sessionBooks: [pillId: SessionBook]`(§12), ~30개 �
 - 앱→릴레이 응답: `{"permissionDecision":"allow|always|deny|ask"}` 또는 `{"permissionDecision":"answer","answers":{…}}`. 응답 없이 닫힘(EOF) = 앱이 포기했거나 다른 곳에서 답함. 릴레이가 에이전트별 형식으로 변환한다(Claude/Codex `hookSpecificOutput.decision.behavior`, Claude의 `always`는 `updatedPermissions`, Copilot/Muse 평면 형식, Hermes `{"choice":…}`, AskUserQuestion은 PreToolUse `allow` + `updatedInput`).
 - `coucou_agent`(`^[a-z0-9-]{1,24}$`, `claude` 거부) → pill ID `agent_<name>`. 자세한 건 `docs/AGENTS.md`.
 
-### 세션 모델 (289ae73 기준 HookServer)
-- 지금 HookServer는 아직 **pill 하나 = 세션 하나**로 라우팅한다. 호스트 판별(`ClaudeHost.swift`): VS Code/알려진 터미널 → `integration_claude`, Cursor 번들 → `agent_cursor`, Codex → `agent_codex`, 그 외 `agent_<coucou_agent>`. 모르는 호스트는 무시. **IDE별 pill과 pill당 여러 세션(`HostResolver`, `SessionBook`)은 §12에서 통합 중이다.**
+### 세션 모델
+- 라우팅은 순수 `HookRouting` + `HostResolver`다: **IDE마다 pill 하나, pill 뒤에 `SessionBook`으로 여러 세션**. 매핑 표는 §12. `coucou_agent`가 붙은 다른 서드파티 에이전트는 `agent_<name>`. (289ae73까지는 `ClaudeHost`로 pill 하나 = 세션 하나였고 모르는 호스트는 무시했다.)
 - `session_id`는 RecapStore, TurnRecorder, approval 매칭에 쓰인다(익명 세션 키는 `pillId+cwd`).
 - 종료: `Stop` → finished 후 5.2초 뒤 idle/제거, `SessionEnd` → 제거, `Interrupt`(Codex) → idle.
 - **Approval·Question은 FIFO 큐**(`PendingRequestQueue`, SPEC §3 규칙 9). 서로 밀어내지 않는다. 화면에는 head 하나만(`AppState.pendingApproval`/`pendingQuestion`, `presentedApprovalId`/`presentedQuestionId`)이고, 결정·끊김·타임아웃·다른 곳에서 답함으로 head가 빠지면 다음 요청이 뜬다. 큐가 가득 차면(approval 16, question 8) 새 요청은 즉시 `ask`.
 - 요청은 fd가 아니라 **요청 ID와 단조 시계 마감**으로 식별한다(fd 번호는 재사용되어 오래된 타이머가 새 요청을 닫을 수 있었다).
 - 보관 fd는 `DispatchSource` 읽기 소스로 감시하고, **소스의 cancel 핸들러에서만 닫는다**(`finishHeld`: 응답 줄을 쓴 뒤 cancel). 소스가 hang-up을 보면 "Handled in X." 노트.
 - 큐에서 빠지는 조건(`PendingRequestQueue.resolves`): 같은 pill·세션의 PostToolUse/PostToolUseFailure 중 **도구 이름과 정렬된 입력 JSON이 같은 것**, 또는 Stop/StopFailure/UserPromptSubmit/SessionEnd/Interrupt. 기다리던 요청은 조용히, 화면의 카드는 노트와 함께 닫힌다. 카드가 떠 있는 동안 그 pill의 다른 이벤트는 건너뛴다(approval 상태를 덮어쓰지 않도록).
-- 카드를 받는 출처: Cursor·VS Code의 Claude Code, 터미널의 Claude Code(Settings의 terminal cards가 켜졌을 때), Codex·Copilot·Muse, Hermes(transport가 있을 때). 그 외는 즉시 `ask`. 질문 카드는 Codex·Cursor·VS Code·터미널(켜졌을 때)만.
+- 카드를 받는 출처(289ae73 기준. 이제 `HookRouting`이 정하고 IDE pill이 더해졌다, §12): Cursor·VS Code의 Claude Code, 터미널의 Claude Code(Settings의 terminal cards가 켜졌을 때), Codex·Copilot·Muse, Hermes(transport가 있을 때). 그 외는 즉시 `ask`. 질문 카드는 Codex·Cursor·VS Code·터미널(켜졌을 때)만.
 
 ### 에이전트별 설치 위치 (`HookServer.swift` 1314–2030, `SettingsView`에서 preview/write 쌍으로 호출)
 
@@ -252,9 +258,9 @@ CLI가 아니라 HTTP API 직접 호출. `ClaudeService.chat`→`api.anthropic.c
 | 번들 ID | `fr.louisraille.NotchBuddy`(Mac GitHub), `fr.louisraille.Coucou`(App Store·iPhone), `.Widgets`, `.NotificationContent`. Keychain·UserDefaults·TCC 권한이 여기 묶여 있다 |
 | Keychain | service `fr.louisraille.NotchBuddy` + §3의 키 이름 12개 |
 | Pill ID | `integration_claude, agent_cursor, agent_antigravity, agent_codex, agent_gemini, agent_copilot, agent_muse, agent_opencode, agent_amp, agent_hermes, agent_claude-desktop, ai_anthropic, ai_google, ai_openai, ai_ollama, ai_lmstudio, integration_resend, integration_n8n, integration_vercel, integration_github, integration_notion, integration_calcom, integration_stripe, integration_music, integration_spotify`, 동적 `agent_<coucou_agent>`, 그리고 새 동적 패밀리 **`ide_<slug>`**(번들 ID 소문자, `[a-z0-9]` 밖의 연속 문자는 `-` 하나, 예: `com.jetbrains.WebStorm` → `ide_com-jetbrains-webstorm`; JetBrains 폴백은 `ide_com-jetbrains-ide`. 슬러그 규칙 `HostResolver.idePillId`를 바꾸면 저장된 ID가 끊긴다). UserDefaults, CloudKit 레코드 이름, `recap.json`, 위젯 설정에 저장된다. 단일 출처는 `CoucouKit/PillCatalog.swift`지만 코드 곳곳에 리터럴로 반복된다 |
-| UserDefaults | `activeIntegrations, mainPill, pillColors, mochiOutfit, soundEnabled, soundVolume, claudeModel, chatProvider, googleChatModel, openAIChatModel, ollamaChatModel, lmstudioChatModel, ollamaServerURL, lmstudioServerURL, openOnHover, autoCloseInterval, absenceInterval, islandDisplay, hotkeyEnabled, hotkeyFlags, hotkeyCode, shortcut.<action>.{keyCode,flags,enabled}, vercelProjectFilter, n8nWorkflowFilter, claudePlanUsage, showPlanInNotch, showCodexPlanInNotch, settingsSection, coucouHooksInstalled, hermesApprovalsEnabled, terminalCardsEnabled, iPhoneSyncEnabled, iPhoneLiveActivityEnabled, iPhoneInstructionsEnabled, phoneRelayURL, phoneLinkPing, mochiOnDesktop, desktopMochiX, desktopMochiY, dictationLanguage, dictationLastLocale, recapEnabled, recapHideProjects, recapLastShownWeek, coucou.spotifyAutomationGranted, coucou.musicAutomationGranted` + 알림·정지 감지(§12): `macNotificationsEnabled, notifyFinished, notifyErrors, notifyWaiting, notifyStalled, stallThresholdMinutes` |
+| UserDefaults | `activeIntegrations, mainPill, pillColors, mochiOutfit, soundEnabled, soundVolume, claudeModel, chatProvider, googleChatModel, openAIChatModel, ollamaChatModel, lmstudioChatModel, ollamaServerURL, lmstudioServerURL, openOnHover, autoCloseInterval, absenceInterval, islandDisplay, hotkeyEnabled, hotkeyFlags, hotkeyCode, shortcut.<action>.{keyCode,flags,enabled}, vercelProjectFilter, n8nWorkflowFilter, claudePlanUsage, showPlanInNotch, showCodexPlanInNotch, settingsSection, coucouHooksInstalled, hermesApprovalsEnabled, terminalCardsEnabled, iPhoneSyncEnabled, iPhoneLiveActivityEnabled, iPhoneInstructionsEnabled, phoneRelayURL, phoneLinkPing, mochiOnDesktop, desktopMochiX, desktopMochiY, dictationLanguage, dictationLastLocale, recapEnabled, recapHideProjects, recapLastShownWeek, coucou.spotifyAutomationGranted, coucou.musicAutomationGranted` + 알림·정지 감지(§12): `macNotificationsEnabled, notifyFinished, notifyErrors, notifyWaiting, notifyStalled, stallThresholdMinutes`(Int 분, 기본 3, 0 = 끔) |
 | 디스크 경로 | `~/Library/Application Support/NotchBuddy/nb.sock`·`nb-hook` (이미 설치된 사용자의 `~/.claude/settings.json`이 이 경로를 가리킨다. `CoucouHookCommand`가 인식하는 형태이기도 하다) |
-| Hook 프로토콜 | 이벤트 이름, `coucou_agent`·`coucou_kind` 필드, `permissionDecision` 응답 형식, 타임아웃 사다리, 릴레이가 붙이는 `term_program`·`bundle_id`·`terminal_emulator`, 서버가 주입하는 `coucou_host_bundle_ids`, DEBUG 전용 `coucou_host_override`(§12) |
+| Hook 프로토콜 | 이벤트 이름, `coucou_agent`·`coucou_kind` 필드, `permissionDecision` 응답 형식, 타임아웃 사다리, 릴레이가 붙이는 `term_program`·`bundle_id`·`terminal_emulator`, 서버가 주입하는 `coucou_host_bundle_ids`, DEBUG 전용 `coucou_host_override`(빈 문자열 = "앱 없음")(§12) |
 | CloudKit | `CloudSchema`의 컨테이너·존 `Coucou`·레코드 타입 12개, 레코드 이름 접두사, 필드 이름과 평문/암호화 구분, 구독 ID(`coucou-zone-mac`, `coucou-zone-phone-silent`, `coucou-approvals`, `coucou-approvals-mochi`), 지문 알고리즘, `BotState` raw 값 |
 | Live Activity / relay | Swift 타입 이름 `MochiActivityAttributes`(relay가 하드코딩), `MochiActivityState` 필드(문자열 ≤60자, 정수 0–999; relay에 추가하지 않은 새 필드는 조용히 버려진다), APNs topic `fr.louisraille.Coucou.push-type.liveactivity` |
 | iOS 식별자 | 앱 그룹과 `sessions.json`, URL `coucou://mochi/<id>`, 위젯·컨트롤 kind, 알림 카테고리·액션 ID(`COUCOU_APPROVAL` 등), 인텐트 타입 이름, Spotlight `domainIdentifier` `turns`, 사운드 파일 이름 |
@@ -275,7 +281,7 @@ CLI가 아니라 HTTP API 직접 호출. `ClaudeService.chat`→`api.anthropic.c
 | test-chat-history | `App/ClaudeResponseText` (`-warnings-as-errors`, 기록 변환) |
 | test-chat-parsing | `App/LocalChat` + `App/ChatMarkdown` (`tests/fake_local_llm.py` 서버 사용) |
 | test-claude-hooks | `App/ClaudeHookDetection` |
-| test-claude-host | `App/ClaudeHost` (예외적으로 AppKit import) |
+| test-claude-host | `App/ClaudeHost` + `App/HostResolver` + `App/HostAppInfo` (예외적으로 AppKit import) |
 | test-claude-response | `App/ClaudeResponseText` (`-warnings-as-errors`) |
 | test-claude-settings | `App/ClaudeSettingsFile` |
 | test-desktop-mochi | `App/DesktopMochiLogic` |
@@ -284,6 +290,7 @@ CLI가 아니라 HTTP API 직접 호출. `ClaudeService.chat`→`api.anthropic.c
 | test-github-activity / -pulse | `App/GitHubActivity` / `App/GitHubPulse` |
 | test-hermes-config | `App/HermesConfigMerger` + `App/ClaudeHookDetection` (실제 소스를 테스트) |
 | test-hook-relay | `App/HookRelayScripts` → 생성된 Python을 `tests/hook_relay_check.py`로 가짜 소켓에 실행 (python3 없으면 Python 부분 건너뜀) |
+| test-hook-routing | `App/HookRouting` (+ 스크립트에 적힌 의존 파일. 이벤트 → 호스트 → pill) |
 | test-host-resolver | `App/HostResolver` (`-strict-concurrency=complete`) |
 | test-island-types | `CoucouKit/IslandTypes` + `CoucouKit/IslandScreenGeometry` (프로젝트 색, 채팅 높이) |
 | test-pending-requests | `App/PendingRequestQueue` (`-strict-concurrency=complete`) |
@@ -293,12 +300,13 @@ CLI가 아니라 HTTP API 직접 호출. `ClaudeService.chat`→`api.anthropic.c
 | test-safe-links | `App/SafeWebURL` |
 | test-screen-geometry | `CoucouKit/IslandScreenGeometry` |
 | test-session-book | `App/SessionBook` (`-strict-concurrency=complete`) |
+| test-session-card-text | `App/SessionCardText` (카드의 세션 목록 문구) |
 | test-shortcuts | `App/ShortcutLogic` |
 | test-terminal-target | `App/TerminalTarget` |
 | test-wardrobe | `CoucouKit/MochiWardrobe` |
 
 - 리팩터링의 기본 전략: **로직을 이런 순수 파일로 빼내고, 같은 방식의 테스트 스크립트를 추가**한 뒤 UI를 바꾼다. 새 스크립트는 `scripts/test-*.sh` 이름이면 `test-all.sh`와 CI가 자동으로 집어 간다. 빠르게(수 초) 유지한다.
-- 테스트 없는 영역: AppState, IslandWindowController, HookServer 라우팅(이벤트 → pill/상태)·소켓 루프, 폴러·ServicePollGate, BotEngine, PhoneLink, iPhone 앱 전부. 라우팅은 `coucou-replay.py`로 실행 중인 앱에 대고 손으로 확인한다(§12).
+- 테스트 없는 영역: AppState, IslandWindowController, HookServer 소켓 루프와 AppState 반영(라우팅 결정 자체는 `test-hook-routing`), MacNotifier·StallMonitor 타이머, 폴러·ServicePollGate, BotEngine, PhoneLink, iPhone 앱 전부. 라우팅은 `coucou-replay.py`로 실행 중인 앱에 대고 손으로 확인한다(§12).
 - 손으로 동기화해야 하는 복사본(드리프트 위험): `scripts/test-weekly-recap.swift`(→`RecapStore` 모델), `scripts/RenderOutfits.swift`(스텁), `coucou-replay.py`의 `relay_output`(→ `HookRelayScripts`의 응답 변환, 표시용).
 - 자동 닫힘 테스트는 타이밍 여유에 의존한다(느린 CI에서 flaky했던 이력, #376).
 
@@ -309,7 +317,7 @@ CLI가 아니라 HTTP API 직접 호출. `ClaudeService.chat`→`api.anthropic.c
 ### 핫스팟 (큰 순서)
 1. `App/IslandViewContent.swift` ~4,900줄 — 뷰 ~70개. 뷰별 파일로 분리(§3의 "동시 마운트" 동작 주의).
 2. `App/SettingsView.swift` ~2,060줄 — `@State` ~50개(에이전트마다 installed/showDiff/pendingJSON/pendingInstall), 문자열 switch로 섹션 선택.
-3. `App/HookServer.swift` ~2,040줄 — approval/question 큐(93–360), 소켓 서버(362–590), 이벤트 라우팅(590–860), 헬퍼·권한·질문(860–1310), 설치기(1314–2030). 릴레이 스크립트는 `HookRelayScripts.swift`, 병합 로직은 `AgentHookConfig`/`HermesConfigMerger`로 이미 빠졌다. 남은 분리: `HookSocketServer` / `HookEventRouter`(§12의 HostResolver·SessionBook 위에서) / `PendingDecisionBroker` / `StepFormatter` / 에이전트별 `AgentInstaller`.
+3. `App/HookServer.swift` ~2,040줄 — approval/question 큐(93–360), 소켓 서버(362–590), 이벤트 라우팅(590–860), 헬퍼·권한·질문(860–1310), 설치기(1314–2030). 릴레이 스크립트는 `HookRelayScripts.swift`, 병합 로직은 `AgentHookConfig`/`HermesConfigMerger`로 이미 빠졌다. 라우팅 결정은 `HookRouting`으로 빠졌다. 남은 분리: `HookSocketServer` / `PendingDecisionBroker` / `StepFormatter` / 에이전트별 `AgentInstaller`.
 4. `CoucouKit/BotEngine.swift` 1,659줄, `MochiOutfitDrawing.swift` 1,464줄.
 5. `App/IslandWindowController.swift` ~1,290줄 — 창, 폴링, FSM 접착, 단축키, 드래그, dizzy.
 6. `App/AppState.swift` ~850줄 — 설정 / UI 상태 / 세션 / 통합 데이터로 분리.
@@ -329,8 +337,8 @@ CLI가 아니라 HTTP API 직접 호출. `ClaudeService.chat`→`api.anthropic.c
 ### 권장 진행 순서
 1. **기준선 고정**: `xcodegen` → 빌드 → `bash scripts/test-all.sh`. 경고 수(0)를 기록.
 2. **계약 상수화**: CloudKit 이름은 `CloudSchema`로 끝났다. 남은 것: pill ID, Keychain 키, UserDefaults 키, NotificationCenter 이름을 각각 한 파일의 상수/enum으로. 동작 변화 0, 이후 모든 단계의 안전망.
-3. **순수 로직 추출 + 테스트 추가**: 큐·accept 정책·릴레이·설치기 병합·호스트 판별·세션 북은 끝났다. 남은 것: HookServer 라우팅(이벤트 → pill/상태)과 폴러 파서.
-4. **IDE별 pill·다중 세션·알림·정지 감지 통합 (§12)**, 그다음 AppState 분해.
+3. **순수 로직 추출 + 테스트 추가**: 큐·accept 정책·릴레이·설치기 병합·호스트 판별·세션 북은 끝났다. 라우팅 결정(`HookRouting`)도 끝났다. 남은 것: 폴러 파서.
+4. **IDE별 pill·다중 세션·알림·정지 감지(§12)를 `coucou-replay.py`로 확인**한 뒤 AppState 분해.
 5. **상태 원천 단일화**: FSM과 `AppState.mode/view`는 `displayed(_:pointerInside:)`로 동기화만 된 상태. 하나로 합친다.
 6. **HookServer·폴러 분해** (§4, §5의 권장 형태).
 7. **뷰 분리**: IslandViewContent, SettingsView를 파일 단위로.
@@ -368,45 +376,48 @@ CLI가 아니라 HTTP API 직접 호출. `ClaudeService.chat`→`api.anthropic.c
 
 ## 12. IDE별 pill · pill당 여러 세션 · macOS 알림 · 정지 감지
 
-> **통합 중인 기능이다.** 순수 빌딩 블록(`HostResolver`, `SessionBook`, 테스트 포함)과 계약(`HostAppInfo`, `AppState.sessionBooks`, `PillBadge.stalled`, `SessionAlert`/`SessionAlertCenter` 스텁)은 289ae73에 있고, HookServer 연결·알림·StallMonitor·`coucou_host_bundle_ids` 주입·`coucou_host_override`·릴레이의 `terminal_emulator`는 병렬로 들어오는 중이다. 아래는 목표 설계이며, 코드와 다르면 코드를 확인하고 이 절을 고친다.
+> **통합 중인 기능이다(병렬 작업으로 들어왔다).** 순수 빌딩 블록(`HostResolver`, `SessionBook`)과 계약(`HostAppInfo`, `AppState.sessionBooks`, `PillBadge.stalled`, `SessionAlert`)은 289ae73에, 라우팅(`HookRouting`, `ProcessAncestry`), 알림(`NotificationPolicy`, `MacNotifier`), `StallMonitor`, 설정 화면, 카드의 세션 목록(`SessionCardText`)과 릴레이의 `terminal_emulator`는 그 뒤 병합으로 들어왔다. 코드와 다르면 코드를 확인하고 이 절을 고친다.
 
 ### 호스트 판별 (`HostResolver.resolve`)
 세션이 어느 앱에서 도는지, 강한 신호부터:
-0. **`coucou_host_override`** (DEBUG 빌드만): 페이로드의 번들 ID를 그대로 호스트로 쓴다. 릴레이 대신 터미널에서 이벤트를 보낼 때(`coucou-replay.py`) 프로세스 트리가 그 터미널을 가리키므로 필요하다. Release 빌드는 이 키를 무시한다(같은 UID 프로세스가 아무 앱을 사칭할 수 없도록).
-1. **프로세스 트리** → `coucou_host_bundle_ids`: 서버가 연결한 피어(릴레이)의 pid에서 부모를 따라 올라가며(`ProcessTree.ancestors`, sysctl `KERN_PROC_PID`, 최대 32단계, launchd에서 멈춤) 일반 앱의 번들 ID를 가까운 것부터 모아 **서버가 페이로드에 주입**한다(클라이언트가 보낸 값은 신뢰하지 않는다). Coucou 자신, Finder, Dock, loginwindow는 건너뛴다. 처음 보는 IDE도 여기서 잡힌다.
+1. **프로세스 트리** → `coucou_host_bundle_ids`: `ProcessAncestry`가 **`accept()` 직후** 피어(릴레이)의 pid와 부모 사슬을 잡는다(`ProcessTree.ancestors`, sysctl `KERN_PROC_PID`, 최대 32단계, launchd에서 멈춤. 릴레이가 끝나면 사슬이 사라지므로 바로 잡는다). 일반 앱의 번들 ID를 가까운 것부터 모아 **앱이 항상 페이로드에 넣고, 클라이언트가 보낸 값은 덮어쓴다.** Coucou 자신, Finder, Dock, loginwindow는 건너뛴다. 처음 보는 IDE도 여기서 잡힌다.
+   - **`coucou_host_override`** (DEBUG 빌드만)는 이 프로세스 트리 결과를 **대체**한다: 번들 ID면 그 앱이 호스트, **빈 문자열이면 "앱 없음"**이라 2·3번(`bundle_id`/`term_program`)으로 넘어간다. 릴레이 대신 터미널에서 이벤트를 보낼 때(`coucou-replay.py`) 트리가 그 터미널을 가리키므로 필요하다. Release 빌드는 이 키를 무시한다(같은 UID 프로세스가 아무 앱을 사칭할 수 없도록).
 2. **`bundle_id`**: 릴레이가 붙이는 `__CFBundleIdentifier`(에이전트 셸이 상속).
-3. **환경 힌트**: `term_program`(`TERM_PROGRAM`; vscode, WarpTerminal, Apple_Terminal, iTerm.app, ghostty, kitty, alacritty, wezterm, hyper, zed), 그다음 `terminal_emulator`(`TERMINAL_EMULATOR`, 릴레이가 새로 붙임. `JetBrains-JediTerm`이면 `com.jetbrains.ide` 폴백).
+3. **환경 힌트**: `term_program`(`TERM_PROGRAM`; vscode, WarpTerminal, Apple_Terminal, iTerm.app, ghostty, kitty, alacritty, wezterm, hyper, zed), 그다음 `terminal_emulator`(`TERMINAL_EMULATOR`, 릴레이가 붙임. `JetBrains-JediTerm`이면 `com.jetbrains.ide` 폴백).
 
-번들 ID 분류(`HostResolver.kind`): Cursor(`com.todesktop.230313mzl4w4u92`) → cursor, VS Code·Insiders·VSCodium → vscode, 알려진 터미널(Warp, Terminal, iTerm, Ghostty, kitty, Alacritty, WezTerm, Hyper, cmux, Orca) → terminal, **나머지 전부 → ide**. IDE 목록이 없다는 것이 새 편집기가 그냥 동작하는 이유다.
+번들 ID 분류(`HostResolver.kind`): Cursor(`com.todesktop.230313mzl4w4u92`) → cursor, VS Code·Insiders·VSCodium → vscode, 알려진 터미널(Warp, Terminal, iTerm, Ghostty, kitty, Alacritty, WezTerm, Hyper, cmux, Orca) → terminal, **나머지 전부 → ide**. 목록에 없는 터미널(Tabby, Rio…)도 IDE로 취급되어 자기 `ide_<slug>` pill을 받는다. IDE 목록이 없다는 것이 새 편집기가 그냥 동작하는 이유다.
 
-### pill 매핑 (`HostResolver.pillId`)
+### pill 매핑 (`HookRouting` + `HostResolver.pillId`)
 | 호스트 | Claude Code | Codex |
 |---|---|---|
-| VS Code(및 포크 목록) | `integration_claude` | `integration_claude` |
+| VS Code·Insiders·VSCodium | `integration_claude` | `integration_claude` |
 | Cursor | `agent_cursor` | `agent_cursor` |
-| 그 외 IDE (JetBrains, Zed, Xcode, Windsurf…) | `ide_<slug>` | `ide_<slug>` |
-| 터미널 | `integration_claude` | `agent_codex` |
-| 판별 불가 | 무시(지금과 같음) | `agent_codex` |
+| 그 외 IDE (JetBrains, Zed, Xcode, Windsurf… 모르는 터미널 포함) | `ide_<slug>` | `ide_<slug>` |
+| 알려진 터미널 | `integration_claude` | `agent_codex` |
+| Codex 데스크톱 앱 | | `agent_codex` |
+| Claude 데스크톱 앱 | `agent_claude-desktop` | |
+| 판별 불가 | 무시 | `agent_codex` |
 
 - `coucou_agent`가 붙은 다른 서드파티 에이전트는 계속 `agent_<name>`.
-- `ide_<slug>` pill의 이름·아이콘은 `HostAppInfo`(설치된 앱에서, 없으면 `HostResolver.fallbackName`: 번들 ID 마지막 성분, 예: "Gram"). ↗ 버튼은 `HostAppInfo.activate`.
-- IDE pill이 approval/question 카드를 받는지는 통합 코드에서 확인한다. **289ae73의 HookServer는 VS Code·Cursor·터미널(설정 시)·Codex 외 호스트의 PermissionRequest/질문에 즉시 `ask`로 답한다.**
+- `ide_<slug>` pill의 이름·아이콘은 `HostAppInfo`(설치된 앱에서, 없으면 `HostResolver.fallbackName`: 번들 ID 마지막 성분, 예: "Gram"). 카드의 "Open <IDE>" 버튼은 `HostAppInfo.activate`.
+- 어느 pill이 approval/question 카드를 받는지는 `HookRouting`이 정한다(289ae73까지는 VS Code·Cursor·터미널(설정 시)·Codex 외 호스트에 즉시 `ask`였다).
 
 ### 다중 세션 (`SessionBook`, `AppState.sessionBooks`)
 - pill마다 `SessionBook` 하나: 세션 ID(`session_id`, 없으면 `<pillId>+<cwd>`)별 `AgentSession`(agent, 프로젝트, cwd, phase, 최근 단계 20개, finalLine, 시작/마지막 이벤트 시각), 최근 활동 순.
 - **lead = 가장 긴급한 세션**, 같으면 가장 최근. 긴급도: waitingApproval 6 > waitingAnswer 5 > error 4 > working 3 > finished 2 > idle 1. pill의 phase는 lead의 phase.
-- **AgentTask로 미러링**: pill의 이름·상태·단계는 book의 lead 세션을 비춘다. 그래서 book 이전에 만든 뷰(pill, ticker, iPhone `Session` 레코드)가 그대로 동작한다. 세션 목록 UI는 book을 직접 읽는다(`bringToFront`로 선택).
+- **AgentTask로 미러링**: pill의 이름·상태·단계는 book의 lead 세션을 비춘다. 그래서 book 이전에 만든 뷰(pill, ticker, iPhone `Session` 레코드)가 그대로 동작한다. 카드 안의 세션 목록은 book을 직접 읽고(문구는 `SessionCardText`), 고르면 `bringToFront`.
 - 보관: 끝난 세션(finished/error/idle)은 마지막 이벤트 **10분 뒤** 제거, pill당 **최대 8개**. 사용자를 기다리는 세션은 절대 버리지 않는다. `SessionEnd`는 즉시 제거.
 - approval/question 큐(§4)는 그대로 전역 FIFO이고, 대기 중인 세션은 waitingApproval/waitingAnswer phase가 된다.
 
-### 알림 (`SessionAlert`, `SessionAlertCenter`)
+### 알림 (`SessionAlert`, `SessionAlertCenter`, `NotificationPolicy`, `MacNotifier`)
 - HookServer와 StallMonitor가 메인 액터에서 `SessionAlertCenter.shared.post(SessionAlert)`를 부른다. 종류: `finished, error, waitingApproval, waitingAnswer, stalled`. 내용: pillId, sessionId, 에이전트 이름, 프로젝트, 호스트 번들 ID, 한 줄 detail(최종 답, 오류, 대기 중인 명령, 질문).
+- `NotificationPolicy`가 띄울지 정하고 `MacNotifier`가 macOS 배너를 띄운다. **배너는 무음**이다(소리는 Mochi의 `SoundEngine`이 이미 낸다). 설정은 `NotificationsSettingsView`.
 - 표시 조건: `macNotificationsEnabled`가 켜져 있고 종류별 토글(`notifyFinished` → finished, `notifyErrors` → error, `notifyWaiting` → waitingApproval/waitingAnswer, `notifyStalled` → stalled)이 켜져 있을 때.
 - **억제**: 세션의 호스트 앱이 frontmost일 때(`HostAppInfo.isFrontmost`), 또는 섬이 지금 그 pill을 보여 주고 있을 때(펼쳐져 있고 focus가 그 pill). 사용자가 이미 보고 있는 것은 알리지 않는다.
 - 알림은 알리기만 한다. 알림에서 승인·답변하지 않는다(§10).
 
 ### 정지 감지 (StallMonitor)
-- `stalled` = phase가 **working**인데 `stallThresholdMinutes`(기본 3분, 0이면 끔) 동안 이벤트가 없는 세션. 사용자를 기다리는 세션은 정지가 아니다.
+- `stalled` = phase가 **working**인데 `stallThresholdMinutes`(Int, 기본 3분, 0이면 끔) 동안 이벤트가 없는 세션. 사용자를 기다리는 세션은 정지가 아니다.
 - 타이머 하나만 예약한다: 모든 book의 `nextStallCheck(threshold:)` 중 가장 이른 시각에 한 번 깨어나 `stalled(now:threshold:)`를 보고 다음 시각을 다시 잡는다. 이벤트가 오면 다시 계산한다. **일하는 세션이 없으면 타이머가 없다**(CPU 0%).
 - 정지되면 pill에 `PillBadge.stalled`(보라 `#A78BFA`) + `SessionAlert(.stalled)`. 이벤트가 다시 오면 배지가 풀린다.
 
@@ -424,7 +435,8 @@ python3 scripts/coucou-replay.py webstorm-claude --host dev.zed.Zed --dry-run   
 ```
 - 소켓 기본값 `~/Library/Application Support/NotchBuddy/nb.sock`, `--socket`으로 변경. 소켓이 없으면 오류로 끝나고 소켓을 만들거나 지우지 않는다.
 - 릴레이와 같은 프로토콜: 이벤트당 연결 하나, JSON 한 줄. 일반 이벤트는 0.3초 타임아웃으로 보내고 닫는다. `PermissionRequest`와 `coucou_kind: "ask_user_question"`은 연결을 열어 두고 응답 줄을 기다려(118초/125초) 결정·답과 릴레이가 에이전트에게 출력했을 JSON을 보여 준다. 노치에서 직접 Allow/Deny를 누르며 확인한다.
-- `--host <bundle id>`(또는 시나리오의 `_meta.host`)가 `coucou_host_override`를, `--agent codex`가 `coucou_agent`를 붙인다. override는 **DEBUG 빌드만** 따른다. Release 빌드에서는 프로세스 트리(=실행한 터미널)로 판별된다.
+- `--host <bundle id>`(또는 시나리오의 `_meta.host`)가 `coucou_host_override`를, `--agent codex`가 `coucou_agent`를 붙인다. override는 **DEBUG 빌드만** 따른다. Release 빌드에서는 프로세스 트리(=실행한 터미널)로 판별된다. `--host ""`는 빈 override("앱 없음")를 보내 시나리오의 `bundle_id`/`term_program` 폴백 경로를 시험하고, `--host none`은 override를 아예 보내지 않는다.
 - 시나리오는 `tests/replay/*.jsonl`: 한 줄 = hook 페이로드 + 제어 키(`_delay`, `_delay_fixed`, `_repeat`, `_cycle`, `_async`, `_if_allowed`, `_comment`, 보내기 전에 제거) + 변수(`${ROOT}`, `${RUN}`, `${WORKER}`, `${I}`, `${C}`, `${HOST}`, `${HOME}`). 첫 줄 `{"_meta": {...}}`에 설명·기본 호스트·에이전트·릴레이가 붙일 필드(`bundle_id`, `term_program`, `terminal_emulator`)·`parallel`. 형식 전체는 스크립트 머리 주석.
 - `--speed`, `--loop`, `--parallel N`, `-q`. 스케줄은 절대 시각 기준이라 전송 비용이 rate를 늦추지 않는다(`burst`로 최적화 전후 CPU·메인 스레드를 잴 때 같은 부하).
 - 테스트: `scripts/test-replay.sh`(§8).
+- 289ae73의 HookServer는 IDE 호스트를 무시했으므로, IDE 시나리오는 라우팅 통합(`HookRouting`) 이후의 DEBUG 빌드에서 확인한다.

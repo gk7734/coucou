@@ -40,8 +40,10 @@ ${WORKER} (worker index, from 0), ${I} (repetition index, from 0), ${C} (pass th
 _cycle: I // len(_cycle), so a Pre/Post pair shares it), ${HOST} (the host override in
 effect, "" if none), ${HOME}.
 
-coucou_host_override is honoured by DEBUG builds of Coucou only: it attributes the session
-to that app instead of the one found in this script's process tree (your terminal).
+coucou_host_override is honoured by DEBUG builds of Coucou only: it replaces the app found in
+this script's process tree (your terminal), so the session goes to that app. An EMPTY override
+means "no app": the app then falls back to bundle_id / term_program / terminal_emulator, which
+is how to test that path (--host ""). --host none sends no override at all (Release behaviour).
 """
 
 import argparse
@@ -192,7 +194,7 @@ def expand(scenario, opts, worker, run_id):
             for key, value in relay.items():
                 payload.setdefault(key, substitute(value, variables, where))
             payload.setdefault("cwd", opts.root)
-            if host and "coucou_host_override" not in payload:
+            if host is not None and "coucou_host_override" not in payload:
                 payload["coucou_host_override"] = host
             yield Step(delay=float(line.get("_delay", 0)),
                        fixed_delay=float(line.get("_delay_fixed", 0)),
@@ -203,7 +205,8 @@ def expand(scenario, opts, worker, run_id):
 
 
 def worker_host(scenario, opts, worker):
-    """--host beats the scenario; "none" sends no override at all."""
+    """--host beats the scenario. None: send no override ("none"); "": the empty override,
+    "no app in the process tree", so the app falls back to bundle_id / term_program."""
     if opts.host is not None:
         return None if opts.host.lower() == "none" else opts.host
     hosts = scenario.meta.get("parallel_hosts")
@@ -326,13 +329,15 @@ def describe(payload):
     if len(extra) > 48:
         extra = extra[:47] + "…"
     sid = str(payload.get("session_id", ""))
-    host = payload.get("coucou_host_override", "")
+    host = payload.get("coucou_host_override")
     parts = ["%-17s" % event]
     if detail and event != "AskUserQuestion":
         parts.append(detail)
     if extra:
         parts.append('"%s"' % extra)
-    parts.append("[%s%s]" % (sid, (" @ " + host) if host else ""))
+    if "coucou_host_override" in payload:
+        sid += " @ " + (host or "(no app)")
+    parts.append("[%s]" % sid)
     return " ".join(parts)
 
 
@@ -476,7 +481,8 @@ def parse_args(argv):
     p.add_argument("scenario", nargs="?", help="scenario name in tests/replay (without .jsonl) or a path")
     p.add_argument("--socket", default=None, help="Coucou's socket (default: %s)" % DEFAULT_SOCKET)
     p.add_argument("--host", default=None,
-                   help="bundle id sent as coucou_host_override (DEBUG builds), 'none' for no override")
+                   help="bundle id sent as coucou_host_override (DEBUG builds); '' = empty override (fall back "
+                        "to bundle_id/term_program); 'none' = no override at all")
     p.add_argument("--agent", default=None, help="agent tag, e.g. 'codex' adds coucou_agent like nb-hook --agent")
     p.add_argument("--root", default=DEFAULT_ROOT, help="${ROOT}, the fake projects folder (default %(default)s)")
     p.add_argument("--speed", type=float, default=1.0, help="delay divisor: 2 = twice as fast (not _delay_fixed)")
