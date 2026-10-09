@@ -159,40 +159,32 @@ struct BotCanvasView: View {
         if let origin = lookOriginOverride {
             return tanh((state.mousePosition.x - origin.x) / 260)
         }
-        let (islandW, islandH) = islandSize(mode: state.mode, view: state.view,
-                                             progress: state.uploadProgress,
-                                             nw: state.notchWidth, nh: state.notchHeight)
-        let (botCx, botCy, _, _) = botPosition(mode: state.mode, view: state.view,
-                                                islandW: islandW, islandH: islandH,
-                                                uploadProgress: state.uploadProgress)
-        let bot = islandBotPoint(islandW: islandW, botCx: botCx, botCy: botCy)
-        return tanh((state.mousePosition.x - bot.x) / 260)
-    }
-
-    /// Bot centre in DesktopSpace, like state.mousePosition. The island is centred at the
-    /// top of its screen, which can be any display, anywhere in the arrangement.
-    private func islandBotPoint(islandW: CGFloat, botCx: CGFloat, botCy: CGFloat) -> CGPoint {
-        let screen = IslandWindowController.islandScreen().frame
-        return DesktopSpace.topDown(CGPoint(x: screen.midX - islandW / 2 + botCx,
-                                            y: screen.maxY - botCy),
-                                    desktopTop: IslandWindowController.desktopTop)
+        return tanh((state.mousePosition.x - islandBotPoint(state: state).x) / 260)
     }
 
     private func lookY(state: AppState, size: CGSize) -> CGFloat {
         if let origin = lookOriginOverride {
             return -tanh((state.mousePosition.y - origin.y) / 200)
         }
+        return -tanh((state.mousePosition.y - islandBotPoint(state: state).y) / 200)
+    }
+
+    /// Bot centre in DesktopSpace, like state.mousePosition. The island is centred at the
+    /// top of its screen, which can be any display, anywhere in the arrangement.
+    /// Same size and position as BotPlacement draws, notchless screens included.
+    private func islandBotPoint(state: AppState) -> CGPoint {
         let (islandW, islandH) = islandSize(mode: state.mode, view: state.view,
                                              progress: state.uploadProgress,
-                                             nw: state.notchWidth, nh: state.notchHeight)
-        let actualH: CGFloat = (state.mode == .expanded && state.view == .prompt)
-            ? min(300, 240 + CGFloat(state.chatHistory.count) * 40)
-            : islandH
+                                             nw: state.notchWidth, nh: state.notchHeight,
+                                             chatCount: state.chatHistory.count)
         let (botCx, botCy, _, _) = botPosition(mode: state.mode, view: state.view,
-                                                islandW: islandW, islandH: actualH,
-                                                uploadProgress: state.uploadProgress)
-        let bot = islandBotPoint(islandW: islandW, botCx: botCx, botCy: botCy)
-        return -tanh((state.mousePosition.y - bot.y) / 200)
+                                                islandW: islandW, islandH: islandH,
+                                                uploadProgress: state.uploadProgress,
+                                                hasNotch: state.hasNotch)
+        let screen = IslandWindowController.islandScreen().frame
+        return DesktopSpace.topDown(CGPoint(x: screen.midX - islandW / 2 + botCx,
+                                            y: screen.maxY - botCy),
+                                    desktopTop: IslandWindowController.desktopTop)
     }
 }
 
@@ -201,6 +193,8 @@ struct MiniBotCanvasView: View {
     let task: AgentTask
     var isDancing: Bool = false
     @StateObject private var engine: BotEngine
+    /// False in an island view that is mounted but not showing: no frames drawn for nobody.
+    @Environment(\.islandViewActive) private var isActive
 
     init(task: AgentTask, isDancing: Bool = false) {
         self.task = task
@@ -214,7 +208,7 @@ struct MiniBotCanvasView: View {
     }
 
     var body: some View {
-        TimelineView(.animation) { timeline in
+        TimelineView(.animation(paused: !isActive)) { timeline in
             Canvas { context, size in
                 let now = timeline.date.timeIntervalSinceReferenceDate
                 let dt = min(0.05, now - engine.lastTime)

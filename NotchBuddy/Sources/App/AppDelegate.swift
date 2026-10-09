@@ -111,12 +111,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         NSApp.activate(ignoringOtherApps: true)
     }
 
-    /// Centres the window horizontally and keeps its title bar clear of the island panel
-    /// (320 pt tall at the top of the island screen), shrinking it to fit if needed.
+    /// Centres the window horizontally and keeps its title bar clear of the island when it
+    /// opens over it (up to ~300 pt for the chat), shrinking it to fit if needed. Not the whole
+    /// 560 pt panel: it is transparent and click-through, and clearing it would squeeze
+    /// Settings to its minimum size on a laptop; only a very tall question card can overlap.
     private func placeBelowIsland(_ win: NSWindow) {
         let screen = IslandWindowController.islandScreen()
         let visible = screen.visibleFrame
-        let islandBottom = screen.frame.maxY - 320 - 12   // island panel height + margin
+        let islandBottom = screen.frame.maxY - 320 - 12   // tallest usual island + margin
         let top = min(visible.maxY, islandBottom)
         var frame = win.frame
         frame.size.height = min(frame.height, max(top - visible.minY - 12, win.minSize.height))
@@ -199,17 +201,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         NotificationCenter.default.addObserver(self, selector: #selector(openSettingsFromNotification(_:)),
                                                name: .openFullSettings, object: nil)
         // After the greeting ends, fly Mochi back to the desktop if it was there at last quit
+        // Main-queue observers run on the main thread: assumeIsolated says so without a hop.
         NotificationCenter.default.addObserver(forName: .greetComplete, object: nil, queue: .main) { [weak self] _ in
-            DesktopMochiController.shared.launchFlyIfNeeded()
-            self?.checkMondayRecap()
+            MainActor.assumeIsolated {
+                DesktopMochiController.shared.launchFlyIfNeeded()
+                self?.checkMondayRecap()
+            }
         }
         // Check for Monday recap on wake and when a new session/prompt arrives
         NSWorkspace.shared.notificationCenter.addObserver(forName: NSWorkspace.didWakeNotification,
                                                           object: nil, queue: .main) { [weak self] _ in
-            self?.checkMondayRecap()
+            MainActor.assumeIsolated { self?.checkMondayRecap() }
         }
         NotificationCenter.default.addObserver(forName: .checkMondayRecap, object: nil, queue: .main) { [weak self] _ in
-            self?.checkMondayRecap()
+            MainActor.assumeIsolated { self?.checkMondayRecap() }
         }
         #if !APPSTORE
         _ = MusicController.shared

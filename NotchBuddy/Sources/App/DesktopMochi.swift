@@ -226,8 +226,8 @@ final class DesktopMochiController {
                 if DesktopMochiLogic.shouldRetractOnLanding(alertActive: alertNow) {
                     self.engine?.triggerEmote(.surprised)
                     self.phase = .retracting
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.45) { [weak self] in
-                        guard let self else { return }
+                    // Strong, like the enclosing closure: the controller is a long-lived singleton.
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.45) { [self] in
                         switch self.phase {
                         case .retracting:              self.retractForAlert()
                         case .alertResolvedDuringRetract: self.phase = .home; self.launchFlyIfNeeded()
@@ -302,8 +302,8 @@ final class DesktopMochiController {
                 if DesktopMochiLogic.shouldRetractOnLanding(alertActive: alertNow) {
                     self.engine?.triggerEmote(.surprised)
                     self.phase = .retracting
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.45) { [weak self] in
-                        guard let self else { return }
+                    // Strong, like the enclosing closure: the controller is a long-lived singleton.
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.45) { [self] in
                         switch self.phase {
                         case .retracting:              self.retractForAlert()
                         case .alertResolvedDuringRetract: self.phase = .home; self.launchFlyIfNeeded()

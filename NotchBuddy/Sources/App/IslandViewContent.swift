@@ -191,7 +191,7 @@ struct OverviewView: View {
             if ClaudeHost.activate(task.hostApp) { return }
             let vscodeBundleId = "com.microsoft.VSCode"
             if let app = NSWorkspace.shared.runningApplications.first(where: { $0.bundleIdentifier == vscodeBundleId }) {
-                app.activate(options: .activateIgnoringOtherApps)
+                app.activate()
             } else {
                 NSWorkspace.shared.open(URL(fileURLWithPath: "/Applications/Visual Studio Code.app"))
             }
@@ -856,8 +856,11 @@ struct UploadView: View {
         guard animTimer == nil else { return }
         // 20 fps — smooth enough for slow dash, 3× lighter than 60fps
         animTimer = Timer.scheduledTimer(withTimeInterval: 1.0/20.0, repeats: true) { _ in
-            dashPhase  += 1.0          // 20 pt/s march
-            breathAngle += 0.9 / 20.0  // advance sin phase at 0.9 rad/s
+            // Scheduled on the main run loop: already on the main actor.
+            MainActor.assumeIsolated {
+                dashPhase  += 1.0          // 20 pt/s march
+                breathAngle += 0.9 / 20.0  // advance sin phase at 0.9 rad/s
+            }
         }
     }
 
@@ -871,6 +874,7 @@ struct UploadView: View {
 
 struct UploadingView: View {
     @ObservedObject var state: AppState
+    @Environment(\.islandViewActive) private var isActive
 
     // Bar geometry in content coords (content has 10pt H padding each side).
     // Island bar: left=36, right=562 (640-78), width=526.
@@ -883,7 +887,8 @@ struct UploadingView: View {
     var body: some View {
         // TimelineView fires at display refresh rate — progress derived from elapsed wall time,
         // not from @Published uploadProgress (which only flips to 1.0 at completion).
-        TimelineView(.animation) { tl in
+        // Paused while another view shows: this one stays mounted at opacity 0.
+        TimelineView(.animation(paused: !isActive)) { tl in
             let elapsed: Double = {
                 guard let start = state.uploadStartTime else { return 0 }
                 return tl.date.timeIntervalSince(start)
@@ -1699,6 +1704,49 @@ struct NoteView: View {
 
 // MARK: - Integration card (overview left card when an integration pill is focused)
 
+/// Whether an agent's hooks or plugin are installed, read from disk once and kept until the
+/// island opens again or a window (Settings) closes: the card's body is evaluated on every
+/// AppState change, and these checks read and parse the agents' settings files.
+@MainActor
+enum IntegrationSetupCache {
+    private static var installed: [String: Bool] = [:]
+
+    static func invalidate() { installed.removeAll() }
+
+    /// nil for pills that are not set up by installing hooks or a plugin.
+    static func hooksInstalled(for pillId: String) -> Bool? {
+        if let cached = installed[pillId] { return cached }
+        guard let value = readFromDisk(pillId) else { return nil }
+        installed[pillId] = value
+        return value
+    }
+
+    private static func readFromDisk(_ pillId: String) -> Bool? {
+        switch pillId {
+        // Cursor sessions are Claude Code running in Cursor's integrated terminal,
+        // so the Cursor pill is set up exactly when the Claude Code hooks are.
+        case "integration_claude", "agent_cursor":
+            return HookServer.claudeHooksInstalled()
+        #if !APPSTORE
+        case "agent_codex":       return HookServer.codexHooksInstalled()
+        case "agent_gemini":      return HookServer.geminiHooksInstalled()
+        case "agent_antigravity": return HookServer.agyHooksInstalled()
+        case "agent_copilot":     return HookServer.copilotHooksInstalled()
+        case "agent_muse":        return HookServer.museHooksInstalled()
+        case "agent_opencode":    return HookServer.openCodePluginInstalled()
+        case "agent_amp":         return HookServer.ampPluginInstalled()
+        case "agent_hermes":      return HookServer.hermesPluginInstalled()
+        #else
+        case "agent_codex", "agent_gemini", "agent_antigravity", "agent_copilot",
+             "agent_muse", "agent_opencode", "agent_amp", "agent_hermes":
+            return false
+        #endif
+        default:
+            return nil
+        }
+    }
+}
+
 struct IntegrationCardView: View {
     let task: AgentTask
     @Binding var showingDetail: Bool
@@ -1707,59 +1755,8 @@ struct IntegrationCardView: View {
     @State private var githubDetailSection: GitHubDetailSection = .myPRs
 
     private var isConfigured: Bool {
+        if let installed = IntegrationSetupCache.hooksInstalled(for: task.id) { return installed }
         switch task.id {
-        // Cursor sessions are Claude Code running in Cursor's integrated terminal,
-        // so the Cursor pill is set up exactly when the Claude Code hooks are.
-        case "integration_claude", "agent_cursor":
-            return HookServer.claudeHooksInstalled()
-        case "agent_codex":
-            #if !APPSTORE
-            return HookServer.codexHooksInstalled()
-            #else
-            return false
-            #endif
-        case "agent_gemini":
-            #if !APPSTORE
-            return HookServer.geminiHooksInstalled()
-            #else
-            return false
-            #endif
-        case "agent_antigravity":
-            #if !APPSTORE
-            return HookServer.agyHooksInstalled()
-            #else
-            return false
-            #endif
-        case "agent_copilot":
-            #if !APPSTORE
-            return HookServer.copilotHooksInstalled()
-            #else
-            return false
-            #endif
-        case "agent_muse":
-            #if !APPSTORE
-            return HookServer.museHooksInstalled()
-            #else
-            return false
-            #endif
-        case "agent_opencode":
-            #if !APPSTORE
-            return HookServer.openCodePluginInstalled()
-            #else
-            return false
-            #endif
-        case "agent_amp":
-            #if !APPSTORE
-            return HookServer.ampPluginInstalled()
-            #else
-            return false
-            #endif
-        case "agent_hermes":
-            #if !APPSTORE
-            return HookServer.hermesPluginInstalled()
-            #else
-            return false
-            #endif
         case "agent_claude-desktop":
             return true  // nothing to install: the relay tags desktop sessions on its own
         case "integration_music":
@@ -2210,7 +2207,7 @@ struct IntegrationCardView: View {
         if let running = ids.compactMap({ id in
             NSWorkspace.shared.runningApplications.first { $0.bundleIdentifier == id }
         }).first {
-            running.activate(options: .activateIgnoringOtherApps)
+            running.activate()
             return
         }
         if let appURL = appURL {
@@ -3800,9 +3797,10 @@ struct TickerRowView: View {
 
 struct TickerShimmerText: View {
     let text: String
+    @Environment(\.islandViewActive) private var isActive
 
     var body: some View {
-        TimelineView(.animation) { tl in
+        TimelineView(.animation(paused: !isActive)) { tl in
             let t = tl.date.timeIntervalSinceReferenceDate
             let p = CGFloat(t.truncatingRemainder(dividingBy: 2.2) / 2.2)
             // phase sweeps -0.1 → 1.1 so white peak enters from left and exits right
@@ -4181,28 +4179,6 @@ struct PillBadgeView: View {
                 .foregroundColor(.black)
         }
         .shadow(color: badgeColor.opacity(0.6), radius: 4, x: 0, y: 0)
-    }
-}
-
-// MARK: - Column agents (right side of non-overview views)
-
-struct ColumnAgentsView: View {
-    @ObservedObject var state: AppState
-
-    var others: [AgentTask] {
-        state.tasks.filter { $0.id != state.focusId }
-    }
-
-    var body: some View {
-        VStack(spacing: 0) {
-            ForEach(Array(others.prefix(4).enumerated()), id: \.1.id) { idx, task in
-                MiniBotCanvasView(task: task)
-                    .frame(width: 16 / 0.6, height: 16 / 0.6)
-                    .frame(width: 16, height: 16)
-                    .position(x: 0, y: CGFloat(50 + idx * 24))
-                    .animation(.spring(response: 0.5, dampingFraction: 0.72).delay(Double(idx) * 0.035), value: idx)
-            }
-        }
     }
 }
 

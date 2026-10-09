@@ -18,6 +18,8 @@ final class IslandWindowController: NSWindowController {
     private var displaySubscription: AnyCancellable?
     private var autoCloseSubscription: AnyCancellable?
     private var openOnHoverSubscription: AnyCancellable?
+    private var absenceSubscription: AnyCancellable?
+    private var modeSubscription: AnyCancellable?
 
     // Confused recovery timer (set by handleDizzy)
     private var confusedRecoveryTimer: DispatchWorkItem?
@@ -25,11 +27,7 @@ final class IslandWindowController: NSWindowController {
     // Suppress peek sound on next reveal (e.g. musicReveal)
     var silentNextReveal = false
 
-    // Finished-pin timer
-    private var finishedPinTimer: DispatchWorkItem?
-
     // Bot-head hover (love emote — mirrors prototype botHover())
-    private var hoverTimer: DispatchWorkItem?
     private var botHoverTimer: DispatchWorkItem?
     private var botHovering: Bool = false
     private var lastLoveTime: Double = 0
@@ -60,8 +58,8 @@ final class IslandWindowController: NSWindowController {
         let nW = geometry.width
         let nH = geometry.height
 
-        let panelW: CGFloat = 720
-        let panelH: CGFloat = 560
+        let panelW = IslandConst.panelWidth
+        let panelH = IslandConst.panelHeight
         let sf = screen.frame
         let panel = IslandPanel(
             contentRect: NSRect(x: sf.midX - panelW/2, y: sf.maxY - panelH,
@@ -177,6 +175,13 @@ final class IslandWindowController: NSWindowController {
         ) { [weak self] _ in
             Task { @MainActor in self?.moveToTargetScreen(choice: AppState.shared.islandDisplay) }
         }
+
+        // Settings or an agent installer may have changed what is set up.
+        NotificationCenter.default.addObserver(
+            forName: NSWindow.willCloseNotification, object: nil, queue: .main
+        ) { _ in
+            MainActor.assumeIsolated { IntegrationSetupCache.invalidate() }
+        }
     }
 
     // MARK: - Screen choice
@@ -231,6 +236,32 @@ final class IslandWindowController: NSWindowController {
         openOnHoverSubscription = state.$openOnHover.sink { [weak self] on in
             self?.fsm.openOnHover = on
         }
+        absenceSubscription = state.$absenceInterval.sink { [weak self] interval in
+            self?.fsm.absenceInterval = interval
+        }
+        fsm.onPresenceChange = { present in
+            AppState.shared.isPresent = present
+        }
+        fsm.onCountdownChange = { [weak self] in
+            guard let self else { return }
+            IslandAutoCloseCountdown.shared.countdown = self.fsm.countdown
+        }
+
+        // Many paths change the mode without going through the FSM (AppState.syncMode, views
+        // opened from a hotkey, the menu or the desktop Mochi, the demo restoring its snapshot).
+        // Mirror every change so the FSM's hover, click and timers match what is on screen.
+        // The FSM's own transitions come back here too and are no-ops.
+        modeSubscription = state.$mode.sink { [weak self] mode in
+            guard let self else { return }
+            let shown: IslandStateMachine.Shown
+            switch mode {
+            case .hidden:   shown = .hidden
+            case .compact:  shown = .compact
+            case .expanded: shown = .expanded
+            }
+            if mode == .expanded { IntegrationSetupCache.invalidate() }
+            self.fsm.displayed(shown, pointerInside: self.wasInIsland)
+        }
 
         fsm.onTransition = { [weak self] from, to in
             guard let self else { return }
@@ -245,7 +276,7 @@ final class IslandWindowController: NSWindowController {
                 } else if from == .hidden {
                     if self.silentNextReveal {
                         self.silentNextReveal = false
-                    } else {
+                    } else if !self.fsm.isQuietTransition {   // back from an absence: no sound
                         SoundEngine.shared.play("peek")
                     }
                 }
@@ -257,14 +288,14 @@ final class IslandWindowController: NSWindowController {
                 if !self.wasInIsland { self.fsm.mouseLeft() }
 
             case .home:
-                self.expand(to: self.defaultView())
+                self.show(self.defaultView())
                 // Start collapse timer if mouse not currently hovering
                 if !self.wasInIsland {
                     self.fsm.mouseLeft()
                 }
 
             case .coucou:
-                self.expand(to: .greeting)
+                self.show(.greeting)
             }
         }
 
@@ -272,7 +303,7 @@ final class IslandWindowController: NSWindowController {
         NotificationCenter.default.addObserver(
             forName: .greetComplete, object: nil, queue: .main
         ) { [weak self] _ in
-            self?.fsm.greetComplete()
+            MainActor.assumeIsolated { self?.fsm.greetComplete() }
         }
 
         fsm.isHeldOpen = { AppState.shared.pendingApproval != nil }
@@ -282,6 +313,9 @@ final class IslandWindowController: NSWindowController {
     // 60 Hz while the island is on screen, Mochi is on the desktop, a drag is under way or the
     // pointer is near the island; 8 Hz (with timer tolerance) while it is hidden and the pointer
     // is elsewhere, so a hidden island costs next to nothing (CLAUDE.md: 0 % CPU when hidden).
+    // Not event-driven: a global mouse-moved monitor would wake the app on every pointer event
+    // (more often than 8 Hz whenever the user moves), and file drags from other apps send no
+    // mouse-moved events, yet must still reach the island.
 
     private static let fastPoll: TimeInterval = 1.0 / 60.0
     private static let idlePoll: TimeInterval = 1.0 / 8.0
@@ -300,8 +334,10 @@ final class IslandWindowController: NSWindowController {
     }
 
     /// Picks the polling rate for the next ticks (see startPolling).
-    private func adjustPollRate(mouse: NSPoint, panelFrame: NSRect) {
-        let nearIsland = panelFrame.insetBy(dx: -120, dy: -120).contains(mouse)
+    private func adjustPollRate(mouse: NSPoint, islandFrame: NSRect) {
+        // Near the island itself, not the 720×560 panel: that one is mostly transparent and
+        // a pointer resting anywhere in the top-centre of the screen kept a hidden island at 60 Hz.
+        let nearIsland = islandFrame.insetBy(dx: -120, dy: -120).contains(mouse)
         let busy = state.mode != .hidden || state.mochiOnDesktop || inAttachDrag || attachDragStart != nil
             || fsm.state != .hidden || nearIsland
         let wanted = busy ? Self.fastPoll : Self.idlePoll
@@ -340,10 +376,8 @@ final class IslandWindowController: NSWindowController {
         let cur = AppState.shared.mousePosition
         if abs(newPos.x - cur.x) > 1 || abs(newPos.y - cur.y) > 1 {
             AppState.shared.mousePosition = newPos
+            fsm.pointerMoved()   // absence clock; first movement after an absence brings the island back
         }
-
-        // AppState can hide the island by itself (last task ended): keep the FSM in step.
-        if state.mode == .hidden && fsm.state == .petit { fsm.hiddenExternally() }
 
         // Feed FSM hover enter/leave
         // Update the hit test before feeding the FSM: its transitions read wasInIsland
@@ -383,10 +417,8 @@ final class IslandWindowController: NSWindowController {
             updateWindowHighlight()
         }
 
-        adjustPollRate(mouse: mouse, panelFrame: pf)
+        adjustPollRate(mouse: mouse, islandFrame: islandRect.offsetBy(dx: pf.minX, dy: pf.minY))
     }
-
-    private var lastMouse: CGPoint = .zero
 
     // MARK: - Bot-head hover (love emote — mirrors prototype botHover())
 
@@ -418,13 +450,6 @@ final class IslandWindowController: NSWindowController {
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.9, execute: item)
     }
 
-    private func scheduleHover(after delay: TimeInterval, action: @escaping () -> Void) {
-        hoverTimer?.cancel()
-        let item = DispatchWorkItem(block: action)
-        hoverTimer = item
-        DispatchQueue.main.asyncAfter(deadline: .now() + delay, execute: item)
-    }
-
     // MARK: - Mode transitions
 
     private func modeLevel(_ m: IslandMode) -> Int {
@@ -446,21 +471,25 @@ final class IslandWindowController: NSWindowController {
         }
     }
 
+    /// Opens the island on `view` from outside the FSM (alerts, hotkeys, menu, recap, desktop
+    /// Mochi…). The mode change reaches the FSM through `modeSubscription`.
     func expand(to view: IslandView) {
+        // Already open on the greeting: the new view replaces it for good, so the FSM must
+        // stop treating the island as a greeting (whose end, and auto-fold, never come).
+        if fsm.state == .coucou && view != .greeting { fsm.openedExternally() }
+        show(view)
+    }
+
+    /// Shows `view` expanded. The FSM's own transitions call this directly.
+    private func show(_ view: IslandView) {
         state.view = view
-        if state.mode == .expanded {
-            // Already expanded — just switch view
-        } else {
-            setMode(.expanded)
-        }
-        state.lastActivity = .now
+        if state.mode != .expanded { setMode(.expanded) }
     }
 
     func collapse(allowPendingApproval: Bool = false) {
         let keepsApprovalPending = allowPendingApproval && state.pendingApproval != nil
         guard fsm.isHeldOpen?() != true || keepsApprovalPending else { return }
         if !keepsApprovalPending { state.isPinned = false }
-        finishedPinTimer?.cancel()
         // Keep the FSM in step with what is on screen (home/coucou → petit now).
         fsm.collapse()
         setMode(.compact)
@@ -595,7 +624,7 @@ final class IslandWindowController: NSWindowController {
         }
         // ⎋ Escape — focused views (.onExitCommand) have first crack; fall back to collapse
         if event.keyCode == 53 && raw.isEmpty {
-            let consumed = NSApp.sendAction(Selector(("cancelOperation:")), to: nil, from: nil)
+            let consumed = NSApp.sendAction(#selector(NSResponder.cancelOperation(_:)), to: nil, from: nil)
             let canCollapse = !state.isPinned || state.pendingApproval != nil
             if !consumed && state.mode == .expanded && canCollapse {
                 collapse(allowPendingApproval: true)
@@ -681,47 +710,56 @@ final class IslandWindowController: NSWindowController {
             }
         }
 
+        // Observers registered on the main queue run on the main thread: assumeIsolated
+        // states it to the compiler without an extra hop.
+
         // Hook server expand requests (alerts only)
         NotificationCenter.default.addObserver(forName: .hookExpand, object: nil, queue: .main) { [weak self] note in
-            guard let self, let view = note.object as? IslandView else { return }
-            self.fsm.openedExternally()
-            self.expand(to: view)
+            let view = note.object as? IslandView
+            MainActor.assumeIsolated {
+                guard let self, let view else { return }
+                self.fsm.openedExternally()
+                self.expand(to: view)
+            }
         }
 
         // Hook server compact reveal (non-alert work events: session start, tool use, etc.)
         NotificationCenter.default.addObserver(forName: .hookReveal, object: nil, queue: .main) { [weak self] _ in
-            guard let self else { return }
-            self.fsm.reveal()
+            MainActor.assumeIsolated { self?.fsm.reveal() }
         }
 
         // Music started playing: reveal silently (no peek sound)
         NotificationCenter.default.addObserver(forName: .musicReveal, object: nil, queue: .main) { [weak self] _ in
-            guard let self else { return }
-            self.silentNextReveal = true
-            self.fsm.reveal()
-            self.silentNextReveal = false
+            MainActor.assumeIsolated {
+                guard let self else { return }
+                self.silentNextReveal = true
+                self.fsm.reveal()
+                self.silentNextReveal = false
+            }
         }
 
         // Collapse requests from views (OK button, etc.)
         NotificationCenter.default.addObserver(forName: .islandCollapse, object: nil, queue: .main) { [weak self] _ in
-            self?.collapse()
+            MainActor.assumeIsolated { self?.collapse() }
         }
 
         // Wardrobe open/close from desktop Mochi right-click (does NOT post .hookExpand)
         NotificationCenter.default.addObserver(forName: .openWardrobeFromDesktop, object: nil, queue: .main) { [weak self] _ in
-            guard let self else { return }
-            if self.state.mode == .expanded && self.state.view == .wardrobe {
-                withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
-                    self.state.view = .overview
+            MainActor.assumeIsolated {
+                guard let self else { return }
+                if self.state.mode == .expanded && self.state.view == .wardrobe {
+                    withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                        self.state.view = .overview
+                    }
+                } else {
+                    self.expand(to: .wardrobe)
                 }
-            } else {
-                self.expand(to: .wardrobe)
             }
         }
 
         // .botDizzy — posted by BotEngine.slap() on 3rd hit; show confused view + recover after 3.3s
         NotificationCenter.default.addObserver(forName: .botDizzy, object: nil, queue: .main) { [weak self] _ in
-            self?.handleDizzy()
+            MainActor.assumeIsolated { self?.handleDizzy() }
         }
 
         // Window attach drag.
@@ -733,7 +771,6 @@ final class IslandWindowController: NSWindowController {
                 guard self.wasInIsland else { return }
                 self.fsm.userInteracted()
                 self.pendingIslandClick = true
-                self.hoverTimer?.cancel()
                 self.botHoverTimer?.cancel()
                 self.botHovering = false
                 // Drag only starts when clicking directly on the bot head
@@ -852,11 +889,9 @@ final class IslandWindowController: NSWindowController {
             forName: NSWorkspace.didActivateApplicationNotification,
             object: nil, queue: .main
         ) { [weak self] note in
-            guard let self else { return }
-            if let app = note.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication,
-               app.bundleIdentifier != ourBundle {
-                self.state.lastExternalApp = app
-            }
+            guard let app = note.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication,
+                  app.bundleIdentifier != ourBundle else { return }
+            MainActor.assumeIsolated { self?.state.lastExternalApp = app }
         }
     }
 
@@ -936,7 +971,10 @@ final class IslandWindowController: NSWindowController {
                     ctx.duration = 0.12
                     ctx.timingFunction = CAMediaTimingFunction(name: .easeIn)
                     captured.animator().alphaValue = 0
-                }, completionHandler: { captured.close() })
+                }, completionHandler: {
+                    // AppKit calls animation completions on the main thread.
+                    MainActor.assumeIsolated { captured.close() }
+                })
             }
             return
         }
@@ -1042,8 +1080,8 @@ final class IslandWindowController: NSWindowController {
     // MARK: - Coordinate conversion: window (AppKit, y-up) → island coords (y-down, 0,0 = island top-left)
 
     func windowToIsland(_ loc: CGPoint) -> CGPoint {
-        let panelH = window?.frame.height ?? 320
-        let panelW = window?.frame.width  ?? 720
+        let panelH = window?.frame.height ?? IslandConst.panelHeight
+        let panelW = window?.frame.width  ?? IslandConst.panelWidth
         let islandLeft = (panelW - IslandConst.expandedWidth) / 2
         // Island is glued to panel top; its bottom in AppKit = panelH - 176
         return CGPoint(
@@ -1057,32 +1095,6 @@ final class IslandWindowController: NSWindowController {
     func defaultView() -> IslandView {
         if state.pendingApproval != nil { return .approval }
         return state.tasks.isEmpty ? .empty : .overview
-    }
-
-    func baseMode() -> IslandMode {
-        guard state.isPresent else { return .hidden }
-        return state.tasks.isEmpty ? .hidden : .compact
-    }
-
-    // MARK: - Activity reset (call on any user interaction in island)
-
-    func resetActivity() {
-        state.lastActivity = .now
-    }
-
-    // MARK: - Finished task pin (5.2s)
-
-    func pinForFinished(taskId: String) {
-        state.isPinned = true
-        finishedPinTimer?.cancel()
-        let item = DispatchWorkItem { [weak self] in
-            guard let self else { return }
-            self.state.removeTask(id: taskId)
-            self.state.isPinned = false
-            self.collapse()
-        }
-        finishedPinTimer = item
-        DispatchQueue.main.asyncAfter(deadline: .now() + 5.2, execute: item)
     }
 
     // MARK: - Dizzy recovery (triggered by BotEngine.slap via .botDizzy)
@@ -1109,19 +1121,10 @@ final class IslandWindowController: NSWindowController {
 
     private func isBotHit(_ windowPoint: CGPoint) -> Bool {
         let s = AppState.shared
-        let panelH = window?.frame.height ?? 320
-        let panelW = window?.frame.width  ?? 720
-        let (islandW, fixedH) = islandSize(mode: s.mode, view: s.view,
-                                            progress: s.uploadProgress, nw: notchW, nh: notchH)
-        // Chat view resizes dynamically — must match IslandContainer.chatPromptHeight
-        let islandH: CGFloat
-        if s.mode == .expanded && s.view == .prompt {
-            let base: CGFloat = 240
-            let perMsg: CGFloat = 40
-            islandH = min(300, base + CGFloat(s.chatHistory.count) * perMsg)
-        } else {
-            islandH = fixedH
-        }
+        let panelH = window?.frame.height ?? IslandConst.panelHeight
+        let panelW = window?.frame.width  ?? IslandConst.panelWidth
+        let (islandW, islandH) = islandSize(mode: s.mode, view: s.view, progress: s.uploadProgress,
+                                            nw: notchW, nh: notchH, chatCount: s.chatHistory.count)
         let islandMinX = (panelW - islandW) / 2
         let (cx, cy, diameter, _) = botPosition(mode: s.mode, view: s.view,
                                                   islandW: islandW, islandH: islandH,
@@ -1187,10 +1190,6 @@ final class IslandWindowController: NSWindowController {
             menuBarHeight: menuBarHeight
         )
     }
-
-    nonisolated func cleanup() {
-        // Called explicitly before release if needed
-    }
 }
 
 // MARK: - IslandPanel
@@ -1209,16 +1208,8 @@ final class IslandPanel: NSPanel {
 
     func currentIslandFrame(nw: CGFloat, nh: CGFloat) -> CGRect {
         let s = AppState.shared
-        let (w, fixedH) = islandSize(mode: s.mode, view: s.view,
-                                      progress: s.uploadProgress, nw: nw, nh: nh)
-        let h: CGFloat
-        if s.mode == .expanded && s.view == .prompt {
-            let base: CGFloat = 240
-            let perMsg: CGFloat = 40
-            h = min(300, base + CGFloat(s.chatHistory.count) * perMsg)
-        } else {
-            h = fixedH
-        }
+        let (w, h) = islandSize(mode: s.mode, view: s.view, progress: s.uploadProgress,
+                                nw: nw, nh: nh, chatCount: s.chatHistory.count)
         return CGRect(x: (frame.width - w) / 2, y: frame.height - h, width: w, height: h)
     }
 }
@@ -1252,7 +1243,6 @@ extension Notification.Name {
     static let botSetTgEs       = Notification.Name("notchBuddy.botSetTgEs")
     static let botGulp          = Notification.Name("notchBuddy.botGulp")
     static let botMorphTo       = Notification.Name("notchBuddy.botMorphTo")
-    static let islandAction     = Notification.Name("notchBuddy.islandAction")
     static let islandCollapse      = Notification.Name("notchBuddy.islandCollapse")
     static let islandSendMessage   = Notification.Name("notchBuddy.islandSendMessage")
     static let islandNewConversation = Notification.Name("notchBuddy.islandNewConversation")
@@ -1273,10 +1263,14 @@ extension Notification.Name {
 
 // MARK: - islandSize (takes real notch dimensions)
 
+/// Island size for a mode and view. The single place that knows the sizes: the panel's hit
+/// test, the bot hit test, the bot's gaze and IslandContainer must agree, or clicks and slaps
+/// land beside the island. `chatCount` is the chat history length (the chat grows with it).
 func islandSize(mode: IslandMode, view: IslandView,
                 progress: Double = 0,
                 nw: CGFloat = IslandConst.notchWidth,
-                nh: CGFloat = IslandConst.notchHeight) -> (CGFloat, CGFloat) {
+                nh: CGFloat = IslandConst.notchHeight,
+                chatCount: Int) -> (CGFloat, CGFloat) {
     switch mode {
     case .hidden:   return (nw, nh)
     case .compact:  return (nw + 160, nh)
@@ -1284,6 +1278,9 @@ func islandSize(mode: IslandMode, view: IslandView,
         let layout = IslandConst.viewLayouts[view]!
         if view == .question, let h = QuestionLayout.height {
             return (IslandConst.expandedWidth, h)
+        }
+        if view == .prompt {
+            return (IslandConst.expandedWidth, IslandConst.chatPromptHeight(messageCount: chatCount))
         }
         return (IslandConst.expandedWidth, layout.height)
     }

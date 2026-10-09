@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// Top-level SwiftUI view rendered inside the 720×320 transparent panel.
+/// Top-level SwiftUI view rendered inside the 720×560 transparent panel.
 /// The island is drawn at the top-center; everything else is transparent and click-through.
 /// Note: drag-drop is handled at the AppKit level in IslandWindowController (FileDropNSView),
 /// not in SwiftUI, to avoid interfering with SwiftUI hit-testing.
@@ -32,12 +32,6 @@ struct IslandContainer: View {
 
     private let openSpring = Animation.spring(response: 0.5, dampingFraction: 0.72)
     private let closeEase  = Animation.timingCurve(0.45, 0, 0.2, 1, duration: 0.34)
-
-    private var chatPromptHeight: CGFloat {
-        let base: CGFloat = 240
-        let perMsg: CGFloat = 40
-        return min(300, base + CGFloat(state.chatHistory.count) * perMsg)
-    }
 
     /// Pixels the content must be pushed down to clear the concave ear transparent area.
     /// = 0 in expanded mode (no ears), = earRadius in compact/notch mode.
@@ -97,10 +91,11 @@ struct IslandContainer: View {
             // Hidden during upload canvas or greeting (both draw their own Mochi).
             BotPlacement(state: state, islandW: islandWidth, islandH: islandHeight)
                 // Keep idle animations inside the resting strip. Expanded views
-                // retain the panel's full height for particles and hands.
+                // retain the panel's full height for particles and hands (a tall question
+                // card centres Mochi below the old 320 pt limit, which clipped him).
                 .mask(alignment: .topLeading) {
                     Rectangle().frame(width: islandWidth,
-                                      height: state.mode == .expanded ? 320 : islandHeight)
+                                      height: state.mode == .expanded ? IslandConst.panelHeight : islandHeight)
                 }
                 .opacity(uploadActive || greetingActive ? 0 : 1)
                 .animation(.easeInOut(duration: 0.25), value: uploadActive || greetingActive)
@@ -136,12 +131,13 @@ struct IslandContainer: View {
             let anim = shrinking ? closeEase : openSpring
             let (w, h) = islandSize(mode: newMode, view: state.view,
                                     progress: state.uploadProgress,
-                                    nw: state.notchWidth, nh: state.notchHeight)
+                                    nw: state.notchWidth, nh: state.notchHeight,
+                                    chatCount: state.chatHistory.count)
             let cr  = newMode == .expanded ? IslandConst.expandedCorner : IslandConst.roundedCorner
             let tr: CGFloat = 0
             withAnimation(anim) {
                 islandWidth      = w
-                islandHeight     = (newMode == .expanded && state.view == .prompt) ? chatPromptHeight : h
+                islandHeight     = h
                 cornerRadius     = cr
                 islandTopRadius  = tr
             }
@@ -155,22 +151,26 @@ struct IslandContainer: View {
             }
             let (w, h) = islandSize(mode: .expanded, view: newView,
                                     progress: state.uploadProgress,
-                                    nw: state.notchWidth, nh: state.notchHeight)
+                                    nw: state.notchWidth, nh: state.notchHeight,
+                                    chatCount: state.chatHistory.count)
             withAnimation(openSpring) {
                 islandWidth  = w
-                islandHeight = newView == .prompt ? chatPromptHeight : h
+                islandHeight = h
             }
         }
         .onChange(of: state.chatHistory.count) { _, _ in
             guard state.mode == .expanded, state.view == .prompt else { return }
-            withAnimation(openSpring) { islandHeight = chatPromptHeight }
+            withAnimation(openSpring) {
+                islandHeight = IslandConst.chatPromptHeight(messageCount: state.chatHistory.count)
+            }
         }
         .onAppear {
             let (w, h) = islandSize(mode: state.mode, view: state.view,
                                     progress: state.uploadProgress,
-                                    nw: state.notchWidth, nh: state.notchHeight)
+                                    nw: state.notchWidth, nh: state.notchHeight,
+                                    chatCount: state.chatHistory.count)
             islandWidth      = w
-            islandHeight     = state.view == .prompt ? chatPromptHeight : h
+            islandHeight     = h
             cornerRadius     = state.mode == .expanded ? IslandConst.expandedCorner : IslandConst.roundedCorner
             islandTopRadius  = 0
         }
@@ -181,9 +181,10 @@ struct IslandContainer: View {
             // New screen, new resting size (notch ↔ bar): snap without animation.
             let (w, h) = islandSize(mode: state.mode, view: state.view,
                                     progress: state.uploadProgress,
-                                    nw: state.notchWidth, nh: state.notchHeight)
+                                    nw: state.notchWidth, nh: state.notchHeight,
+                                    chatCount: state.chatHistory.count)
             islandWidth  = w
-            islandHeight = (state.mode == .expanded && state.view == .prompt) ? chatPromptHeight : h
+            islandHeight = h
         }
     }
 
@@ -283,7 +284,9 @@ struct BotPlacement: View {
         let (cx, cy, diameter, opacity) = botPosition(mode: state.mode, view: state.view, islandW: islandW, islandH: islandH, uploadProgress: state.uploadProgress, hasNotch: state.hasNotch)
         let canvasSize = diameter / 0.6
         let overhang: CGFloat = 40
-        let isUploading = state.view == .uploading
+        // Expanded only: an island folded mid-upload keeps view == .uploading, and the
+        // uploading branch then misplaced Mochi and ran its TimelineView while hidden.
+        let isUploading = state.mode == .expanded && state.view == .uploading
 
         Group {
             // No glow in uploading mode — the tiny dot doesn't need it
@@ -400,44 +403,55 @@ func botPosition(mode: IslandMode, view: IslandView, islandW: CGFloat, islandH: 
 
 // MARK: - Countdown bar
 
+/// The FSM's pending auto-close (`IslandStateMachine.countdown`), published for the bar.
+/// Its own object so a countdown starting or stopping redraws the bar, not the whole island.
+@MainActor
+final class IslandAutoCloseCountdown: ObservableObject {
+    static let shared = IslandAutoCloseCountdown()
+    @Published var countdown: IslandStateMachine.Countdown?
+}
+
+/// 2 pt line at the bottom of an open island, 160 pt → 0 over the last seconds before the
+/// island really folds. Driven by the FSM's timer: no countdown (pointer on the island,
+/// opened by an alert, hover grace) means no bar, and it redraws only inside its window.
 struct CountdownBar: View {
     @ObservedObject var state: AppState
     let islandW: CGFloat
-    @State private var barWidth: CGFloat = 0
-    @State private var timer: Timer? = nil
+    @ObservedObject private var autoClose = IslandAutoCloseCountdown.shared
 
     var body: some View {
-        GeometryReader { _ in
-            Rectangle()
-                .fill(Color.white.opacity(0.35))
-                .frame(width: barWidth, height: 2)
-                .cornerRadius(2)
-                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
-        }
-        .onAppear { startTimer() }
-        .onDisappear { timer?.invalidate() }
-    }
-
-    private func startTimer() {
-        timer = Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { _ in
-            updateBar()
+        let countdown = state.mode == .expanded ? autoClose.countdown : nil
+        let ticks = countdown.map { IslandStateMachine.countdownTicks($0, from: .now) } ?? []
+        TimelineView(.explicit(ticks)) { _ in
+            GeometryReader { _ in
+                Rectangle()
+                    .fill(Color.white.opacity(0.35))
+                    .frame(width: barWidth(countdown), height: 2)
+                    .cornerRadius(2)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
+            }
         }
     }
 
-    private func updateBar() {
-        guard state.mode == .expanded && !state.isPinned else {
-            barWidth = 0
-            return
-        }
-        let autoClose = state.autoCloseInterval
-        let window = min(10.0, autoClose * 0.6)
-        let elapsed = Date.now.timeIntervalSince(state.lastActivity)
-        let remaining = autoClose - elapsed
-        if remaining < window {
-            barWidth = max(0, CGFloat(remaining / window) * 160)
-        } else {
-            barWidth = 0
-        }
+    /// Reads the clock, not the timeline entry: before its first tick the timeline may
+    /// already render with that future date.
+    private func barWidth(_ countdown: IslandStateMachine.Countdown?) -> CGFloat {
+        guard let countdown, !state.isPinned,
+              let fraction = IslandStateMachine.countdownFraction(countdown, at: .now) else { return 0 }
+        return max(0, CGFloat(fraction) * 160)
+    }
+}
+
+/// False inside the island views that are mounted but not showing (IslandContentView keeps
+/// all of them alive): their animations pause instead of running unseen.
+private struct IslandViewActiveKey: EnvironmentKey {
+    static let defaultValue = true
+}
+
+extension EnvironmentValues {
+    var islandViewActive: Bool {
+        get { self[IslandViewActiveKey.self] }
+        set { self[IslandViewActiveKey.self] = newValue }
     }
 }
 
@@ -464,6 +478,7 @@ struct IslandContentView: View {
                         ? .spring(response: 0.4, dampingFraction: 0.8).delay(0.16)
                         : .easeIn(duration: 0.16)
                     IslandViewContent(view: v, state: state)
+                        .environment(\.islandViewActive, active)
                         .frame(maxWidth: .infinity)
                         .frame(height: isTall ? nil : 98)
                         .frame(minHeight: (isTall && !active) ? 0 : nil, maxHeight: isTall ? .infinity : nil)
@@ -666,6 +681,8 @@ struct CompactMiniGrid: View {
                 MiniBotCanvasView(task: task)
                     .frame(width: 12 / 0.6, height: 12 / 0.6)
                     .frame(width: 12, height: 12, alignment: .center)
+                    // Still mounted while it fades out: no animating an island going away.
+                    .environment(\.islandViewActive, state.mode == .compact)
             }
         }
         .frame(width: 28, height: 28)

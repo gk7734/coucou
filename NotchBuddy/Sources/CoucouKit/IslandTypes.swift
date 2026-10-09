@@ -169,6 +169,16 @@ enum IslandConst {
     static let roundedCorner: CGFloat = 14    // hidden/peek/compact
     static let expandedCorner: CGFloat = 22
 
+    /// Fixed, mostly transparent panel the island is drawn in (top centre of the screen).
+    /// 560 tall so the tallest question card fits (`AskQuestion.estimatedIslandHeight`).
+    static let panelWidth: CGFloat  = 720
+    static let panelHeight: CGFloat = 560
+
+    /// The chat grows with its messages: 240 pt, +40 per message, up to 300.
+    static func chatPromptHeight(messageCount: Int) -> CGFloat {
+        min(300, 240 + CGFloat(messageCount) * 40)
+    }
+
     static let viewLayouts: [IslandView: ViewLayout] = [
         // Home is the reference: height 150
         .overview:  ViewLayout(height: 160, botX: 68,  botY: nil, botDiameter: 58, agentMode: .pills),
@@ -210,24 +220,25 @@ enum IslandConst {
 
     static let fallbackColors = ["#22C55E", "#EAB308", "#60A5FA", "#E879F9"]
 
-    /// Returns the fixed project color for a display name, or a stable fallback.
+    /// Returns the fixed project color for a display name, or a fallback that stays the same
+    /// across launches (`hashValue` is seeded per process, so it changed at every launch).
     static func colorForProject(_ name: String) -> String {
         let key = name.lowercased().trimmingCharacters(in: .whitespaces)
         if let c = projectColors[key] { return c }
-        // partial match (e.g. "korus-api" → "korus")
-        for (k, c) in projectColors where key.hasPrefix(k) || key.contains(k) { return c }
-        return fallbackColors[abs(name.hashValue) % fallbackColors.count]
+        // partial match (e.g. "korus-api" → "korus"); longest name first, in a fixed order,
+        // since a dictionary's iteration order also changes between launches
+        let byLength = projectColors.keys.sorted { ($0.count, $0) > ($1.count, $1) }
+        for k in byLength where key.hasPrefix(k) || key.contains(k) { return projectColors[k]! }
+        return fallbackColors[Int(stableHash(name) % UInt64(fallbackColors.count))]
     }
 
-    // State card wash colors (radial gradient from bottom)
-    static let washColors: [IslandView: String] = [
-        .approval:  "rgba(245,165,36,0.42)",
-        .question:  "rgba(34,211,238,0.38)",
-        .error:     "rgba(244,80,94,0.55)",
-        .finished:  "rgba(52,211,153,0.5)",
-        .confused:  "rgba(244,114,182,0.55)",
-        .searching: "rgba(99,102,241,0.5)",
-        .result:    "rgba(52,211,153,0.22)",
-        .prompt:    "rgba(99,102,241,0.22)",
-    ]
+    /// FNV-1a (64-bit) over the UTF-8 bytes: the same value on every launch and device.
+    static func stableHash(_ text: String) -> UInt64 {
+        var hash: UInt64 = 0xcbf2_9ce4_8422_2325
+        for byte in text.utf8 {
+            hash ^= UInt64(byte)
+            hash = hash &* 0x0000_0100_0000_01b3
+        }
+        return hash
+    }
 }
