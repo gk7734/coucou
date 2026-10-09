@@ -37,7 +37,7 @@ enum AudioSpectrumTests {
         precondition(ranges48[band1k].contains(bin1k))
 
         // dB → 0…1.
-        precondition(AudioSpectrumMath.normalized(db: -60) == 0)
+        precondition(AudioSpectrumMath.normalized(db: AudioSpectrumMath.floorDB) == 0)
         precondition(AudioSpectrumMath.normalized(db: -90) == 0)
         precondition(AudioSpectrumMath.normalized(db: AudioSpectrumMath.ceilingDB) == 1)
         precondition(AudioSpectrumMath.normalized(db: 6) == 1)

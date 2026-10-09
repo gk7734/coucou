@@ -446,10 +446,32 @@ private final class TapSession: @unchecked Sendable {
             analyzer.decay()   // no new audio (paused IO, permission prompt): bars fall
         }
         lastWritten = written
+        #if DEBUG
+        debugLogFrame()
+        #endif
         guard AudioSpectrumMath.changedEnough(analyzer.levels, since: published) else { return }
         published = analyzer.levels
         Self.publish(published)
     }
+
+    #if DEBUG
+    private var debugFrame = 0
+    /// `defaults write fr.louisraille.NotchBuddy debugLogSpectrum -bool YES`: twice a second,
+    /// the raw band dB and the published levels go to /tmp/coucou-spectrum.log (tuning aid).
+    private func debugLogFrame() {
+        debugFrame += 1
+        guard debugFrame % 15 == 0, UserDefaults.standard.bool(forKey: "debugLogSpectrum") else { return }
+        let db = analyzer.decibels.map { String(format: "%6.1f", $0) }.joined(separator: " ")
+        let lv = analyzer.levels.map { String(format: "%.2f", $0) }.joined(separator: " ")
+        let line = "dB [\(db)]  levels [\(lv)]\n"
+        let url = URL(fileURLWithPath: "/tmp/coucou-spectrum.log")
+        if let handle = try? FileHandle(forWritingTo: url) {
+            handle.seekToEndOfFile(); handle.write(Data(line.utf8)); try? handle.close()
+        } else {
+            try? Data(line.utf8).write(to: url)
+        }
+    }
+    #endif
 
     private static func publish(_ bands: [Float]) {
         DispatchQueue.main.async {

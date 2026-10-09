@@ -7,8 +7,10 @@ enum AudioSpectrumMath {
     static let lowFrequency: Float = 60
     static let highFrequency: Float = 12_000
     /// Band energy (dB, 0 = a full-scale sine) drawn as an empty bar, and as a full bar.
-    static let floorDB: Float = -60
-    static let ceilingDB: Float = -6
+    /// Tuned on real music (TIDAL, measured with debugLogSpectrum): bands sit between about
+    /// −60 and −17 dB, so −60…−6 squeezed every bar into 0.3–0.7 and they all looked alike.
+    static let floorDB: Float = -50
+    static let ceilingDB: Float = -15
     /// Smoothing per frame (~30 per second): bars jump up fast and fall slowly.
     static let attack: Float = 0.6
     static let release: Float = 0.15
