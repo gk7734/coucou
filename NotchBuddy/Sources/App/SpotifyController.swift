@@ -409,11 +409,8 @@ final class SpotifyController: ObservableObject {
     }
 
     func openSpotify() {
-        if let app = NSWorkspace.shared.runningApplications.first(where: { $0.bundleIdentifier == Self.bundleId }) {
-            app.activate()
-        } else if let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: Self.bundleId) {
-            NSWorkspace.shared.openApplication(at: url, configuration: .init(), completionHandler: nil)
-        }
+        // Launch Services, not activate(): the window comes back even when Spotify is hidden.
+        HostAppInfo.activate(Self.bundleId)
     }
 
     func openDownloadPage() {

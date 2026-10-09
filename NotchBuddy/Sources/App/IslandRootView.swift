@@ -735,7 +735,8 @@ struct CompactStatusOverlay: View {
                                          status: model.metrics)
         ZStack(alignment: .topLeading) {
             if let line, layout.hasStatus {
-                CompactStatusView(line: line)
+                CompactStatusView(line: line,
+                                  fits: layout.statusWidth + 0.5 >= CompactStatusModel.contentWidth(line))
                     .frame(width: layout.statusWidth, height: islandH, alignment: .leading)
                     .offset(x: layout.statusX)
                     .id(identity(line))
@@ -775,6 +776,9 @@ struct CompactMiniTooltipLayer: View {
 /// name · icon text [elapsed]. Same fonts and spacing as CompactStatusModel.contentWidth.
 struct CompactStatusView: View {
     let line: CompactStatusLine
+    /// The island made room for the whole line: the text keeps its full width (SwiftUI
+    /// otherwise trimmed it by a character — "Thinkin…" — next to a wide gap).
+    var fits = false
 
     private static let amber = Color(hex: "#F5A524")
 
@@ -812,9 +816,14 @@ struct CompactStatusView: View {
                 .foregroundColor(waits ? Self.amber : Color(hex: "#B0B5BE"))
                 .lineLimit(1)
                 .truncationMode(kind == .edit || kind == .read ? .middle : .tail)
+                .fixedSize(horizontal: fits, vertical: false)
+                .layoutPriority(1)
             if let start = line.turnStartedAt {
                 Spacer(minLength: CompactStatusModel.timeGap)
+                // A TimelineView takes all the width it is offered: pin it to its text, or it
+                // squeezes the activity text ("Thinkin…") while leaving a wide gap.
                 CompactElapsedText(since: start)
+                    .fixedSize()
             }
         }
     }

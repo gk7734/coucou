@@ -153,6 +153,8 @@ final class CompactStatusModel {
         var total = width(line.pillName, nameFont) + spacing + width("·", textFont) + spacing
             + iconWidth + spacing + width(line.text, textFont)
         if line.turnStartedAt != nil { total += timeGap + timeSlot }
-        return total + 2
+        // Slack for SwiftUI's text layout, which renders a few points wider than NSString
+        // measures (the line was truncated by about one character without it).
+        return total + 6
     }
 }

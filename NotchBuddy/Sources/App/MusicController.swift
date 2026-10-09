@@ -218,11 +218,8 @@ final class MusicController: ObservableObject {
     }
 
     func openMusic() {
-        if let app = NSWorkspace.shared.runningApplications.first(where: { $0.bundleIdentifier == "com.apple.Music" }) {
-            app.activate()
-        } else {
-            NSWorkspace.shared.open(URL(fileURLWithPath: "/System/Applications/Music.app"))
-        }
+        // Launch Services, not activate(): the window comes back even when Music is hidden.
+        HostAppInfo.activate("com.apple.Music")
     }
 
     func openAutomationSettings() {
