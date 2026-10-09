@@ -391,7 +391,7 @@ CLI가 아니라 HTTP API 직접 호출. `ClaudeService.chat`→`api.anthropic.c
 2. **`bundle_id`**: 릴레이가 붙이는 `__CFBundleIdentifier`(에이전트 셸이 상속).
 3. **환경 힌트**: `term_program`(`TERM_PROGRAM`; vscode, WarpTerminal, Apple_Terminal, iTerm.app, ghostty, kitty, alacritty, wezterm, hyper, zed), 그다음 `terminal_emulator`(`TERMINAL_EMULATOR`, 릴레이가 붙임. `JetBrains-JediTerm`이면 `com.jetbrains.ide` 폴백).
 
-번들 ID 분류(`HostResolver.kind`): Cursor(`com.todesktop.230313mzl4w4u92`) → cursor, VS Code·Insiders·VSCodium → vscode, 알려진 터미널(Warp, Terminal, iTerm, Ghostty, kitty, Alacritty, WezTerm, Hyper, cmux, Orca) → terminal, **나머지 전부 → ide**. 목록에 없는 터미널(Tabby, Rio…)도 IDE로 취급되어 자기 `ide_<slug>` pill을 받는다. IDE 목록이 없다는 것이 새 편집기가 그냥 동작하는 이유다.
+번들 ID 분류(`HostResolver.kind`): Cursor(`com.todesktop.230313mzl4w4u92`) → cursor, VS Code·Insiders·VSCodium → vscode, 알려진 터미널(Warp, Terminal, iTerm, Ghostty, kitty, Alacritty, WezTerm, Hyper, cmux) → terminal, **나머지 전부 → ide**(Orca 같은 에이전트 워크스페이스도 IDE). 목록에 없는 터미널(Tabby, Rio…)도 IDE로 취급되어 자기 `ide_<slug>` pill을 받는다. IDE 목록이 없다는 것이 새 편집기가 그냥 동작하는 이유다.
 
 ### pill 매핑 (`HookRouting` + `HostResolver.pillId`)
 | 호스트 | Claude Code | Codex |
