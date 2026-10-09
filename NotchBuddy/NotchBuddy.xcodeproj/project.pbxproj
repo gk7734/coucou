@@ -76,6 +76,7 @@
 		4117E7C8AA231AAE36E7509D /* UploadCanvasView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B241B043223AFBBFB7418A5E /* UploadCanvasView.swift */; };
 		41966EEF7599793AD70DFCEA /* DiffEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = B32FB972D02162720E566674 /* DiffEngine.swift */; };
 		422C116E73D2D9A96DAE104D /* MochiLive.swift in Sources */ = {isa = PBXBuildFile; fileRef = 265262A422C270C1798F4A80 /* MochiLive.swift */; };
+		430586177AB25FAAB28FC808 /* HostAppInfo.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1CD2B28985A5D4E8676D6237 /* HostAppInfo.swift */; };
 		440AAF9FA27CC3DF7CC9EF51 /* MochiStill.swift in Sources */ = {isa = PBXBuildFile; fileRef = 045E7300878138F0AC385920 /* MochiStill.swift */; };
 		4755AAC633DCE5DAA6D54A3C /* ServiceDetailRunner.swift in Sources */ = {isa = PBXBuildFile; fileRef = E6AAC67875F84A862BC2A9AF /* ServiceDetailRunner.swift */; };
 		4778852A12726803BCF8B357 /* SessionDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A27178AA6007F7B56901750 /* SessionDetailView.swift */; };
@@ -203,6 +204,7 @@
 		B605F976F4141435F27CF266 /* IslandRootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 15A1A8206F73376F4CAF2057 /* IslandRootView.swift */; };
 		B608539B2273B7D32FA77EB7 /* CloudSchema.swift in Sources */ = {isa = PBXBuildFile; fileRef = 977A280276BC2C882FD7C13E /* CloudSchema.swift */; };
 		B69DE31E2B0C2E35594CAA87 /* RecapStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 78FB882D49084DEA6A10DB4D /* RecapStore.swift */; };
+		B6B69C96325CA2ACEB3A5475 /* HostAppInfo.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1CD2B28985A5D4E8676D6237 /* HostAppInfo.swift */; };
 		B733A76DD197F6D6D949284C /* HotKeyCenter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1218B86E249691AF44F819AC /* HotKeyCenter.swift */; };
 		B7C93262AA9D5DEAA0B79C7C /* MacStubs.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9B66D0C664FB9FF74517AAF5 /* MacStubs.swift */; };
 		B7ED198C941104866BB3BC57 /* Haptics.swift in Sources */ = {isa = PBXBuildFile; fileRef = F86B99CF65C5E4BC887888C6 /* Haptics.swift */; };
@@ -339,6 +341,7 @@
 		192844E7299DEED5C2372067 /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
 		1B2EED5205DD7161E51BE1E1 /* IntroView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IntroView.swift; sourceTree = "<group>"; };
 		1BE21C2B315D37AA70ED45E9 /* SoundEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SoundEngine.swift; sourceTree = "<group>"; };
+		1CD2B28985A5D4E8676D6237 /* HostAppInfo.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HostAppInfo.swift; sourceTree = "<group>"; };
 		1EA7D927F6BB2667D37AA963 /* ClaudeHookDetection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClaudeHookDetection.swift; sourceTree = "<group>"; };
 		21B710512DB99390EC564487 /* ServiceLiveDetail.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ServiceLiveDetail.swift; sourceTree = "<group>"; };
 		244A7909EEDA4BFF4C2EA9B5 /* TerminalTarget+AppKit.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "TerminalTarget+AppKit.swift"; sourceTree = "<group>"; };
@@ -504,6 +507,7 @@
 				FB6A710FB73B8217484DA7A6 /* HermesConfigMerger.swift */,
 				76F27AAF61FFAE44E4209B51 /* HookRelayScripts.swift */,
 				79D8DD79C3DD9BBC584B3CB2 /* HookServer.swift */,
+				1CD2B28985A5D4E8676D6237 /* HostAppInfo.swift */,
 				3FB897CD268F47C14E0B214C /* HostResolver.swift */,
 				1218B86E249691AF44F819AC /* HotKeyCenter.swift */,
 				4A09E73F1E58019EF6EA2A62 /* IslandDisplayChoice.swift */,
@@ -906,6 +910,7 @@
 				27CAA2593D35ABDF14E085BF /* HermesConfigMerger.swift in Sources */,
 				F9915D1B6A25AC29DD8945E5 /* HookRelayScripts.swift in Sources */,
 				2C798C3837A63B9BB561A1A0 /* HookServer.swift in Sources */,
+				B6B69C96325CA2ACEB3A5475 /* HostAppInfo.swift in Sources */,
 				C5A7EE3DBB5B52F420F42831 /* HostResolver.swift in Sources */,
 				B733A76DD197F6D6D949284C /* HotKeyCenter.swift in Sources */,
 				658C579523CF5F8D67B31369 /* InstructionRunner.swift in Sources */,
@@ -1081,6 +1086,7 @@
 				8520F8ACCDC2689F665CC8AD /* HermesConfigMerger.swift in Sources */,
 				58A38FB29F85A95744B208EF /* HookRelayScripts.swift in Sources */,
 				9DD56C95ECABDDCE23652D50 /* HookServer.swift in Sources */,
+				430586177AB25FAAB28FC808 /* HostAppInfo.swift in Sources */,
 				5B1D797F940ED559CDAC9423 /* HostResolver.swift in Sources */,
 				530443F46F896F037A56F663 /* HotKeyCenter.swift in Sources */,
 				52F0DF1FBCB522951910390E /* InstructionRunner.swift in Sources */,

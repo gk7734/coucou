@@ -4155,6 +4155,7 @@ struct PillBadgeView: View {
         case .approval: return Color(hex: "#F5A524")
         case .finished: return Color(hex: "#22C55E")
         case .error:    return Color(hex: "#F4505E")
+        case .stalled:  return Color(hex: "#A78BFA")
         }
     }
 
@@ -4163,6 +4164,7 @@ struct PillBadgeView: View {
         case .approval: return "exclamationmark"
         case .finished: return "checkmark"
         case .error:    return "xmark"
+        case .stalled:  return "hourglass"
         }
     }
 

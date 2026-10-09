@@ -13,6 +13,9 @@ final class AppState: ObservableObject {
 
     // Tasks
     @Published var tasks: [AgentTask] = []
+    /// The sessions behind each pill, by pill id (see SessionBook). A pill's own name, state
+    /// and steps mirror its book's lead session, so views that predate the book keep working.
+    @Published var sessionBooks: [String: SessionBook] = [:]
     @Published var focusId: String? = nil
 
     // Bot state override
