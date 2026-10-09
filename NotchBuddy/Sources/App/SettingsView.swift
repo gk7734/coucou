@@ -137,6 +137,7 @@ struct SettingsView: View {
     @AppStorage("iPhoneInstructionsEnabled") private var iPhoneInstructionsEnabled = false
     #endif
     @AppStorage(ClaudeHost.terminalCardsKey) private var terminalCardsEnabled = false
+    @AppStorage(AudioSpectrum.visualizerKey) private var visualizerEnabled = true
     @State private var customSoundCount = SoundEngine.shared.customized.count
 
     private var appVersion: String {
@@ -355,6 +356,12 @@ struct SettingsView: View {
                 }
                 .frame(maxWidth: 360)
                 Text("On a screen without a notch, Mochi sits in a small bar at the top. Follow the mouse moves it to your cursor's screen while it is closed.")
+                    .font(.system(size: 11))
+                    .foregroundColor(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                Toggle("Sound visualizer in the notch", isOn: $visualizerEnabled)
+                    .help("While music plays and no agent is at work, the folded island shows the sound's bars and the song.")
+                Text("macOS asks once for System Audio Recording permission, to draw the bars. Nothing is recorded or saved: only the sound's levels are read, while the bars are on screen.")
                     .font(.system(size: 11))
                     .foregroundColor(.secondary)
                     .fixedSize(horizontal: false, vertical: true)

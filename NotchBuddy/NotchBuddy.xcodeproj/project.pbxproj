@@ -28,6 +28,7 @@
 		0D1AD905638B2B021B684A09 /* ServiceDetail.swift in Sources */ = {isa = PBXBuildFile; fileRef = 65F64746B2740D5FE26B7E5A /* ServiceDetail.swift */; };
 		0E83C1DD4D20E7FB7A904450 /* VercelPoller.swift in Sources */ = {isa = PBXBuildFile; fileRef = 71718D1B87A39A4879DD2A9D /* VercelPoller.swift */; };
 		0F0557D2EA52536C0449D01B /* OrderedDelivery.swift in Sources */ = {isa = PBXBuildFile; fileRef = 95555C0B28D5596C8338046D /* OrderedDelivery.swift */; };
+		0F54E8744DBBE3B10C56D147 /* CompactVisualizer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 637AC4E165B00AF6C361B075 /* CompactVisualizer.swift */; };
 		0FAAA8683282E9E8EA9E2416 /* AgentNotifier.swift in Sources */ = {isa = PBXBuildFile; fileRef = 011D05714C97CF5CAB32DCE7 /* AgentNotifier.swift */; };
 		118FC4AE0AC74D84B4A134D8 /* VercelPoller.swift in Sources */ = {isa = PBXBuildFile; fileRef = 71718D1B87A39A4879DD2A9D /* VercelPoller.swift */; };
 		11F14DB97C93CF84DF9D5C43 /* TerminalTarget+AppKit.swift in Sources */ = {isa = PBXBuildFile; fileRef = 244A7909EEDA4BFF4C2EA9B5 /* TerminalTarget+AppKit.swift */; };
@@ -99,6 +100,7 @@
 		530443F46F896F037A56F663 /* HotKeyCenter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1218B86E249691AF44F819AC /* HotKeyCenter.swift */; };
 		535EC818E1DAF0FA588545D8 /* QuestionPayload.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6C6993B34A0FFF8E3D454ADC /* QuestionPayload.swift */; };
 		56BE8C733F10A030A638FB60 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7C1A7D5CBE2AC084A10C5FF3 /* SettingsView.swift */; };
+		56FD9B735C9C60E19179578B /* VisualizerDebugFeed.swift in Sources */ = {isa = PBXBuildFile; fileRef = D325614A2F91EAE441AEFC4C /* VisualizerDebugFeed.swift */; };
 		58A38FB29F85A95744B208EF /* HookRelayScripts.swift in Sources */ = {isa = PBXBuildFile; fileRef = 76F27AAF61FFAE44E4209B51 /* HookRelayScripts.swift */; };
 		59FABCC0B6794FE95319825C /* CoucouNotificationContent.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = D6DF93125491729E14636AD8 /* CoucouNotificationContent.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		5B1D797F940ED559CDAC9423 /* HostResolver.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3FB897CD268F47C14E0B214C /* HostResolver.swift */; };
@@ -212,6 +214,7 @@
 		9F43BE6E77E371FCEB7FE8BA /* ServiceDetailRunner.swift in Sources */ = {isa = PBXBuildFile; fileRef = E6AAC67875F84A862BC2A9AF /* ServiceDetailRunner.swift */; };
 		9FF91A6EDF43CB9702F3F5B9 /* MochiFrameRate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8E6F699C3899A77FEFC7B5E4 /* MochiFrameRate.swift */; };
 		A4EA99BDB40970A9B4E9BF59 /* NowPlaying.swift in Sources */ = {isa = PBXBuildFile; fileRef = A02502D702F6452D3C0F49FD /* NowPlaying.swift */; };
+		A6C1D739161889058B99C332 /* VisualizerDebugFeed.swift in Sources */ = {isa = PBXBuildFile; fileRef = D325614A2F91EAE441AEFC4C /* VisualizerDebugFeed.swift */; };
 		A7733EE60694EA3E2A86C37A /* IslandTypes.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0365DDE3C554F5E8570055F4 /* IslandTypes.swift */; };
 		A7EEF05A08F6B95370712089 /* error.wav in Resources */ = {isa = PBXBuildFile; fileRef = 871CA2BADC67D97C97C7009D /* error.wav */; };
 		A885B7E6DC43231BECE36E3D /* MochiWardrobe.swift in Sources */ = {isa = PBXBuildFile; fileRef = 79A7807ADD0963FF260D1FAD /* MochiWardrobe.swift */; };
@@ -235,6 +238,7 @@
 		B733A76DD197F6D6D949284C /* HotKeyCenter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1218B86E249691AF44F819AC /* HotKeyCenter.swift */; };
 		B7C93262AA9D5DEAA0B79C7C /* MacStubs.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9B66D0C664FB9FF74517AAF5 /* MacStubs.swift */; };
 		B7ED198C941104866BB3BC57 /* Haptics.swift in Sources */ = {isa = PBXBuildFile; fileRef = F86B99CF65C5E4BC887888C6 /* Haptics.swift */; };
+		B8177C5906F3C34CAAA5C82F /* CompactVisualizer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 637AC4E165B00AF6C361B075 /* CompactVisualizer.swift */; };
 		BA65FC4A40F7227837C26214 /* DesktopMochiLogic.swift in Sources */ = {isa = PBXBuildFile; fileRef = C086E1932F86B9C2B559BE03 /* DesktopMochiLogic.swift */; };
 		BC6819C32C715E203254B9C6 /* TurnShare.swift in Sources */ = {isa = PBXBuildFile; fileRef = 29E156CF1C215B8FE713B3A0 /* TurnShare.swift */; };
 		BCB4B7AEA1140868C36F39CC /* SessionStatus.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5108F622EF0C553F053716C2 /* SessionStatus.swift */; };
@@ -425,6 +429,7 @@
 		60401D1023D17C3FD30D7113 /* PhoneAssets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = PhoneAssets.xcassets; sourceTree = "<group>"; };
 		61B5FDDE03F5F711146937E2 /* ResendPoller.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ResendPoller.swift; sourceTree = "<group>"; };
 		62CF42AE7611EF212CA0458F /* ShortcutsSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShortcutsSettingsView.swift; sourceTree = "<group>"; };
+		637AC4E165B00AF6C361B075 /* CompactVisualizer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CompactVisualizer.swift; sourceTree = "<group>"; };
 		6544ED02D945CF9F00647AD1 /* MacDictation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MacDictation.swift; sourceTree = "<group>"; };
 		65F64746B2740D5FE26B7E5A /* ServiceDetail.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ServiceDetail.swift; sourceTree = "<group>"; };
 		66E6F5FC81429871B6F766A8 /* BotEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BotEngine.swift; sourceTree = "<group>"; };
@@ -496,6 +501,7 @@
 		D0F0D0F67E7C56B9E37E7648 /* ClaudeHost.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClaudeHost.swift; sourceTree = "<group>"; };
 		D1D96E57E8DADE6B82628E3E /* OpenLeadMochiIntent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OpenLeadMochiIntent.swift; sourceTree = "<group>"; };
 		D2562AA78A6A7866122B10DF /* KeychainStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeychainStore.swift; sourceTree = "<group>"; };
+		D325614A2F91EAE441AEFC4C /* VisualizerDebugFeed.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VisualizerDebugFeed.swift; sourceTree = "<group>"; };
 		D6DF93125491729E14636AD8 /* CoucouNotificationContent.appex */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = "wrapper.app-extension"; path = CoucouNotificationContent.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		D710BD7834228045869D0184 /* IslandWindowController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IslandWindowController.swift; sourceTree = "<group>"; };
 		D797CC384B5BC70D34F121BC /* ChatMarkdown.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatMarkdown.swift; sourceTree = "<group>"; };
@@ -564,6 +570,7 @@
 				73FA4DF1BE5246CCFFB72E5C /* CodexPlanGauge.swift */,
 				084DB13E6C2428A952BCBC28 /* CompactStatus.swift */,
 				97266FE1FD921DD55CE51B6F /* CompactStatusModel.swift */,
+				637AC4E165B00AF6C361B075 /* CompactVisualizer.swift */,
 				AEF5BD66B00BB64BB80AF38C /* DemoEngine.swift */,
 				B1DDC96E7967032F5D0BD585 /* DesktopMochi.swift */,
 				C086E1932F86B9C2B559BE03 /* DesktopMochiLogic.swift */,
@@ -625,6 +632,7 @@
 				6FD65943C32E150F1CD65C31 /* UploadSequenceEngine.swift */,
 				F4A13AEE6E06F46CEC9D908C /* UserIdentity.swift */,
 				71718D1B87A39A4879DD2A9D /* VercelPoller.swift */,
+				D325614A2F91EAE441AEFC4C /* VisualizerDebugFeed.swift */,
 				888B3E1420BCB6292BDC8117 /* WeeklyRecapView.swift */,
 				E91B733ADC638E14E9BB6EFA /* WindowContextCapture.swift */,
 				9207F9B32D9C7844F5332A31 /* PhoneLink */,
@@ -987,6 +995,7 @@
 				EE3AB10544113500486A9684 /* ColorHex.swift in Sources */,
 				AA2ABA6BA244DC9FB4F55E59 /* CompactStatus.swift in Sources */,
 				6024D34E0163D897B45FE087 /* CompactStatusModel.swift in Sources */,
+				0F54E8744DBBE3B10C56D147 /* CompactVisualizer.swift in Sources */,
 				B0CE5AC8B579866A14BD61D0 /* DemoEngine.swift in Sources */,
 				BEC5DDB55B3DA67C61CA8470 /* DesktopMochi.swift in Sources */,
 				BA65FC4A40F7227837C26214 /* DesktopMochiLogic.swift in Sources */,
@@ -1068,6 +1077,7 @@
 				FAD78D74C6906D4EC8AA4101 /* UploadSequenceEngine.swift in Sources */,
 				8A6B3688D6B3BF728D106D8B /* UserIdentity.swift in Sources */,
 				118FC4AE0AC74D84B4A134D8 /* VercelPoller.swift in Sources */,
+				56FD9B735C9C60E19179578B /* VisualizerDebugFeed.swift in Sources */,
 				01B96F947DF2BDC352E8526D /* WeeklyRecapView.swift in Sources */,
 				2875610F701376BD65573386 /* WindowContextCapture.swift in Sources */,
 			);
@@ -1184,6 +1194,7 @@
 				9ECEE890D4486B6E83BD5B7F /* ColorHex.swift in Sources */,
 				DFC2409E242BBF05928DB598 /* CompactStatus.swift in Sources */,
 				C5C6416A563173F434AD368D /* CompactStatusModel.swift in Sources */,
+				B8177C5906F3C34CAAA5C82F /* CompactVisualizer.swift in Sources */,
 				F157D7A9BF878DB2B286B1F7 /* DemoEngine.swift in Sources */,
 				273FC0FA14AAF6CE62FD14AE /* DesktopMochi.swift in Sources */,
 				C93BA975D35B8CD7473CF995 /* DesktopMochiLogic.swift in Sources */,
@@ -1265,6 +1276,7 @@
 				ECECA2F225E82B7C951658D7 /* UploadSequenceEngine.swift in Sources */,
 				63F9F3AAC881D3EDDDD8AED9 /* UserIdentity.swift in Sources */,
 				0E83C1DD4D20E7FB7A904450 /* VercelPoller.swift in Sources */,
+				A6C1D739161889058B99C332 /* VisualizerDebugFeed.swift in Sources */,
 				FB58020A389126865363C342 /* WeeklyRecapView.swift in Sources */,
 				2CC2E3B688B15BBEB3AE3BCE /* WindowContextCapture.swift in Sources */,
 			);

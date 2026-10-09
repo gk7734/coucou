@@ -663,10 +663,11 @@ final class IslandWindowController: NSWindowController {
 
     enum CompactClickTarget {
         case status(CompactStatusLine)
+        case music(CompactMusicLine)
         case mini(String)
     }
 
-    /// The status line or mini Mochi under a point of the panel (AppKit window coordinates),
+    /// The status line (or the visualizer in its slot) or mini Mochi under a point of the panel (AppKit window coordinates),
     /// from the same layout the island is drawn with (CompactIslandLayout). nil elsewhere and
     /// outside the compact island.
     private func compactTarget(at windowPoint: CGPoint) -> CompactClickTarget? {
@@ -677,6 +678,7 @@ final class IslandWindowController: NSWindowController {
         let model = CompactStatusModel.shared
         let layout = CompactIslandLayout(notchWidth: notchW, hasNotch: hasNotch, status: model.metrics)
         if let line = model.line, layout.statusContains(x: x) { return .status(line) }
+        if let music = model.music, layout.statusContains(x: x) { return .music(music) }
         let others = CompactMiniGrid.others(state)
         let scale = IslandRestingLayout(width: rect.width, height: rect.height).miniGridScale
         if let i = layout.miniIndex(atX: x, y: y, height: rect.height, count: others.count, scale: scale) {
@@ -686,12 +688,15 @@ final class IslandWindowController: NSWindowController {
     }
 
     /// A click in the folded island: the status line opens its pill (or the card waiting on
-    /// the user), a mini Mochi its pill, anything else the island as it is.
+    /// the user), the visualizer its music's pill, a mini Mochi its pill, anything else the
+    /// island as it is.
     private func openFromClick(_ target: CompactClickTarget?) {
         switch target {
         case .status(let line)?:
             if line.activity.kind.waitsOnUser, openPendingAlert() { return }
             focusFromCompact(line.pillId)
+        case .music(let music)?:
+            focusFromCompact(music.pillId)
         case .mini(let id)?:
             focusFromCompact(id)
         case nil:

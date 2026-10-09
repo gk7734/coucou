@@ -722,14 +722,17 @@ struct CompactStatusOverlay: View {
     let topRadius: CGFloat
     private var model: CompactStatusModel { CompactStatusModel.shared }
 
-    /// A new identity for each new thing said: the old line fades out as the new one fades in.
-    private func identity(_ line: CompactStatusLine?) -> String {
+    /// A new identity for each new thing said: the old line fades out as the new one fades in
+    /// (the status line and the visualizer cross-fade the same way).
+    private func identity(_ line: CompactStatusLine?, _ music: CompactMusicLine?) -> String {
+        if let music { return "♪\u{1F}\(music.source.rawValue)\u{1F}\(music.text)" }
         guard let line else { return "" }
         return "\(line.pillId)\u{1F}\(line.activity.kind.rawValue)\u{1F}\(line.text)\u{1F}\(line.pillName)\u{1F}\(line.turnStartedAt != nil)"
     }
 
     var body: some View {
         let line = model.line
+        let music = model.music
         // Same inputs as islandSize: the line sits where the island made room for it.
         let layout = CompactIslandLayout(notchWidth: state.notchWidth, hasNotch: state.hasNotch,
                                          status: model.metrics)
@@ -739,14 +742,94 @@ struct CompactStatusOverlay: View {
                                   fits: layout.statusWidth + 0.5 >= CompactStatusModel.contentWidth(line))
                     .frame(width: layout.statusWidth, height: islandH, alignment: .leading)
                     .offset(x: layout.statusX)
-                    .id(identity(line))
+                    .id(identity(line, nil))
+                    .transition(.opacity)
+            } else if let music, layout.hasStatus {
+                CompactVisualizerView(music: music,
+                                      fits: layout.statusWidth + 0.5 >= CompactStatusModel.musicContentWidth(music))
+                    .frame(width: layout.statusWidth, height: islandH, alignment: .leading)
+                    .offset(x: layout.statusX)
+                    .id(identity(nil, music))
                     .transition(.opacity)
             }
         }
         .frame(width: islandW, height: islandH, alignment: .topLeading)
         .clipShape(IslandShape(width: islandW, height: islandH, cornerRadius: cornerRadius, topRadius: topRadius))
-        .animation(.easeInOut(duration: 0.25), value: identity(line))
+        .animation(.easeInOut(duration: 0.25), value: identity(line, music))
         .allowsHitTesting(false)
+    }
+}
+
+// MARK: - Compact sound visualizer ("▁▃▅▂ ♪ Title · Artist")
+
+/// 12 bars of the audio spectrum, then "♪ Title · Artist", in the status line's slot while no
+/// agent works and music plays. Same fonts and spacing as CompactStatusModel.musicContentWidth.
+/// Clicks are handled by IslandWindowController (they open the music's pill).
+struct CompactVisualizerView: View {
+    let music: CompactMusicLine
+    /// The island made room for the whole title (see CompactStatusView.fits).
+    var fits = false
+
+    /// The music pill's colour (the user's own if they picked one), else the source's.
+    private var accent: Color {
+        if let def = PillCatalog.definition(for: music.pillId) { return Color(hex: def.color) }
+        switch music.source {
+        case .music:   return Color(hex: "#FA2D48")
+        case .spotify: return Color(hex: "#1DB954")
+        case .tidal:   return Color(hex: "#E6E8EB")
+        }
+    }
+
+    var body: some View {
+        HStack(spacing: 0) {
+            CompactVisualizerBars(accent: accent)
+                .frame(width: CompactVisualizer.barsWidth, height: CompactVisualizer.maxBarHeight)
+            Spacer().frame(width: CompactVisualizer.barsToText)
+            HStack(spacing: CompactStatusModel.spacing) {
+                Text(verbatim: "♪")
+                    .font(.system(size: 11))
+                    .foregroundColor(accent)
+                    .fixedSize()
+                title
+                    .font(.system(size: 11))
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+                    .fixedSize(horizontal: fits, vertical: false)
+                    .layoutPriority(1)
+            }
+        }
+    }
+
+    private var title: Text {
+        let headline = Text(verbatim: music.headline)
+            .fontWeight(.semibold)
+            .foregroundColor(Color(hex: "#F5F6F8"))
+        guard !music.subline.isEmpty else { return headline }
+        return headline + Text(verbatim: " · " + music.subline).foregroundColor(Color(hex: "#B0B5BE"))
+    }
+}
+
+/// The bars, drawn in one Canvas. They redraw only when the model hands new levels (at most
+/// 30 a second, only while capture runs): no timeline, so silent bands cost nothing and
+/// show a static idle skyline.
+struct CompactVisualizerBars: View {
+    let accent: Color
+    private var model: CompactStatusModel { CompactStatusModel.shared }
+
+    var body: some View {
+        let heights = CompactVisualizer.barHeights(model.levels)
+        let range = CompactVisualizer.maxBarHeight - CompactVisualizer.minBarHeight
+        Canvas { ctx, size in
+            let step = CompactVisualizer.barWidth + CompactVisualizer.barGap
+            for (i, h) in heights.enumerated() {
+                let rect = CGRect(x: CGFloat(i) * step, y: (size.height - h) / 2,
+                                  width: CompactVisualizer.barWidth, height: h)
+                // Taller bars glow a little brighter.
+                let strength = range > 0 ? (h - CompactVisualizer.minBarHeight) / range : 0
+                ctx.fill(Path(roundedRect: rect, cornerRadius: CompactVisualizer.barWidth / 2),
+                         with: .color(accent.opacity(0.55 + 0.45 * strength)))
+            }
+        }
     }
 }
 

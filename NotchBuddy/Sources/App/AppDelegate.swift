@@ -31,6 +31,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let debugMenuItem = NSMenuItem(title: "Debug", action: nil, keyEquivalent: "")
         debugMenuItem.submenu = debugMenu
         NSApp.mainMenu?.addItem(debugMenuItem)
+        VisualizerDebugFeed.shared.start()
         #endif
         #if PHONE_LINK
         CloudProbe.shared.startIfEnabled()
@@ -63,6 +64,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         menu.addItem(withTitle: NSLocalizedString("Weekly recap", comment: ""), action: #selector(openWeeklyRecap), keyEquivalent: "")
         menu.addItem(withTitle: NSLocalizedString("Settings…", comment: ""), action: #selector(openSettings), keyEquivalent: ",")
         menu.addItem(.separator())
+        #if DEBUG
+        VisualizerDebugFeed.shared.addMenuItems(to: menu)
+        menu.addItem(.separator())
+        #endif
         menu.addItem(withTitle: NSLocalizedString("Quit", comment: ""), action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
 
         statusItem?.menu = menu
