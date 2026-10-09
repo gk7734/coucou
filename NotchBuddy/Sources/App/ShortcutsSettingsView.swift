@@ -58,7 +58,6 @@ struct ShortcutsSettingsView: View {
     @ViewBuilder
     private func shortcutRow(_ action: ShortcutAction) -> some View {
         let isEnabled    = enabled[action] ?? action.enabledByDefault
-        let spec         = specs[action]   ?? ShortcutLogic.defaults[action]!
         let hasSysConf   = systemConflicts.contains(action)
         let hasIntConf   = internalDups.contains(action)
 

@@ -221,7 +221,7 @@ final class MusicController: ObservableObject {
 
     func openMusic() {
         if let app = NSWorkspace.shared.runningApplications.first(where: { $0.bundleIdentifier == "com.apple.Music" }) {
-            app.activate(options: .activateIgnoringOtherApps)
+            app.activate()
         } else {
             NSWorkspace.shared.open(URL(fileURLWithPath: "/System/Applications/Music.app"))
         }

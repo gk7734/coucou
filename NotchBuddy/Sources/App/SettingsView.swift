@@ -1772,7 +1772,7 @@ struct SettingsView: View {
         URLSession.shared.dataTask(with: req) { data, response, _ in
             let code = (response as? HTTPURLResponse)?.statusCode ?? 0
             guard let data, code == 200 else {
-                self.fetchN8nWorkflows(urls: urls, apiKey: apiKey, idx: idx + 1)
+                DispatchQueue.main.async { self.fetchN8nWorkflows(urls: urls, apiKey: apiKey, idx: idx + 1) }
                 return
             }
             let items: [[String: Any]]

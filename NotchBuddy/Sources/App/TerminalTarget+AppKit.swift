@@ -9,6 +9,6 @@ extension TerminalTarget {
         let running = Set(apps.compactMap(\.bundleIdentifier))
         guard let id = pick(sessionBundleId: sessionBundleId, running: running),
               let app = apps.first(where: { $0.bundleIdentifier == id }) else { return false }
-        return app.activate(options: .activateIgnoringOtherApps)
+        return app.activate()
     }
 }
