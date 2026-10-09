@@ -358,6 +358,8 @@ final class HookServer: @unchecked Sendable {
         guard let entry = takePresentedQuestion() else { return }
         presentedQuestionId = nil
         AppState.shared.pendingQuestion = nil
+        // Unpinned unless an approval card holds the island (the next question pins again).
+        AppState.shared.isPinned = AppState.shared.pendingApproval != nil
         mirror(pillId: entry.pillId, resetState: true)
         finishHeld(fd: entry.payload.fd, source: entry.payload.source, line: #"{"permissionDecision":"ask"}"#)
         presentQuestionHeadIfNeeded()

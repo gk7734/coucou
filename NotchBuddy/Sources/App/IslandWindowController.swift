@@ -17,6 +17,7 @@ final class IslandWindowController: NSWindowController {
     private var autoCloseObserver: ChangeObserver<TimeInterval>?
     private var openOnHoverObserver: ChangeObserver<Bool>?
     private var absenceObserver: ChangeObserver<TimeInterval>?
+    private var heldObserver: ChangeObserver<Bool>?
 
     // Confused recovery timer (set by handleDizzy)
     private var confusedRecoveryTimer: DispatchWorkItem?
@@ -305,7 +306,17 @@ final class IslandWindowController: NSWindowController {
             MainActor.assumeIsolated { self?.fsm.greetComplete() }
         }
 
-        fsm.isHeldOpen = { AppState.shared.pendingApproval != nil }
+        // An approval or a question holds the island open: it must not fold (the question's
+        // card would hand it back to the terminal) until the user answers it or it goes.
+        fsm.isHeldOpen = { AppState.shared.pendingApproval != nil || AppState.shared.pendingQuestion != nil }
+        // The hold ended without the pointer on the island (answered from the iPhone, in the
+        // editor or terminal, or expired): arm the normal auto-close, which nothing else would
+        // do, so the island doesn't stay open (drawing at full frame rate) for good.
+        heldObserver = ChangeObserver({ AppState.shared.pendingApproval != nil || AppState.shared.pendingQuestion != nil },
+                                      removeDuplicates: true) { [weak self] held in
+            guard let self, !held, self.fsm.state == .home, !self.wasInIsland else { return }
+            self.fsm.openedByAlert(pointerInside: false)
+        }
         // Views the user is busy in keep the normal auto-close when the pointer leaves;
         // the others (overview, finished, error…) fold right away.
         fsm.keepsOpenOnLeave = {
@@ -502,7 +513,10 @@ final class IslandWindowController: NSWindowController {
 
     func collapse(allowPendingApproval: Bool = false) {
         let keepsApprovalPending = allowPendingApproval && state.pendingApproval != nil
-        guard fsm.isHeldOpen?() != true || keepsApprovalPending else { return }
+        // The hotkey still folds a question, as before it held the island: its card then
+        // hands it back to the terminal.
+        let foldsQuestion = allowPendingApproval && state.pendingQuestion != nil
+        guard fsm.isHeldOpen?() != true || keepsApprovalPending || foldsQuestion else { return }
         if !keepsApprovalPending { state.isPinned = false }
         // Keep the FSM in step with what is on screen (home/coucou → petit now).
         fsm.collapse()
