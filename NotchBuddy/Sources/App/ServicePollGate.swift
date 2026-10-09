@@ -11,7 +11,7 @@ import Foundation
 //   (the poll is handed a generation, checked with `isCurrent`);
 // - turning the pill on or saving a new key polls right away instead of waiting
 //   for the next tick.
-// Everything but the timer runs on the main thread.
+// Everything but the poll itself runs on the main thread.
 
 final class ServicePollGate: @unchecked Sendable {
     private let pillId: String
@@ -50,9 +50,14 @@ final class ServicePollGate: @unchecked Sendable {
                poll: @escaping @Sendable (_ generation: Int) async -> Void) {
         guard timer == nil else { return }
         self.poll = poll
-        let t = DispatchSource.makeTimerSource(queue: .global(qos: .background))
+        // The timer fires on the main queue: this closure is formed in a @MainActor method,
+        // so Swift 6 checks at run time that it runs there (a global queue traps).
+        // The poll itself still runs off the main thread (runIfWanted).
+        let t = DispatchSource.makeTimerSource(queue: .main)
         t.schedule(deadline: .now() + delay, repeating: interval)
-        t.setEventHandler { [weak self] in self?.tick() }
+        t.setEventHandler { [weak self] in
+            MainActor.assumeIsolated { self?.runIfWanted() }
+        }
         t.resume()
         timer = t
 
@@ -89,11 +94,6 @@ final class ServicePollGate: @unchecked Sendable {
     }
 
     // MARK: - Private
-
-    private func tick() {
-        guard !DemoEngine.isPollerPaused else { return }
-        DispatchQueue.main.async { [weak self] in self?.runIfWanted() }
-    }
 
     @MainActor private func keyChanged() {
         generation += 1
