@@ -351,12 +351,18 @@ def main():
             sys.stdout.flush()
         sys.exit(0)
 
-    # All other events: fire-and-forget (0.3s timeout, never blocks)
+    # All other events: fire-and-forget (0.3s timeout, never blocks). The relay waits for the
+    # app's short "ok" (within the same 0.3s) so it is still alive while Coucou walks its
+    # process tree to find the IDE the session runs in; an exited process has no parent.
     try:
         s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
         s.settimeout(0.3)
         s.connect(socket_path)
         s.sendall((json.dumps(payload) + '\\n').encode())
+        try:
+            s.recv(64)
+        except Exception:
+            pass
         s.close()
     except Exception:
         pass  # Always exit cleanly — never block the agent
