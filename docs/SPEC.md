@@ -110,7 +110,7 @@ Toutes les pastilles déclarées sont définies dans `PillCatalog.all` (source d
 | `workspace` | Where you code | VS Code, Cursor, Antigravity *(GitHub only)*, Codex *(GitHub only)* | Integration | Claude Code / Cursor / Codex / Agent |
 | `agent` | Agents | Gemini CLI *(GitHub only)*, Copilot CLI *(GitHub only)*, Muse Code *(GitHub only)*, OpenCode *(GitHub only)*, Amp *(GitHub only)*, Hermes *(GitHub only)* | Agent | Agent |
 | `ai` | AI for the chat | Anthropic, Google AI, OpenAI, Ollama, LM Studio | Chat | — |
-| `service` | Services | Resend, n8n, Vercel, GitHub, Notion, Cal.com, Stripe, Apple Music *(GitHub only)*, Spotify *(GitHub only)* | Integration | — |
+| `service` | Services | Resend, n8n, Vercel, GitHub, Notion, Cal.com, Stripe, Apple Music *(GitHub only)*, Spotify *(GitHub only)*, TIDAL *(GitHub only)* | Integration | — |
 
 Couleurs : Cursor `#C0C4CC`, Codex `#2DD4BF`, Gemini CLI `#8AB4F8`, Antigravity `#E879F9`, Copilot CLI `#818CF8`, Muse Code `#38BDF8`, OpenCode `#4ADE80`, Amp `#F59E0B`, Hermes `#C084FC`, pastilles IA = `ChatProvider.accentHex` (Ollama `#FACC15`, LM Studio `#A3E635`).
 
@@ -118,6 +118,7 @@ Règles :
 - **`mainPillId`** (défaut `integration_claude`) est la pastille workspace toujours chargée. Elle ne compte pas dans les 4 places. Modifiable via le sélecteur Main dans Settings.
 - Quand `mainPillId != "integration_claude"`, la pastille VS Code est chargée seulement si une session VS Code est active (transient) ou si elle est cochée dans `activeIntegrations`.
 - Max 4 pastilles autres que `mainPillId` actives à la fois (`activeIntegrations`, persisté).
+- Pastille musique automatique *(GitHub only)* : avec « Show music automatically » (`autoMusicEnabled`, défaut oui), la pastille de la source qui joue (`integration_music`, `integration_spotify`, `integration_tidal`) apparaît sans être déclarée, ne compte pas dans les 4 places, se place après `mainPillId` et part 30 s après l'arrêt de la lecture (pause, fin, app quittée). Une pastille déclarée reste. Décision : `AutoMusicPill` (testée), appliquée par `MusicPillDriver`.
 - `removeTask` sur `mainPillId` ou une pastille déclarée + active → reset à `.idle` + `pillBadge = nil` + nom du catalogue (pas de suppression). Sinon → suppression normale.
 - `sortTasksByCatalog` : pastilles du catalogue dans l'ordre du catalogue ; pastilles hors catalogue juste après `integration_claude`.
 - Pastilles `githubOnly` : exclues des builds App Store (`#if APPSTORE`).
@@ -332,7 +333,7 @@ Mochi peut quitter l'island et vivre comme une icône flottante sur le bureau. I
 
 - Respiration, clignements, suivi des yeux depuis la position du panneau (pas depuis l'island).
 - Tenue : toujours celle de `state.resolvedOutfit` (main Mochi = toujours habillé).
-- Danse : mêmes règles que le mode compact (musique + intégration active + état autorisé).
+- Danse : mêmes règles que le mode compact (de la musique joue, quelle que soit la source — NowPlayingCenter — + état autorisé).
 - 30 fps actif, 10 fps au repos (`TimelineView` adapte `minimumInterval` selon `isSleeping`).
 
 ### Absences de la notch

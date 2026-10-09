@@ -76,6 +76,11 @@ final class NowPlayingCenter {
         controllers[source] = controller
     }
 
+    /// A source's own controls, playing or not (a paused source's card resumes it).
+    func controller(for source: NowPlayingSource) -> NowPlayingControlling? {
+        controllers[source]
+    }
+
     func playPause() { current.flatMap { controllers[$0.source] }?.playPause() }
     func next()      { current.flatMap { controllers[$0.source] }?.next() }
     func previous()  { current.flatMap { controllers[$0.source] }?.previous() }

@@ -238,6 +238,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         _ = MusicController.shared
         _ = SpotifyController.shared
         TidalController.shared.start()
+        MusicPillDriver.shared.start()
         #endif
     }
 }

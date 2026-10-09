@@ -390,6 +390,11 @@ final class AppState {
         }
     }
 
+    /// The music pill on the island because music plays (AutoMusicPill), not because the
+    /// user declared it: not in activeIntegrations, so it doesn't count against their 4.
+    /// Set by MusicPillDriver through setAutoMusicPill (GitHub build); nil otherwise.
+    @ObservationIgnored private(set) var autoMusicPillId: String? = nil
+
     // Pending API result
     var searchResult: SearchResult? = nil
 
@@ -731,8 +736,9 @@ final class AppState {
         if mainPillChoice != PillCatalog.autoMainPillId { activeIntegrations.remove(mainPillId) }
         ensureMainTask()
         for def in catalog {
-            // mainPillId always loads; activeIntegrations load
+            // mainPillId always loads; activeIntegrations load; so does the auto music pill
             let shouldLoad = def.id == mainPillId || activeIntegrations.contains(def.id)
+                || def.id == autoMusicPillId
             let loaded = tasks.contains(where: { $0.id == def.id })
             if shouldLoad && !loaded {
                 let task = AgentTask(id: def.id, name: def.name, color: def.color,
@@ -757,8 +763,11 @@ final class AppState {
         guard PillCatalog.available.contains(where: { $0.id == id }) else { return }
         if activeIntegrations.contains(id) {
             activeIntegrations.remove(id)
-            tasks.removeAll { $0.id == id }
-            if focusId == id { focusId = mainPillId }
+            // The music pill showing because music plays stays until the music stops.
+            if id != autoMusicPillId {
+                tasks.removeAll { $0.id == id }
+                if focusId == id { focusId = mainPillId }
+            }
         } else {
             guard activeIntegrations.count < 4 else { return }
             activeIntegrations.insert(id)
@@ -779,14 +788,45 @@ final class AppState {
     private func sortTasksByCatalog() {
         let order = PillCatalog.available.enumerated()
             .reduce(into: [String: Int]()) { $0[$1.element.id] = $1.offset }
+        // The auto music pill, undeclared, goes with the undeclared pills: the overview shows
+        // the first four after the main, and it would otherwise come last.
+        let autoMusic       = autoMusicPillId.flatMap { activeIntegrations.contains($0) ? nil : $0 }
+        let isUndeclared    = { (t: AgentTask) in order[t.id] == nil || t.id == autoMusic }
         let main            = tasks.filter { $0.id == mainPillId }
         let others          = tasks.filter { $0.id != mainPillId }
-        let undeclaredPills = others.filter { order[$0.id] == nil }
-        let sortedCatalog   = others.filter { order[$0.id] != nil }
+        let undeclaredPills = others.filter(isUndeclared)
+        let sortedCatalog   = others.filter { !isUndeclared($0) }
             .sorted { (order[$0.id] ?? 0) < (order[$1.id] ?? 0) }
         let result = main + undeclaredPills + sortedCatalog
         if result.map(\.id) != tasks.map(\.id) { tasks = result }
     }
+
+    #if !APPSTORE
+    /// Shows `id` as the auto music pill (nil: none), as AutoMusicPill decided. The pill
+    /// it replaces leaves unless it is declared, the main pill or has sessions.
+    func setAutoMusicPill(_ id: String?) {
+        let old = autoMusicPillId
+        guard id != old else { return }
+        autoMusicPillId = id
+        var kept = activeIntegrations
+        kept.insert(mainPillId)
+        if let old, hasSessions(old) { kept.insert(old) }
+        let change = AutoMusicPill.transition(from: old, to: id, kept: kept)
+        if let remove = change.remove {
+            tasks.removeAll { $0.id == remove }
+            if focusId == remove { focusId = mainPillId }
+        }
+        if let add = change.add, !tasks.contains(where: { $0.id == add }),
+           let def = PillCatalog.available.first(where: { $0.id == add }) {
+            tasks.append(AgentTask(id: def.id, name: def.name, color: def.color,
+                                   state: .idle, steps: [], source: def.source, isIntegration: true))
+        }
+        sortTasksByCatalog()
+        if focusId == nil { focusId = mainPillId }
+        syncMode()
+        syncView()
+    }
+    #endif
 
     // MARK: - Main pill (Auto)
 

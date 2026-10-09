@@ -62,16 +62,14 @@ struct BotCanvasView: View {
                 // Compute shouldDance per-frame (no observer lag)
                 let dancing: Bool = {
                     #if !APPSTORE
-                    let active = AppState.shared.activeIntegrations
-                    let music = AppState.shared.musicPlaying && active.contains("integration_music")
-                    let spotify = SpotifyController.shared.isPlaying && active.contains(SpotifyController.pillId)
-                    guard music || spotify else { return false }
+                    // Music plays, from any source (NowPlayingCenter)
+                    guard let playing = NowPlayingCenter.shared.current, playing.isPlaying else { return false }
                     let allowed: Set<BotState> = [.idle, .working, .thinking, .searching, .finished]
                     guard allowed.contains(state.effectiveState) else { return false }
                     if state.mode == .compact { return true }
                     guard state.mode == .expanded && state.view == .overview else { return false }
-                    return (music && state.focusId == "integration_music")
-                        || (spotify && state.focusId == SpotifyController.pillId)
+                    // Expanded: on the playing source's own pill
+                    return state.focusId == AutoMusicPill.pillId(forSource: playing.source.rawValue)
                     #else
                     return false
                     #endif

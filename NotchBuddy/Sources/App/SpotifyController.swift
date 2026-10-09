@@ -52,12 +52,20 @@ final class SpotifyController: ObservableObject {
     private let queue = DispatchQueue(label: "fr.louisraille.coucou.spotify")
     private var artworkCache: [String: NSImage] = [:]
     private var artworkCacheOrder: [String] = []
+    /// Where each cached artwork came from (NowPlayingInfo.artworkURL), by track id.
+    private var artworkURLCache: [String: URL] = [:]
     private var artworkLoadingId: String?
     private var pendingVolume: Int?
     private var volumeTask: Task<Void, Never>?
 
     private var isPillActive: Bool {
         AppState.shared.activeIntegrations.contains(Self.pillId)
+    }
+
+    /// Spotify's notification is listened to when the pill is declared, or always with
+    /// "Show music automatically" on (it costs nothing and needs no permission).
+    private var isFeedOn: Bool {
+        isPillActive || NowPlayingCenter.autoMusicEnabled
     }
 
     private var automationGranted: Bool {
@@ -81,6 +89,8 @@ final class SpotifyController: ObservableObject {
     }
 
     private init() {
+        NowPlayingCenter.shared.register(self, for: .spotify)
+
         // Spotify posts this on play, pause and track change. Seeks inside Spotify don't post it,
         // so the card re-reads the position when it appears.
         let tok1 = DistributedNotificationCenter.default().addObserver(
@@ -140,7 +150,11 @@ final class SpotifyController: ObservableObject {
             guard let self else { return }
             let active = integrations.contains(Self.pillId)
             defer { wasActive = active }
-            guard active else { self.clearState(); return }
+            guard active else {
+                // Still listened to for "Show music automatically": keep what plays
+                if !self.isFeedOn { self.clearState() }
+                return
+            }
             guard wasActive != true else { return }
             if wasActive == false || self.automationGranted {
                 // As when a publisher fired this before the property was set: read on the next turn
@@ -151,9 +165,14 @@ final class SpotifyController: ObservableObject {
 
     // MARK: - State
 
+    /// "Show music automatically" was switched: off (and no pill declared) forgets the track.
+    func feedSettingChanged() {
+        if !isFeedOn { clearState() }
+    }
+
     private func handleNotification(state: String?, trackId: String?, name: String?, artist: String?,
                                     album: String?, durationMs: Double?, position: Double?) {
-        guard isPillActive else { return }
+        guard isFeedOn else { return }
         if state == "Stopped" { clearState(); return }
 
         if let trackId, !trackId.isEmpty {
@@ -196,6 +215,7 @@ final class SpotifyController: ObservableObject {
             anchor(position(at: Date()))
         }
         isPlaying = playing
+        publish()
         // Reveal only on transition from not-playing → playing
         if playing && !wasPlaying {
             NotificationCenter.default.post(name: .musicReveal, object: nil)
@@ -213,9 +233,19 @@ final class SpotifyController: ObservableObject {
         isPlaying = false
         anchor(0)
         syncTaskName()
+        publish()
     }
 
-    private func syncTaskName() {
+    /// What Spotify plays, for NowPlayingCenter (Mochi dances, the auto pill shows).
+    private func publish() {
+        guard let track else { NowPlayingFeed.publish(nil, for: .spotify); return }
+        let title = track.isAd ? String(localized: "Advertisement") : track.title
+        NowPlayingFeed.publish(NowPlayingInfo(source: .spotify, title: title, artist: track.artist,
+                                              isPlaying: isPlaying, artworkURL: artworkURLCache[track.id]),
+                               for: .spotify)
+    }
+
+    func syncTaskName() {
         guard let idx = AppState.shared.tasks.firstIndex(where: { $0.id == Self.pillId }) else { return }
         let title = track?.isAd == true ? "Advertisement" : (track?.title ?? "")
         AppState.shared.tasks[idx].name = title.isEmpty
@@ -226,9 +256,10 @@ final class SpotifyController: ObservableObject {
     // MARK: - Reading Spotify
 
     /// Reads track, position, shuffle, repeat, volume and artwork URL. Never launches Spotify.
-    /// The first call is what makes macOS ask for Automation.
+    /// The first call is what makes macOS ask for Automation: only for a declared pill, or
+    /// once allowed (a press on a control of the automatic pill asks first).
     func refresh() {
-        guard isPillActive, isRunning else { return }
+        guard isFeedOn, isPillActive || automationGranted, isRunning else { return }
         Task {
             let result = await runAppleScript("""
                 tell application id "com.spotify.client"
@@ -268,7 +299,7 @@ final class SpotifyController: ObservableObject {
                 end tell
             """)
             guard case .success(let v) = result, let ps = v.first?.text else { return }
-            guard isPillActive else { return }
+            guard isFeedOn else { return }
             if ps == "stopped" || v.count < 11 { clearState(); return }
 
             let artworkURL = v[10].text.isEmpty ? nil : v[10].text
@@ -309,17 +340,23 @@ final class SpotifyController: ObservableObject {
                   let (data, response) = try? await URLSession.shared.data(from: imageURL),
                   (response as? HTTPURLResponse)?.statusCode == 200,
                   let image = NSImage(data: data) else { return }
-            cacheArtwork(image, for: id)
-            if self.track?.id == id { artwork = image }
+            cacheArtwork(image, for: id, url: imageURL)
+            if self.track?.id == id {
+                artwork = image
+                publish()
+            }
         }
     }
 
-    private func cacheArtwork(_ image: NSImage, for id: String) {
+    private func cacheArtwork(_ image: NSImage, for id: String, url: URL) {
         artworkCache[id] = image
+        artworkURLCache[id] = url
         artworkCacheOrder.removeAll { $0 == id }
         artworkCacheOrder.append(id)
         while artworkCacheOrder.count > 12 {
-            artworkCache[artworkCacheOrder.removeFirst()] = nil
+            let gone = artworkCacheOrder.removeFirst()
+            artworkCache[gone] = nil
+            artworkURLCache[gone] = nil
         }
     }
 
@@ -505,5 +542,12 @@ final class SpotifyController: ObservableObject {
         }
         return result
     }
+}
+
+// MARK: - NowPlayingControlling
+
+extension SpotifyController: NowPlayingControlling {
+    func next()     { nextTrack() }
+    func previous() { previousTrack() }
 }
 #endif

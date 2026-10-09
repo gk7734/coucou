@@ -23,7 +23,15 @@ final class MusicController: ObservableObject {
         AppState.shared.activeIntegrations.contains("integration_music")
     }
 
+    /// Music's notification is listened to when the pill is declared, or always with
+    /// "Show music automatically" on (it costs nothing and needs no permission).
+    private var isFeedOn: Bool {
+        isPillActive || NowPlayingCenter.autoMusicEnabled
+    }
+
     private init() {
+        NowPlayingCenter.shared.register(self, for: .music)
+
         // playerInfo fires whenever Music state changes (play/pause/track change).
         // Extract Sendable String? values before crossing into @MainActor.
         let tok1 = DistributedNotificationCenter.default().addObserver(
@@ -81,7 +89,7 @@ final class MusicController: ObservableObject {
                    UserDefaults.standard.bool(forKey: "coucou.musicAutomationGranted") {
                     self.fetchAndApply()
                 }
-            } else {
+            } else if !self.isFeedOn {
                 self.clearState()
             }
         }
@@ -130,8 +138,13 @@ final class MusicController: ObservableObject {
         return raw
     }
 
+    /// "Show music automatically" was switched: off (and no pill declared) forgets the track.
+    func feedSettingChanged() {
+        if !isFeedOn { clearState() }
+    }
+
     private func handlePlayerInfo(playerState: String?, name: String?, artist inputArtist: String?, album inputAlbum: String?) {
-        guard isPillActive else { return }
+        guard isFeedOn else { return }
 
         let playing = playerState == "Playing"
         let wasPlaying = AppState.shared.musicPlaying
@@ -142,6 +155,7 @@ final class MusicController: ObservableObject {
 
         AppState.shared.musicPlaying = playing
         syncTaskName()
+        publish()
 
         // Reveal only on transition from not-playing → playing
         if playing && !wasPlaying {
@@ -180,6 +194,7 @@ final class MusicController: ObservableObject {
             album      = values[3].isEmpty ? nil : values[3]
             AppState.shared.musicPlaying = playing
             syncTaskName()
+            publish()
             if playing && !wasPlaying {
                 NotificationCenter.default.post(name: .musicReveal, object: nil)
             }
@@ -190,9 +205,17 @@ final class MusicController: ObservableObject {
         trackTitle = nil; artist = nil; album = nil
         AppState.shared.musicPlaying = false
         syncTaskName()
+        publish()
     }
 
-    private func syncTaskName() {
+    /// What Music plays, for NowPlayingCenter (Mochi dances, the auto pill shows).
+    private func publish() {
+        guard let title = trackTitle else { NowPlayingFeed.publish(nil, for: .music); return }
+        NowPlayingFeed.publish(NowPlayingInfo(source: .music, title: title, artist: artist ?? "",
+                                              isPlaying: AppState.shared.musicPlaying), for: .music)
+    }
+
+    func syncTaskName() {
         guard let idx = AppState.shared.tasks.firstIndex(where: { $0.id == "integration_music" }) else { return }
         let title = trackTitle ?? ""
         AppState.shared.tasks[idx].name = title.isEmpty
@@ -270,5 +293,12 @@ final class MusicController: ObservableObject {
             }
         }
     }
+}
+
+// MARK: - NowPlayingControlling
+
+extension MusicController: NowPlayingControlling {
+    func next()     { nextTrack() }
+    func previous() { previousTrack() }
 }
 #endif

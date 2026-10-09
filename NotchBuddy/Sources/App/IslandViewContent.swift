@@ -255,6 +255,10 @@ struct OverviewView: View {
             #if !APPSTORE
             SpotifyController.shared.openSpotify()
             #endif
+        case "integration_tidal":
+            #if !APPSTORE
+            HostAppInfo.activate(NowPlayingSource.tidal.bundleId)
+            #endif
         default:
             // Non-integration real tasks
             if task.source == .n8n {
@@ -1929,6 +1933,15 @@ struct IntegrationCardView: View {
         #endif
     }
 
+    // TIDAL: what NowPlayingCenter knows, in every state
+    private var isTidal: Bool {
+        #if !APPSTORE
+        return task.id == "integration_tidal"
+        #else
+        return false
+        #endif
+    }
+
     private var statusDot: Color {
         #if !APPSTORE
         if task.id == "integration_music" {
@@ -2058,6 +2071,11 @@ struct IntegrationCardView: View {
         } else if isSpotify {
             #if !APPSTORE
             SpotifyCardView()
+                .transition(.opacity)
+            #endif
+        } else if isTidal {
+            #if !APPSTORE
+            NowPlayingSourceCard(source: .tidal, accent: Color(hex: task.color))
                 .transition(.opacity)
             #endif
         } else if agentSessionActive {

@@ -183,4 +183,78 @@ struct NowPlayingPressStyle: ButtonStyle {
             .animation(.spring(response: 0.2, dampingFraction: 0.7), value: configuration.isPressed)
     }
 }
+
+// MARK: - Source card (TIDAL: a source with no controller view of its own)
+
+/// What NowPlayingCenter knows of one source, laid out like the Apple Music card: title,
+/// artist, then previous / play-pause / next through the source's own controller.
+struct NowPlayingSourceCard: View {
+    let source: NowPlayingSource
+    let accent: Color
+    private var center: NowPlayingCenter { .shared }
+
+    var body: some View {
+        let info = center.bySource[source]
+        VStack(alignment: .leading, spacing: 4) {
+            // Line 1: dot + title (the source's name when nothing is loaded)
+            HStack(spacing: 6) {
+                Circle()
+                    .fill(accent)
+                    .frame(width: 7, height: 7)
+                Text(info?.title ?? source.displayName)
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundColor(Color(hex: "#F5F6F8"))
+                    .lineLimit(1).truncationMode(.tail)
+                    .frame(maxWidth: 150, alignment: .leading)
+            }
+            .padding(.top, 6)
+            .padding(.leading, 108)
+
+            // Line 2: artist, or that nothing plays
+            Text(info.map(\.artist) ?? String(localized: "Not playing"))
+                .font(.system(size: 11))
+                .foregroundColor(Color(hex: "#8E939C"))
+                .lineLimit(1).truncationMode(.tail)
+                .frame(maxWidth: 150, alignment: .leading)
+                .padding(.leading, 108)
+
+            // Line 3: controls
+            if info != nil {
+                HStack(spacing: 8) {
+                    Button(action: { center.controller(for: source)?.previous() }) {
+                        Image(systemName: "backward.fill")
+                            .font(.system(size: 11))
+                            .foregroundColor(Color(hex: "#8E939C"))
+                    }
+                    .buttonStyle(.plain)
+                    Button(action: { center.controller(for: source)?.playPause() }) {
+                        Image(systemName: info?.isPlaying == true ? "pause.fill" : "play.fill")
+                            .font(.system(size: 11))
+                            .foregroundColor(accent)
+                    }
+                    .buttonStyle(.plain)
+                    Button(action: { center.controller(for: source)?.next() }) {
+                        Image(systemName: "forward.fill")
+                            .font(.system(size: 11))
+                            .foregroundColor(Color(hex: "#8E939C"))
+                    }
+                    .buttonStyle(.plain)
+                }
+                .padding(.leading, 108)
+                .padding(.top, 6)
+            } else {
+                Button(String(format: String(localized: "Open %@"), source.displayName)) {
+                    HostAppInfo.activate(source.bundleId)
+                }
+                .font(.system(size: 11, weight: .medium))
+                .foregroundColor(accent.opacity(0.85))
+                .buttonStyle(.plain)
+                .padding(.leading, 108)
+                .padding(.top, 2)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .topLeading)
+        .padding(.top, 4)
+    }
+}
 #endif

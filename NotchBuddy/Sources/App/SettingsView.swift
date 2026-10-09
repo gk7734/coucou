@@ -138,6 +138,9 @@ struct SettingsView: View {
     #endif
     @AppStorage(ClaudeHost.terminalCardsKey) private var terminalCardsEnabled = false
     @AppStorage(AudioSpectrum.visualizerKey) private var visualizerEnabled = true
+    #if !APPSTORE
+    @AppStorage(NowPlayingCenter.autoMusicKey) private var autoMusicEnabled = true
+    #endif
     @State private var customSoundCount = SoundEngine.shared.customized.count
 
     private var appVersion: String {
@@ -335,6 +338,11 @@ struct SettingsView: View {
                         .frame(width: 48)
                     Text("min without movement")
                 }
+                #if !APPSTORE
+                Toggle("Show music automatically", isOn: $autoMusicEnabled)
+                    .help("While Apple Music, Spotify or TIDAL plays, its pill shows and Mochi dances, without adding the pill to Active pills.")
+                    .onChange(of: autoMusicEnabled) { _, _ in MusicPillDriver.shared.autoMusicChanged() }
+                #endif
             }
             .padding(6)
         }
