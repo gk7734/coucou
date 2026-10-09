@@ -207,6 +207,7 @@
 		9ECEE890D4486B6E83BD5B7F /* ColorHex.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8ACB4350729C6513824D1ADF /* ColorHex.swift */; };
 		9F43BE6E77E371FCEB7FE8BA /* ServiceDetailRunner.swift in Sources */ = {isa = PBXBuildFile; fileRef = E6AAC67875F84A862BC2A9AF /* ServiceDetailRunner.swift */; };
 		9FF91A6EDF43CB9702F3F5B9 /* MochiFrameRate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8E6F699C3899A77FEFC7B5E4 /* MochiFrameRate.swift */; };
+		A4EA99BDB40970A9B4E9BF59 /* NowPlaying.swift in Sources */ = {isa = PBXBuildFile; fileRef = A02502D702F6452D3C0F49FD /* NowPlaying.swift */; };
 		A7733EE60694EA3E2A86C37A /* IslandTypes.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0365DDE3C554F5E8570055F4 /* IslandTypes.swift */; };
 		A7EEF05A08F6B95370712089 /* error.wav in Resources */ = {isa = PBXBuildFile; fileRef = 871CA2BADC67D97C97C7009D /* error.wav */; };
 		A885B7E6DC43231BECE36E3D /* MochiWardrobe.swift in Sources */ = {isa = PBXBuildFile; fileRef = 79A7807ADD0963FF260D1FAD /* MochiWardrobe.swift */; };
@@ -276,6 +277,7 @@
 		D9FF132804EB458F6FA69116 /* GitHubActivity.swift in Sources */ = {isa = PBXBuildFile; fileRef = 168A9A73B519018FAB0AA465 /* GitHubActivity.swift */; };
 		DBA38F8F673F436CE1D4A2E0 /* MochiActivityAttributes.swift in Sources */ = {isa = PBXBuildFile; fileRef = 323F242B14A61A7C071EC115 /* MochiActivityAttributes.swift */; };
 		DBAA93FE823B9383A1E5FC57 /* HookSocketServer.swift in Sources */ = {isa = PBXBuildFile; fileRef = EBEC3FBB8941A27B19C8DE02 /* HookSocketServer.swift */; };
+		DC49282EDEE875C26B4A3CC3 /* NowPlaying.swift in Sources */ = {isa = PBXBuildFile; fileRef = A02502D702F6452D3C0F49FD /* NowPlaying.swift */; };
 		DCAC390FF9EC65B945A15B24 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 506824380E9C80B9BC6DCE72 /* Assets.xcassets */; };
 		DD2EEF113DB5EAA35CD88312 /* MochiOutfitDrawing.swift in Sources */ = {isa = PBXBuildFile; fileRef = E84E5D91129352E8A1D32AA4 /* MochiOutfitDrawing.swift */; };
 		DE05D09A32117582AC93A24A /* NotchBuddyApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1BD8F3CAA60CF37640759E1 /* NotchBuddyApp.swift */; };
@@ -457,6 +459,7 @@
 		9AF705275522F99CAE7E1429 /* ServiceStatus.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ServiceStatus.swift; sourceTree = "<group>"; };
 		9B66D0C664FB9FF74517AAF5 /* MacStubs.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MacStubs.swift; sourceTree = "<group>"; };
 		9F6D7015D6A77AA59323C0E7 /* AppLog.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppLog.swift; sourceTree = "<group>"; };
+		A02502D702F6452D3C0F49FD /* NowPlaying.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NowPlaying.swift; sourceTree = "<group>"; };
 		A14A61070D293AB4BBA303F7 /* NotchBuddy.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = NotchBuddy.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		A29F4C0B02BE91654D02AA0C /* BotCanvasView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BotCanvasView.swift; sourceTree = "<group>"; };
 		A5DC0954D23B69B247578437 /* question.wav */ = {isa = PBXFileReference; lastKnownFileType = audio.wav; path = question.wav; sourceTree = "<group>"; };
@@ -584,6 +587,7 @@
 				4B32A670C5335DEED782CE1D /* NotificationPolicy.swift */,
 				6F166E4282193475E1C00EEE /* NotificationsSettingsView.swift */,
 				BE03E03D1804B0B92C5C2DAD /* NotionPoller.swift */,
+				A02502D702F6452D3C0F49FD /* NowPlaying.swift */,
 				F56C7E1EBC74664A7F1689CF /* NowPlayingViews.swift */,
 				95555C0B28D5596C8338046D /* OrderedDelivery.swift */,
 				501DFE8274B5D5F1F86F716A /* PendingRequestQueue.swift */,
@@ -1012,6 +1016,7 @@
 				92FBD781508F75BA69D6A974 /* NotificationPolicy.swift in Sources */,
 				6253CA7410CF8EB6DE116CCB /* NotificationsSettingsView.swift in Sources */,
 				2F36E3C6C073E968A682AFA4 /* NotionPoller.swift in Sources */,
+				A4EA99BDB40970A9B4E9BF59 /* NowPlaying.swift in Sources */,
 				03FDC0AA0CEDE913B59D0F4D /* NowPlayingViews.swift in Sources */,
 				0F0557D2EA52536C0449D01B /* OrderedDelivery.swift in Sources */,
 				D8F3654C8DB6A5823016BF42 /* PendingRequestQueue.swift in Sources */,
@@ -1205,6 +1210,7 @@
 				974BE56F6C08C59288F9C004 /* NotificationPolicy.swift in Sources */,
 				780E797FDCF07642828B786D /* NotificationsSettingsView.swift in Sources */,
 				78FCEDC8F78B683AB10E6529 /* NotionPoller.swift in Sources */,
+				DC49282EDEE875C26B4A3CC3 /* NowPlaying.swift in Sources */,
 				3E84EA0AE7C450941ED943CF /* NowPlayingViews.swift in Sources */,
 				CC32EB0B4E8CC7708748F1A9 /* OrderedDelivery.swift in Sources */,
 				B31955759E2DA9879547E71B /* PendingRequestQueue.swift in Sources */,
