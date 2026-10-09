@@ -154,6 +154,7 @@ targets:
           - fr
           - hi
           - id
+          - ko
           - pt-BR
           - ru
           - zh-Hans
@@ -221,6 +222,7 @@ targets:
           - fr
           - hi
           - id
+          - ko
           - pt-BR
           - ru
           - zh-Hans
