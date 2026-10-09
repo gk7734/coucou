@@ -914,7 +914,7 @@ final class HookServer: @unchecked Sendable {
     @MainActor private var trimWork: DispatchWorkItem?
 
     /// Drops ended sessions past their retention and abandoned working ones (SessionBook.trim).
-    /// An IDE pill goes with its last session; other pills stay as they are. Runs when
+    /// An IDE or third-party agent pill goes with its last session; other pills stay, idle. Runs when
     /// something changed, and once more at the earliest expiry so a session whose agent
     /// vanished without SessionEnd doesn't stay forever; nothing is scheduled when no book
     /// can expire.
@@ -928,9 +928,15 @@ final class HookServer: @unchecked Sendable {
             guard trimmed != book else { continue }
             if trimmed.isEmpty {
                 state.sessionBooks[pillId] = nil
-                if HostResolver.isIDEPill(pillId) {
+                if HostResolver.isIDEPill(pillId) || Self.isExternalAgentPill(pillId) {
+                    // As SessionEnd / settleFinished would (a main or declared pill is reset).
                     state.clearSessionDiffs(for: pillId)
                     state.removeTask(id: pillId)
+                } else {
+                    // No book left to mirror: a session dropped while "working" (its agent
+                    // was killed) must not leave the pill working for good.
+                    state.updateTask(id: pillId, state: .idle)
+                    clearPillBadge(id: pillId)
                 }
             } else {
                 state.sessionBooks[pillId] = trimmed

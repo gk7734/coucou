@@ -39,6 +39,10 @@ enum SessionBookTests {
         check("new turn clears the final line", book.session("b")?.finalLine == nil)
         book.record(id: "b", agent: "codex", projectName: "", cwd: "", phase: nil, step: "note", at: at(6))
         check("nil phase keeps the phase", book.session("b")?.phase == .working)
+        var fresh = SessionBook()
+        fresh.record(id: "n", agent: "claude", projectName: "p", cwd: "", phase: nil, step: "Waiting for input?", at: at(0))
+        check("a session first seen without a phase starts idle", fresh.session("n")?.phase == .idle
+              && fresh.session("n")?.turnStartedAt == nil)
 
         print("steps are capped")
         var many = SessionBook()

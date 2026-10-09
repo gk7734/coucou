@@ -92,7 +92,10 @@ struct SessionBook: Equatable, Sendable {
     // MARK: Events
 
     /// Records an event for a session, creating it when new, and moves it to the front.
-    /// `phase` nil keeps the session's current phase (e.g. a Notification that only adds a step).
+    /// `phase` nil keeps the session's current phase (e.g. a Notification that only adds a step);
+    /// a session first seen through such an event starts idle, not working: nothing says it
+    /// works (after a relaunch, the "waiting for your input" Notification showed a working
+    /// pill and a stall hint for an hour).
     mutating func record(id: String, agent: String, projectName: String, cwd: String,
                          phase: SessionPhase?, step: String? = nil, at now: Date) {
         var session: AgentSession
@@ -103,7 +106,7 @@ struct SessionBook: Equatable, Sendable {
             if !cwd.isEmpty { session.cwd = cwd }
         } else {
             session = AgentSession(id: id, agent: agent, projectName: projectName, cwd: cwd,
-                                   phase: phase ?? .working, startedAt: now, lastEventAt: now)
+                                   phase: phase ?? .idle, startedAt: now, lastEventAt: now)
         }
         if let phase {
             if phase == .working && session.phase != .working { session.finalLine = nil }
