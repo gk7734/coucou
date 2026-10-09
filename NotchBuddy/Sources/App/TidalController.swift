@@ -175,8 +175,11 @@ final class TidalController: NowPlayingControlling {
         if let snapshot {
             publish(TidalNowPlaying.resolve(windowTitle: snapshot.windowTitle,
                                             reading: snapshot.reading, audible: audible))
+        } else {
+            // A failed read (TIDAL busy, no window) keeps what was published, paused once
+            // the Mac is silent; the next one retries.
+            publish(TidalNowPlaying.afterFailedRead(published: published, audible: audible))
         }
-        // A failed read (TIDAL busy, no window) keeps what was published; the next one retries.
         if readAgainAfterFlight {
             readAgainAfterFlight = false
             scheduleRead(after: 0)

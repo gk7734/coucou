@@ -258,6 +258,16 @@ enum TidalNowPlaying {
         return TidalTrack(title: title, artist: artist, isPlaying: isPlaying)
     }
 
+    /// What to publish when a read found nothing (no window: TIDAL closed to the Dock, or
+    /// busy): what was published stays, except that a track still shown playing while the Mac
+    /// is silent is now paused — otherwise a TIDAL paused without a window stayed "playing"
+    /// for good (the music pill, Mochi's dance and the visualizer with it).
+    static func afterFailedRead(published: TidalTrack?, audible: Bool) -> TidalTrack? {
+        guard var track = published, track.isPlaying, !audible else { return published }
+        track.isPlaying = false
+        return track
+    }
+
     private static func nonEmpty(_ text: String) -> String? {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
         return trimmed.isEmpty ? nil : trimmed

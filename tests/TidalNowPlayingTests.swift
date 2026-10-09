@@ -192,6 +192,16 @@ enum TidalNowPlayingTests {
               TidalNowPlaying.resolve(windowTitle: title, reading: nil, audible: false)?.isPlaying == false)
         check("nothing loaded: nil", TidalNowPlaying.resolve(windowTitle: "TIDAL", reading: empty, audible: true) == nil)
         check("no window: nil", TidalNowPlaying.resolve(windowTitle: nil, reading: nil, audible: true) == nil)
+
+        print("after a read that found nothing")
+        let playing = TidalTrack(title: "Blue Ambience", artist: "Asmi", isPlaying: true)
+        let stopped = TidalTrack(title: "Blue Ambience", artist: "Asmi", isPlaying: false)
+        check("playing and still audible: kept",
+              TidalNowPlaying.afterFailedRead(published: playing, audible: true) == playing)
+        check("playing but the Mac went silent: paused",
+              TidalNowPlaying.afterFailedRead(published: playing, audible: false) == stopped)
+        check("paused stays paused", TidalNowPlaying.afterFailedRead(published: stopped, audible: true) == stopped)
+        check("nothing published: nothing", TidalNowPlaying.afterFailedRead(published: nil, audible: false) == nil)
         var noArtist = r
         noArtist.artist = nil
         check("artist from the window title when it is the same track",
