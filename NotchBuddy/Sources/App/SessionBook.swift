@@ -29,6 +29,9 @@ enum SessionPhase: String, Equatable, Sendable {
 
     /// The user is the one holding it up, so silence is not a stall.
     var waitsOnUser: Bool { self == .waitingApproval || self == .waitingAnswer }
+
+    /// The turn is over: the next working event starts a new one.
+    var endsTurn: Bool { self == .finished || self == .error || self == .idle }
 }
 
 struct AgentSession: Identifiable, Equatable, Sendable {
@@ -43,6 +46,10 @@ struct AgentSession: Identifiable, Equatable, Sendable {
     var finalLine: String? = nil
     var startedAt: Date
     var lastEventAt: Date
+    /// When the current turn began: the session started working after being idle, finished
+    /// or in error (a prompt, usually). Waiting on the user and back is the same turn.
+    /// nil for a session that has not worked yet.
+    var turnStartedAt: Date? = nil
 
     static let maxSteps = 20
 }
@@ -100,6 +107,9 @@ struct SessionBook: Equatable, Sendable {
         }
         if let phase {
             if phase == .working && session.phase != .working { session.finalLine = nil }
+            if phase == .working && (session.turnStartedAt == nil || session.phase.endsTurn) {
+                session.turnStartedAt = now
+            }
             session.phase = phase
         }
         if let step, !step.isEmpty {

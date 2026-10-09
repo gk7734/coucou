@@ -192,16 +192,14 @@ struct BotCanvasView: View {
     /// top of its screen, which can be any display, anywhere in the arrangement.
     /// Same size and position as BotPlacement draws, notchless screens included.
     private func islandBotPoint(state: AppState) -> CGPoint {
-        let (islandW, islandH) = islandSize(mode: state.mode, view: state.view,
-                                             progress: state.uploadProgress,
-                                             nw: state.notchWidth, nh: state.notchHeight,
-                                             chatCount: state.chatHistory.count)
+        let size = islandSize(state)
+        let (islandW, islandH) = (size.width, size.height)
         let (botCx, botCy, _, _) = botPosition(mode: state.mode, view: state.view,
                                                 islandW: islandW, islandH: islandH,
                                                 uploadProgress: state.uploadProgress,
                                                 hasNotch: state.hasNotch)
         let screen = IslandWindowController.islandScreen().frame
-        return DesktopSpace.topDown(CGPoint(x: screen.midX - islandW / 2 + botCx,
+        return DesktopSpace.topDown(CGPoint(x: screen.midX + size.offsetX - islandW / 2 + botCx,
                                             y: screen.maxY - botCy),
                                     desktopTop: IslandWindowController.desktopTop)
     }

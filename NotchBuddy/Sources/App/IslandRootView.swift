@@ -28,7 +28,11 @@ struct IslandContainer: View {
     @State private var cornerRadius: CGFloat = IslandConst.roundedCorner
     // topRadius > 0 → convex expanded corners; < 0 → concave ear cutouts
     @State private var islandTopRadius: CGFloat = 0
+    /// Island centre minus panel centre: a compact island with its status line on a notched
+    /// screen grows its right ear only (CompactIslandLayout). Animated with the width.
+    @State private var islandOffsetX: CGFloat = 0
     @State private var greetNotif: Bool = false
+    private var compactStatus: CompactStatusModel { CompactStatusModel.shared }
 
     private let openSpring = Animation.spring(response: 0.5, dampingFraction: 0.72)
     private let closeEase  = Animation.timingCurve(0.45, 0, 0.2, 1, duration: 0.34)
@@ -117,29 +121,42 @@ struct IslandContainer: View {
 
             Group {
                 if state.mode == .compact {
+                    // Own views, so a new line or a hovered mini redraws them, not the island.
+                    CompactStatusOverlay(state: state, islandW: islandWidth, islandH: islandHeight,
+                                         cornerRadius: cornerRadius, topRadius: islandTopRadius)
+                        .transition(.opacity)
                     CompactMiniGrid(state: state)
                         .scaleEffect(IslandRestingLayout(width: islandWidth, height: islandHeight).miniGridScale)
                         .position(x: islandWidth - 40, y: islandHeight / 2)
                         .transition(.opacity)
+                    CompactMiniTooltipLayer(state: state, islandW: islandWidth, islandH: islandHeight)
                 }
             }
             .animation(.easeInOut(duration: 0.25), value: state.mode == .compact)
         }
         .frame(width: islandWidth, height: islandHeight, alignment: .topLeading)
+        .offset(x: islandOffsetX)
         .onChange(of: state.mode) { oldMode, newMode in
             let shrinking = modeOrder(newMode) < modeOrder(oldMode)
             let anim = shrinking ? closeEase : openSpring
-            let (w, h) = islandSize(mode: newMode, view: state.view,
-                                    progress: state.uploadProgress,
-                                    nw: state.notchWidth, nh: state.notchHeight,
-                                    chatCount: state.chatHistory.count)
+            let size = islandSize(state, mode: newMode)
             let cr  = newMode == .expanded ? IslandConst.expandedCorner : IslandConst.roundedCorner
             let tr: CGFloat = 0
             withAnimation(anim) {
-                islandWidth      = w
-                islandHeight     = h
+                islandWidth      = size.width
+                islandHeight     = size.height
+                islandOffsetX    = size.offsetX
                 cornerRadius     = cr
                 islandTopRadius  = tr
+            }
+        }
+        .onChange(of: compactStatus.metrics) { old, new in
+            // The status line came, went or changed width: the compact island follows it.
+            guard state.mode == .compact else { return }
+            let size = islandSize(state)
+            withAnimation(new.statusWidth >= old.statusWidth ? openSpring : closeEase) {
+                islandWidth   = size.width
+                islandOffsetX = size.offsetX
             }
         }
         .onChange(of: state.view) { _, newView in
@@ -149,13 +166,11 @@ struct IslandContainer: View {
             if UploadSequenceEngine.shared.isActive && !uploadViews.contains(newView) {
                 UploadSequenceEngine.shared.deactivate()
             }
-            let (w, h) = islandSize(mode: .expanded, view: newView,
-                                    progress: state.uploadProgress,
-                                    nw: state.notchWidth, nh: state.notchHeight,
-                                    chatCount: state.chatHistory.count)
+            let size = islandSize(state, mode: .expanded, view: newView)
             withAnimation(openSpring) {
-                islandWidth  = w
-                islandHeight = h
+                islandWidth   = size.width
+                islandHeight  = size.height
+                islandOffsetX = size.offsetX
             }
         }
         .onChange(of: state.questionContentHeight) { _, _ in
@@ -169,12 +184,10 @@ struct IslandContainer: View {
             }
         }
         .onAppear {
-            let (w, h) = islandSize(mode: state.mode, view: state.view,
-                                    progress: state.uploadProgress,
-                                    nw: state.notchWidth, nh: state.notchHeight,
-                                    chatCount: state.chatHistory.count)
-            islandWidth      = w
-            islandHeight     = h
+            let size = islandSize(state)
+            islandWidth      = size.width
+            islandHeight     = size.height
+            islandOffsetX    = size.offsetX
             cornerRadius     = state.mode == .expanded ? IslandConst.expandedCorner : IslandConst.roundedCorner
             islandTopRadius  = 0
         }
@@ -183,12 +196,10 @@ struct IslandContainer: View {
         }
         .onReceive(NotificationCenter.default.publisher(for: .islandScreenChanged)) { _ in
             // New screen, new resting size (notch ↔ bar): snap without animation.
-            let (w, h) = islandSize(mode: state.mode, view: state.view,
-                                    progress: state.uploadProgress,
-                                    nw: state.notchWidth, nh: state.notchHeight,
-                                    chatCount: state.chatHistory.count)
-            islandWidth  = w
-            islandHeight = h
+            let size = islandSize(state)
+            islandWidth   = size.width
+            islandHeight  = size.height
+            islandOffsetX = size.offsetX
         }
     }
 
@@ -677,9 +688,12 @@ struct ClaudePlanHeaderPill: View {
 struct CompactMiniGrid: View {
     var state: AppState
 
-    private var others: [AgentTask] {
+    /// The pills shown as mini Mochis, in grid order (IslandWindowController hit-tests them).
+    static func others(_ state: AppState) -> [AgentTask] {
         Array(state.tasks.filter { $0.id != state.focusId }.prefix(4))
     }
+
+    private var others: [AgentTask] { Self.others(state) }
 
     var body: some View {
         let cols = [GridItem(.fixed(12), spacing: 4), GridItem(.fixed(12), spacing: 4)]
@@ -693,5 +707,164 @@ struct CompactMiniGrid: View {
             }
         }
         .frame(width: 28, height: 28)
+    }
+}
+
+// MARK: - Compact status line ("Orca · ✎ HookServer.swift  2m")
+
+/// The status line inside the compact island, clipped to the island's shape so it never shows
+/// outside it while the island grows. Clicks are handled by IslandWindowController (AppKit).
+struct CompactStatusOverlay: View {
+    var state: AppState
+    let islandW: CGFloat
+    let islandH: CGFloat
+    let cornerRadius: CGFloat
+    let topRadius: CGFloat
+    private var model: CompactStatusModel { CompactStatusModel.shared }
+
+    /// A new identity for each new thing said: the old line fades out as the new one fades in.
+    private func identity(_ line: CompactStatusLine?) -> String {
+        guard let line else { return "" }
+        return "\(line.pillId)\u{1F}\(line.activity.kind.rawValue)\u{1F}\(line.text)\u{1F}\(line.pillName)\u{1F}\(line.turnStartedAt != nil)"
+    }
+
+    var body: some View {
+        let line = model.line
+        // Same inputs as islandSize: the line sits where the island made room for it.
+        let layout = CompactIslandLayout(notchWidth: state.notchWidth, hasNotch: state.hasNotch,
+                                         status: model.metrics)
+        ZStack(alignment: .topLeading) {
+            if let line, layout.hasStatus {
+                CompactStatusView(line: line)
+                    .frame(width: layout.statusWidth, height: islandH, alignment: .leading)
+                    .offset(x: layout.statusX)
+                    .id(identity(line))
+                    .transition(.opacity)
+            }
+        }
+        .frame(width: islandW, height: islandH, alignment: .topLeading)
+        .clipShape(IslandShape(width: islandW, height: islandH, cornerRadius: cornerRadius, topRadius: topRadius))
+        .animation(.easeInOut(duration: 0.25), value: identity(line))
+        .allowsHitTesting(false)
+    }
+}
+
+/// The label under a hovered mini Mochi, right-aligned on the island's right edge so it
+/// stays inside the panel. Drawn below the island, where the panel lets clicks through.
+struct CompactMiniTooltipLayer: View {
+    var state: AppState
+    let islandW: CGFloat
+    let islandH: CGFloat
+    private var model: CompactStatusModel { CompactStatusModel.shared }
+
+    var body: some View {
+        ZStack(alignment: .topTrailing) {
+            if let id = model.hoveredMiniId, let task = state.tasks.first(where: { $0.id == id }) {
+                CompactMiniTooltip(label: model.miniLabel(for: task, state: state))
+                    .id(id)
+                    .transition(.opacity)
+            }
+        }
+        .frame(width: max(0, islandW - 4), alignment: .topTrailing)
+        .offset(y: islandH + 5)
+        .animation(.easeInOut(duration: 0.15), value: model.hoveredMiniId)
+        .allowsHitTesting(false)
+    }
+}
+
+/// name · icon text [elapsed]. Same fonts and spacing as CompactStatusModel.contentWidth.
+struct CompactStatusView: View {
+    let line: CompactStatusLine
+
+    private static let amber = Color(hex: "#F5A524")
+
+    private var iconColor: Color {
+        switch line.activity.kind {
+        case .needsOK, .asks: Self.amber
+        case .error:          Color(hex: "#F4505E")
+        case .done:           Color(hex: "#34D399")
+        case .thinking:       Color(hex: "#A78BFA")
+        default:              Color(hex: "#8E939C")
+        }
+    }
+
+    var body: some View {
+        let kind = line.activity.kind
+        let waits = kind.waitsOnUser
+        HStack(spacing: CompactStatusModel.spacing) {
+            Text(verbatim: line.pillName)
+                .font(.system(size: 11, weight: .semibold))
+                .foregroundColor(waits ? Self.amber : Color(hex: "#F5F6F8"))
+                .lineLimit(1)
+                .fixedSize()
+            Text(verbatim: "·")
+                .font(.system(size: 11))
+                .foregroundColor(Color(hex: "#6B7079"))
+                .fixedSize()
+            Image(systemName: kind.symbolName)
+                .font(.system(size: 9, weight: .semibold))
+                .foregroundColor(iconColor)
+                // The gentle pulse of a line waiting on the user (a symbol effect, no redraw loop).
+                .symbolEffect(.pulse, options: .repeating, isActive: waits)
+                .frame(width: CompactStatusModel.iconWidth)
+            Text(verbatim: line.text)
+                .font(.system(size: 11))
+                .foregroundColor(waits ? Self.amber : Color(hex: "#B0B5BE"))
+                .lineLimit(1)
+                .truncationMode(kind == .edit || kind == .read ? .middle : .tail)
+            if let start = line.turnStartedAt {
+                Spacer(minLength: CompactStatusModel.timeGap)
+                CompactElapsedText(since: start)
+            }
+        }
+    }
+}
+
+/// "2m": how long the turn has run. Ticks every 30 s, only while it is on screen (it is
+/// mounted in the compact island only).
+struct CompactElapsedText: View {
+    let since: Date
+
+    var body: some View {
+        TimelineView(.periodic(from: since, by: 30)) { context in
+            Text(verbatim: CompactStatus.elapsedLabel(since: since, now: context.date))
+                .font(.system(size: 10, weight: .medium).monospacedDigit())
+                .foregroundColor(Color(hex: "#6B7079"))
+                .fixedSize()
+        }
+    }
+}
+
+/// "PyCharm · thinking" under a hovered mini Mochi.
+struct CompactMiniTooltip: View {
+    let label: (name: String, activity: CompactActivity?, word: String)
+
+    var body: some View {
+        HStack(spacing: 4) {
+            Text(verbatim: label.name)
+                .font(.system(size: 10, weight: .semibold))
+                .foregroundColor(Color(hex: "#F5F6F8"))
+            Text(verbatim: "·")
+                .font(.system(size: 10))
+                .foregroundColor(Color(hex: "#6B7079"))
+            if let activity = label.activity {
+                Image(systemName: activity.kind.symbolName)
+                    .font(.system(size: 8, weight: .semibold))
+                    .foregroundColor(activity.kind.waitsOnUser ? Color(hex: "#F5A524") : Color(hex: "#8E939C"))
+                Text(verbatim: CompactStatus.text(activity))
+                    .font(.system(size: 10))
+                    .foregroundColor(Color(hex: "#B0B5BE"))
+            } else {
+                Text(verbatim: label.word)
+                    .font(.system(size: 10))
+                    .foregroundColor(Color(hex: "#B0B5BE"))
+            }
+        }
+        .lineLimit(1)
+        .fixedSize()
+        .padding(.horizontal, 8)
+        .padding(.vertical, 4)
+        .background(Capsule().fill(Color.black))
+        .overlay(Capsule().stroke(Color.white.opacity(0.12), lineWidth: 1))
     }
 }

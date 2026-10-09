@@ -33,6 +33,8 @@ final class IslandWindowController: NSWindowController {
     // Window attach drag (M8)
     private var attachDragStart: NSPoint? = nil
     private var pendingIslandClick = false   // any island click → expand on mouseUp
+    /// What a click in the compact island landed on (status line, mini Mochi), from mouseDown.
+    private var compactClickTarget: CompactClickTarget?
     private var inAttachDrag = false
     private var dragGhostPanel: NSPanel? = nil
     private var dragGhostSize: CGFloat = 0
@@ -141,6 +143,7 @@ final class IslandWindowController: NSWindowController {
         container.addSubview(dropView)   // z-top: drag only (hitTest→nil, transparent to mouse)
         panel.contentView = container
 
+        CompactStatusModel.shared.start()
         startPolling()
         startKeyMonitor()
         startLocalKeyMonitor()
@@ -400,6 +403,13 @@ final class IslandWindowController: NSWindowController {
             fsm.mouseLeft()
         }
 
+        // Mini Mochi under the pointer in the compact island (its label shows under the island).
+        var hoveredMini: String? = nil
+        if inIsland, state.mode == .compact, case .mini(let id)? = compactTarget(at: local) { hoveredMini = id }
+        if CompactStatusModel.shared.hoveredMiniId != hoveredMini {
+            CompactStatusModel.shared.hoveredMiniId = hoveredMini
+        }
+
         // Bot-head hover (love emote)
         let overBot = state.mode == .expanded && state.stateOverride == nil && isBotHit(local)
         if overBot && !botHovering { botHoverIn(mousePos: NSEvent.mouseLocation) }
@@ -524,14 +534,7 @@ final class IslandWindowController: NSWindowController {
             expand(to: .prompt)
 
         case .goToAlert:
-            if state.pendingApproval != nil {
-                islandPanel.makeKey()
-                fsm.openedExternally()
-                expand(to: .approval)
-            } else if state.pendingQuestion != nil {
-                islandPanel.makeKey()
-                expand(to: .question)
-            } else {
+            if !openPendingAlert() {
                 NotificationCenter.default.post(name: .triggerEmote, object: BotEmote.annoyed)
                 SoundEngine.shared.play("error")
             }
@@ -636,6 +639,76 @@ final class IslandWindowController: NSWindowController {
             return true
         }
         return false
+    }
+
+    /// Opens the island on the approval or question waiting for the user (the ⌃⌥A hotkey,
+    /// a click on the amber status line). false when nothing waits.
+    @discardableResult
+    private func openPendingAlert() -> Bool {
+        if state.pendingApproval != nil {
+            islandPanel.makeKey()
+            fsm.openedExternally()
+            expand(to: .approval)
+            return true
+        }
+        if state.pendingQuestion != nil {
+            islandPanel.makeKey()
+            expand(to: .question)
+            return true
+        }
+        return false
+    }
+
+    // MARK: - Compact island clicks
+
+    enum CompactClickTarget {
+        case status(CompactStatusLine)
+        case mini(String)
+    }
+
+    /// The status line or mini Mochi under a point of the panel (AppKit window coordinates),
+    /// from the same layout the island is drawn with (CompactIslandLayout). nil elsewhere and
+    /// outside the compact island.
+    private func compactTarget(at windowPoint: CGPoint) -> CompactClickTarget? {
+        guard state.mode == .compact, let panel = window as? IslandPanel else { return nil }
+        let rect = panel.currentIslandFrame(nw: notchW, nh: notchH)
+        let x = windowPoint.x - rect.minX
+        let y = rect.maxY - windowPoint.y   // from the island's top
+        let model = CompactStatusModel.shared
+        let layout = CompactIslandLayout(notchWidth: notchW, hasNotch: hasNotch, status: model.metrics)
+        if let line = model.line, layout.statusContains(x: x) { return .status(line) }
+        let others = CompactMiniGrid.others(state)
+        let scale = IslandRestingLayout(width: rect.width, height: rect.height).miniGridScale
+        if let i = layout.miniIndex(atX: x, y: y, height: rect.height, count: others.count, scale: scale) {
+            return .mini(others[i].id)
+        }
+        return nil
+    }
+
+    /// A click in the folded island: the status line opens its pill (or the card waiting on
+    /// the user), a mini Mochi its pill, anything else the island as it is.
+    private func openFromClick(_ target: CompactClickTarget?) {
+        switch target {
+        case .status(let line)?:
+            if line.activity.kind.waitsOnUser, openPendingAlert() { return }
+            focusFromCompact(line.pillId)
+        case .mini(let id)?:
+            focusFromCompact(id)
+        case nil:
+            break
+        }
+        if fsm.state == .home {
+            // FSM already thinks it's open (e.g. the view folded it): just reopen.
+            expand(to: defaultView())
+        } else {
+            fsm.click()   // FSM petit/hidden→home; onTransition calls expand(to:)
+        }
+    }
+
+    private func focusFromCompact(_ pillId: String) {
+        guard state.tasks.contains(where: { $0.id == pillId }) else { return }
+        state.setFocus(pillId)
+        state.cardSelection = nil
     }
 
     // MARK: - Pill cycling helpers
@@ -778,8 +851,10 @@ final class IslandWindowController: NSWindowController {
                 self.pendingIslandClick = true
                 self.botHoverTimer?.cancel()
                 self.botHovering = false
+                let onBot = self.isBotHit(event.locationInWindow)
+                self.compactClickTarget = onBot ? nil : self.compactTarget(at: event.locationInWindow)
                 // Drag only starts when clicking directly on the bot head
-                guard self.isBotHit(event.locationInWindow) else { return }
+                guard onBot else { return }
                 // Notch Mochi is invisible when on desktop — no drag, no slap
                 guard !self.state.mochiOnDesktop else { return }
                 self.attachDragStart = NSEvent.mouseLocation
@@ -851,18 +926,15 @@ final class IslandWindowController: NSWindowController {
             MainActor.assumeIsolated {
                 let hadPendingClick = self.pendingIslandClick
                 let wasDragging     = self.inAttachDrag
+                let target          = self.compactClickTarget
                 self.pendingIslandClick = false
+                self.compactClickTarget = nil
                 if wasDragging {
                     finishDrag()
                 } else {
                     self.attachDragStart = nil
                     if hadPendingClick && self.state.mode != .expanded {
-                        if self.fsm.state == .home {
-                            // FSM already thinks it's open (e.g. the view folded it): just reopen.
-                            self.expand(to: self.defaultView())
-                        } else {
-                            self.fsm.click()   // FSM petit/hidden→home; onTransition calls expand(to:)
-                        }
+                        self.openFromClick(target)
                     }
                 }
             }
@@ -1128,9 +1200,9 @@ final class IslandWindowController: NSWindowController {
         let s = AppState.shared
         let panelH = window?.frame.height ?? IslandConst.panelHeight
         let panelW = window?.frame.width  ?? IslandConst.panelWidth
-        let (islandW, islandH) = islandSize(mode: s.mode, view: s.view, progress: s.uploadProgress,
-                                            nw: notchW, nh: notchH, chatCount: s.chatHistory.count)
-        let islandMinX = (panelW - islandW) / 2
+        let size = islandSize(s, nw: notchW, nh: notchH)
+        let (islandW, islandH) = (size.width, size.height)
+        let islandMinX = (panelW - islandW) / 2 + size.offsetX
         let (cx, cy, diameter, _) = botPosition(mode: s.mode, view: s.view,
                                                   islandW: islandW, islandH: islandH,
                                                   uploadProgress: s.uploadProgress, hasNotch: s.hasNotch)
@@ -1212,10 +1284,9 @@ final class IslandPanel: NSPanel {
     }
 
     func currentIslandFrame(nw: CGFloat, nh: CGFloat) -> CGRect {
-        let s = AppState.shared
-        let (w, h) = islandSize(mode: s.mode, view: s.view, progress: s.uploadProgress,
-                                nw: nw, nh: nh, chatCount: s.chatHistory.count)
-        return CGRect(x: (frame.width - w) / 2, y: frame.height - h, width: w, height: h)
+        let size = islandSize(AppState.shared, nw: nw, nh: nh)
+        return CGRect(x: (frame.width - size.width) / 2 + size.offsetX, y: frame.height - size.height,
+                      width: size.width, height: size.height)
     }
 }
 
@@ -1268,25 +1339,50 @@ extension Notification.Name {
 
 // MARK: - islandSize (takes real notch dimensions)
 
+/// The island's size, and how far its centre sits from the panel's (screen's) centre: only
+/// a compact island showing its status line on a notched screen is off-centre (its right
+/// ear grows, CompactIslandLayout).
+struct IslandSize: Equatable {
+    var width: CGFloat
+    var height: CGFloat
+    var offsetX: CGFloat = 0
+}
+
 /// Island size for a mode and view. The single place that knows the sizes: the panel's hit
 /// test, the bot hit test, the bot's gaze and IslandContainer must agree, or clicks and slaps
 /// land beside the island. `chatCount` is the chat history length (the chat grows with it).
+/// `status`: the compact island's status line (CompactStatusModel.metrics).
 func islandSize(mode: IslandMode, view: IslandView,
                 progress: Double = 0,
                 nw: CGFloat = IslandConst.notchWidth,
                 nh: CGFloat = IslandConst.notchHeight,
-                chatCount: Int) -> (CGFloat, CGFloat) {
+                hasNotch: Bool,
+                chatCount: Int,
+                status: CompactStatusMetrics) -> IslandSize {
     switch mode {
-    case .hidden:   return (nw, nh)
-    case .compact:  return (nw + 160, nh)
+    case .hidden:   return IslandSize(width: nw, height: nh)
+    case .compact:
+        let layout = CompactIslandLayout(notchWidth: nw, hasNotch: hasNotch, status: status)
+        return IslandSize(width: layout.width, height: nh, offsetX: layout.offsetX)
     case .expanded:
         let layout = IslandConst.viewLayouts[view]!
         if view == .question, let h = QuestionLayout.height {
-            return (IslandConst.expandedWidth, h)
+            return IslandSize(width: IslandConst.expandedWidth, height: h)
         }
         if view == .prompt {
-            return (IslandConst.expandedWidth, IslandConst.chatPromptHeight(messageCount: chatCount))
+            return IslandSize(width: IslandConst.expandedWidth,
+                              height: IslandConst.chatPromptHeight(messageCount: chatCount))
         }
-        return (IslandConst.expandedWidth, layout.height)
+        return IslandSize(width: IslandConst.expandedWidth, height: layout.height)
     }
+}
+
+/// The same, from the app's state: every caller reads the same inputs. `nw`/`nh` default to
+/// the state's notch (the controller passes its own copy, which `relocate` keeps equal).
+@MainActor
+func islandSize(_ s: AppState, mode: IslandMode? = nil, view: IslandView? = nil,
+                nw: CGFloat? = nil, nh: CGFloat? = nil) -> IslandSize {
+    islandSize(mode: mode ?? s.mode, view: view ?? s.view, progress: s.uploadProgress,
+               nw: nw ?? s.notchWidth, nh: nh ?? s.notchHeight, hasNotch: s.hasNotch,
+               chatCount: s.chatHistory.count, status: CompactStatusModel.shared.metrics)
 }

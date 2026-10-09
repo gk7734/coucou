@@ -84,6 +84,8 @@ cd relay && npm install && npm run typecheck
 | `HookRouting.swift` | 순수. 이벤트 → 호스트 → pill 라우팅 결정 (`test-hook-routing`) (§12) |
 | `SessionBook.swift` | 순수. pill 하나 뒤의 세션 목록, 긴급도, 보관, 정지 감지 (§12) |
 | `SessionCardText.swift` | 순수. 카드의 세션 목록 문구 (`test-session-card-text`) |
+| `CompactStatus.swift` | 순수. compact 섬의 상태 줄: 어느 pill, 단계 → 활동(아이콘+짧은 글), 턴 경과 시간, 0.4초 변경 제한, **compact 폭·오프셋·히트 영역(`CompactIslandLayout`)** (`test-compact-status`) |
+| `CompactStatusModel.swift` | 상태 줄을 AppState에서 계산(`ChangeObserver`), 글자 폭 측정(NSFont), 미니 Mochi hover 라벨. AppState 밖의 `@Observable`(파생 상태라 데모 Snapshot 불필요) |
 | `AutoMainPill.swift` | 순수. Auto 메인 pill: 활동 이벤트, flip-flop 방지 전환, 해석 (`test-auto-main-pill`) (§12) |
 | `SessionAlert.swift` | `SessionAlert` + `SessionAlertCenter`(알림 진입점) (§12) |
 | `NotificationPolicy.swift`, `MacNotifier.swift` | 알림을 띄울지 결정(토글·억제) / 무음 macOS 배너 (§12) |
@@ -135,8 +137,9 @@ cd relay && npm install && npm run typecheck
 ### 뷰
 - `IslandView` enum 19개: `overview, empty, approval, question, error, finished, confused, upload, uploading, choose, mail, prompt, searching, result, note, settings, greeting, wardrobe, recap`. 크기·봇 위치는 `IslandConst.viewLayouts`(`IslandTypes.swift`).
 - `IslandViewContent.swift`(~4,900줄, 구조체 ~70개)에 거의 모든 뷰가 있다. `IslandContentView`는 **19개 뷰를 ZStack에 동시에 마운트하고 opacity로만 전환**한다. 그래서 `@State`(질문 선택, diff 오버레이 등)가 뷰 전환 사이에 살아남고 `onAppear`는 한 번만 불린다. 보이지 않는 뷰는 `islandViewActive` 환경값(false)으로 `TimelineView`를 멈춘다. 활성 뷰만 마운트하도록 바꾸면 이 동작이 달라진다.
+- **compact 상태 줄**: 일하는 세션이 있으면 compact 섬이 "Orca · ✎ HookServer.swift  2m"을 보여 준다(`CompactStatus`, `CompactStatusModel`, 뷰는 `IslandRootView`의 `CompactStatusOverlay`). 노치 화면에서는 **오른쪽 귀만** 넓어지고(최대 300pt, 720pt 패널 안) 섬 중심이 `offsetX`만큼 오른쪽으로 간다. Mochi·왼쪽 귀는 그대로. 노치 없는 화면은 가운데 바가 240→최대 420pt로 넓어진다. 일하는 세션이 없으면 예전 그대로(nw + 160). 줄 클릭 = 그 pill로 열기(사용자 대기면 `.goToAlert`와 같은 경로), 미니 클릭 = 그 pill 포커스, 미니 hover = 섬 아래 라벨(폴링 루프가 기하로 판정).
 - 레이아웃 매직 넘버: 콘텐츠 프레임 98pt, 헤더 34pt, 봇 여백 `padding(.leading, 108/116)`, 업로드 지오메트리 36/526/103(`IslandRootView`, `UploadingView`, `ViewLayout`에서 공유).
-- 채팅 높이 공식은 `IslandConst.chatPromptHeight(messageCount:)` 한 곳(테스트됨). `islandSize`/`botPosition` 히트 테스트는 아직 패널·컨트롤러·BotCanvasView에 중복되어 서로 맞아야 클릭과 "때리기" 판정이 어긋나지 않는다.
+- 채팅 높이 공식은 `IslandConst.chatPromptHeight(messageCount:)` 한 곳(테스트됨). `islandSize`는 `IslandSize(width, height, offsetX)`를 돌려주고 AppState 버전 `islandSize(state)`를 모든 호출처(IslandContainer, `currentIslandFrame`, `isBotHit`, BotCanvasView 시선)가 쓴다. **오프셋까지 더해야** 클릭과 "때리기" 판정이 어긋나지 않는다.
 - `QuestionLayout.height`는 `pendingQuestion.didSet`이 쓰고 `islandSize`가 읽는 `nonisolated(unsafe)` 전역(`AskQuestion.swift`).
 - 통합 카드의 "hook/플러그인 설치됨" 검사(파일 읽기)는 캐시되고, 섬이 열리거나 창이 닫힐 때 갱신된다(body 평가마다 I/O 하지 않음).
 
@@ -307,6 +310,7 @@ CLI가 아니라 HTTP API 직접 호출. `ClaudeService.chat`→`api.anthropic.c
 | test-screen-geometry | `CoucouKit/IslandScreenGeometry` |
 | test-session-book | `App/SessionBook` (`-strict-concurrency=complete`) |
 | test-session-card-text | `App/SessionCardText` (카드의 세션 목록 문구) |
+| test-compact-status | `App/CompactStatus` + `App/SessionBook` + `CoucouKit/DiffEngine` (`-strict-concurrency=complete -warnings-as-errors`, 상태 줄 pill 선택·단계 분류·경과 시간·compact 폭/오프셋/히트 영역, 턴 시작 시각) |
 | test-shortcuts | `App/ShortcutLogic` |
 | test-terminal-target | `App/TerminalTarget` |
 | test-wardrobe | `CoucouKit/MochiWardrobe` |
@@ -418,7 +422,7 @@ CLI가 아니라 HTTP API 직접 호출. `ClaudeService.chat`→`api.anthropic.c
 - 메인인 `ide_` pill은 `removeTask`에서 보호되어 세션이 없어도 남고, idle 카드("Hooks installed", "Open <IDE>")를 보인다.
 
 ### 다중 세션 (`SessionBook`, `AppState.sessionBooks`)
-- pill마다 `SessionBook` 하나: 세션 ID(`session_id`, 없으면 `<pillId>+<cwd>`)별 `AgentSession`(agent, 프로젝트, cwd, phase, 최근 단계 20개, finalLine, 시작/마지막 이벤트 시각), 최근 활동 순.
+- pill마다 `SessionBook` 하나: 세션 ID(`session_id`, 없으면 `<pillId>+<cwd>`)별 `AgentSession`(agent, 프로젝트, cwd, phase, 최근 단계 20개, finalLine, 시작/마지막 이벤트 시각, 턴 시작 시각 `turnStartedAt`), 최근 활동 순.
 - **lead = 가장 긴급한 세션**, 같으면 가장 최근. 긴급도: waitingApproval 6 > waitingAnswer 5 > error 4 > working 3 > finished 2 > idle 1. pill의 phase는 lead의 phase.
 - **AgentTask로 미러링**: pill의 이름·상태·단계는 book의 lead 세션을 비춘다. 그래서 book 이전에 만든 뷰(pill, ticker, iPhone `Session` 레코드)가 그대로 동작한다. 카드 안의 세션 목록은 book을 직접 읽고(문구는 `SessionCardText`), 고르면 `bringToFront`.
 - 보관: 끝난 세션(finished/error/idle)은 마지막 이벤트 **10분 뒤** 제거, pill당 **최대 8개**. 사용자를 기다리는 세션은 절대 버리지 않는다. `SessionEnd`는 즉시 제거.
