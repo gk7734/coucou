@@ -11,7 +11,8 @@ enum IslandStateSyncTests {
         try await countdown()
         countdownMath()
         try await absence()
-        print("Island state sync: 5 groups passed")
+        try await alertAutoClose()
+        print("Island state sync: 6 groups passed")
     }
 
     // MARK: - displayed(_:pointerInside:)
@@ -99,6 +100,30 @@ enum IslandStateSyncTests {
         try await Task.sleep(for: .milliseconds(600))
         precondition(m.state == .home, "the alert was folded like a greeting")
         precondition(m.countdown != nil, "leaving starts the normal auto-close")
+    }
+
+    // MARK: - Alerts opened while the pointer is elsewhere
+
+    @MainActor
+    static func alertAutoClose() async throws {
+        // A finished/error alert that opens while the pointer is elsewhere folds by itself.
+        let away = IslandStateMachine()
+        away.homeToPetitDelay = 0.2
+        away.openedByAlert(pointerInside: false)
+        precondition(away.state == .home && away.countdown != nil, "an alert opened away must auto-close")
+        try await Task.sleep(for: .milliseconds(700))
+        precondition(away.state == .petit, "the alert stayed open")
+
+        // An approval holds the island open: no countdown.
+        let held = IslandStateMachine()
+        held.isHeldOpen = { true }
+        held.openedByAlert(pointerInside: false)
+        precondition(held.state == .home && held.countdown == nil)
+
+        // Pointer on the island: the timer starts when it leaves, as before.
+        let hovered = IslandStateMachine()
+        hovered.openedByAlert(pointerInside: true)
+        precondition(hovered.state == .home && hovered.countdown == nil)
     }
 
     // MARK: - Countdown

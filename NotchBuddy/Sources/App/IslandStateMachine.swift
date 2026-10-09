@@ -154,6 +154,16 @@ final class IslandStateMachine {
         state = .home
     }
 
+    /// An alert (finished, error, approval, question…) opened the island.
+    /// Like `openedExternally`, plus the normal auto-close when nothing holds it open and the
+    /// pointer isn't on it: the close timer is otherwise only armed when the pointer leaves,
+    /// so an alert that opened while the pointer was elsewhere stayed open (and drawing at
+    /// full frame rate) for good.
+    func openedByAlert(pointerInside: Bool) {
+        openedExternally()
+        if !pointerInside, isHeldOpen?() != true { scheduleHomeCollapse() }
+    }
+
     /// The app folded the island itself (Escape, Settings, OK button, auto-close).
     /// Move to `.petit` right away so hover and click keep working; waiting for the
     /// 15 s home timer left the island compact on screen while the FSM still said `.home`.

@@ -715,7 +715,7 @@ final class IslandWindowController: NSWindowController {
             let view = note.object as? IslandView
             MainActor.assumeIsolated {
                 guard let self, let view else { return }
-                self.fsm.openedExternally()
+                self.fsm.openedByAlert(pointerInside: self.wasInIsland)
                 self.expand(to: view)
             }
         }
