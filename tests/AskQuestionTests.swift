@@ -22,6 +22,11 @@ enum AskQuestionTests {
     }
 
     static func main() {
+        print("QuestionLayout.islandHeight")
+        checkTrue("a one-line answer field keeps the usual 98 pt card", QuestionLayout.islandHeight(contentHeight: 50) == 8 + 34 + 98 + 10)
+        checkTrue("a tall card grows the island with it", QuestionLayout.islandHeight(contentHeight: 200) == 8 + 34 + 216 + 10)
+        checkTrue("never taller than the panel", QuestionLayout.islandHeight(contentHeight: 2000) == 560)
+
         let opt1: [String: Any] = ["label": "Postgres", "description": "Full-text search"]
         let opt2: [String: Any] = ["label": "Meilisearch", "description": ""]
         let opt3: [String: Any] = ["label": "Algolia", "description": "Managed search"]

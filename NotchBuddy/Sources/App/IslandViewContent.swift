@@ -529,7 +529,11 @@ struct QuestionView: View {
                 }
                 .padding(.leading, 116)
                 .padding(.trailing, 16)
-                .padding(.vertical, 4)
+                .fixedSize(horizontal: false, vertical: true)
+                .onGeometryChange(for: CGFloat.self, of: { $0.size.height }) { h in
+                    // The island follows the card actually shown (see AppState.questionContentHeight).
+                    if abs((state.questionContentHeight ?? 0) - h) > 1 { state.questionContentHeight = h }
+                }
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
         }

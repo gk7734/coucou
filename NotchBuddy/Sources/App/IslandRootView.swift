@@ -158,6 +158,10 @@ struct IslandContainer: View {
                 islandHeight = h
             }
         }
+        .onChange(of: state.questionContentHeight) { _, _ in
+            guard state.mode == .expanded, state.view == .question, let h = QuestionLayout.height else { return }
+            withAnimation(openSpring) { islandHeight = h }
+        }
         .onChange(of: state.chatHistory.count) { _, _ in
             guard state.mode == .expanded, state.view == .prompt else { return }
             withAnimation(openSpring) {
@@ -475,7 +479,8 @@ struct IslandContentView: View {
                     // Views that fill available height instead of the fixed 98pt content frame:
                     // chat (prompt) is always flexible; mail is flexible only when active so
                     // it doesn't push the ZStack taller when inactive.
-                    let isTall = v == .prompt || (v == .mail && active)
+                    // The question card fills the island, whose height follows the card's content.
+                    let isTall = v == .prompt || ((v == .mail || v == .question) && active)
                     let anim: Animation = active
                         ? .spring(response: 0.4, dampingFraction: 0.8).delay(0.16)
                         : .easeIn(duration: 0.16)

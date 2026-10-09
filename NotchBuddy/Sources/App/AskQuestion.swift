@@ -17,6 +17,14 @@ struct AskQuestionItem: Equatable {
 /// Island height of the pending question, readable from the nonisolated `islandSize`. Written on the main actor only.
 enum QuestionLayout {
     nonisolated(unsafe) static var height: CGFloat?
+
+    /// The island around a question card whose content is `contentHeight` tall: top padding,
+    /// the 34 pt header, the card (never shorter than the usual 98 pt content frame, plus its
+    /// own vertical padding) and the bottom padding.
+    static func islandHeight(contentHeight: CGFloat) -> CGFloat {
+        let card = max(98, contentHeight + 16)
+        return min(8 + 34 + card + 10, 560)
+    }
 }
 
 extension AskQuestionItem {

@@ -434,7 +434,21 @@ final class AppState {
 
     // Pending AskUserQuestion from Claude Code hook
     var pendingQuestion: AskQuestion? = nil {
-        didSet { QuestionLayout.height = pendingQuestion?.estimatedIslandHeight }
+        didSet {
+            // A new question starts from the estimate until its card has been measured.
+            questionContentHeight = nil
+            QuestionLayout.height = pendingQuestion?.estimatedIslandHeight
+        }
+    }
+
+    /// Measured height of the question card's content (QuestionView), so the island fits
+    /// the question actually shown: the current one of several, the "Other…" field, wide
+    /// scripts like Korean that the character-count estimate gets wrong.
+    var questionContentHeight: CGFloat? = nil {
+        didSet {
+            guard let h = questionContentHeight else { return }
+            QuestionLayout.height = QuestionLayout.islandHeight(contentHeight: h)
+        }
     }
 
     // Per-pill flat list of FileDiffs, in order of reception.
