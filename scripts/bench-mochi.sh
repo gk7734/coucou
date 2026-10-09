@@ -24,6 +24,7 @@ swiftc -O -g \
   "$SRC/IslandScreenGeometry.swift" \
   "$SRC/IslandTypes.swift" \
   "$SRC/MochiWardrobe.swift" \
+  "$SRC/AppDefaults.swift" \
   "$SRC/ColorHex.swift" \
   "$SRC/BotEngine.swift" \
   "$SRC/MochiOutfitDrawing.swift" \

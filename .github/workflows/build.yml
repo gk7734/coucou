@@ -21,6 +21,22 @@ jobs:
       - name: Run all test scripts
         run: bash scripts/test-all.sh
 
+      # Offscreen UI snapshots (scripts/snapshot.sh). The baselines in tests/snapshots/ are
+      # rendered on a developer's Mac; the runner has another macOS, Xcode and set of fonts,
+      # so its text rasterises differently and a pixel comparison would fail for nothing.
+      # Here the step fails only if rendering fails (a crash, a case that draws nothing),
+      # and uploads the PNGs, with side-by-side diffs against the baselines, to look at.
+      - name: UI snapshots (rendered, compared for the record)
+        run: bash scripts/snapshot.sh --ci snapshot-artifacts
+
+      - name: Upload UI snapshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ui-snapshots
+          path: snapshot-artifacts
+          if-no-files-found: ignore
+
       - name: Build
         run: |
           xcodebuild \

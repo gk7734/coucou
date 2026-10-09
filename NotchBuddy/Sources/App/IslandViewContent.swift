@@ -552,6 +552,11 @@ struct QuestionView: View {
         selections = Array(repeating: [], count: count)
         otherTexts = Array(repeating: "", count: count)
         showOther  = Array(repeating: false, count: count)
+        #if DEBUG
+        if SnapshotMode.isActive && SnapshotScene.questionShowsOther {
+            showOther = Array(repeating: true, count: count)
+        }
+        #endif
     }
 
     private func toggleSelection(qi: Int, label: String) {
@@ -2375,7 +2380,7 @@ struct AgentSessionCard: View {
                 .padding(.trailing, 12)
 
             if let session, session.phase == .working {
-                let threshold = SessionCardText.stallThresholdMinutes()
+                let threshold = SessionCardText.stallThresholdMinutes(AppDefaults.store)
                 if threshold > 0 {
                     // Redrawn every 30 s while the card is on screen, never while hidden.
                     TimelineView(.animation(minimumInterval: 30, paused: !isActive)) { tl in
@@ -2398,7 +2403,7 @@ struct AgentSessionCard: View {
 
     private func listBody(_ book: SessionBook) -> some View {
         let rows = SessionCardText.listOrder(book)
-        let threshold = SessionCardText.stallThresholdMinutes()
+        let threshold = SessionCardText.stallThresholdMinutes(AppDefaults.store)
         let anyWorking = threshold > 0 && rows.contains { $0.phase == .working }
         let shownRows = CGFloat(min(rows.count, Self.visibleRows))
         let listHeight = shownRows * Self.rowHeight + (shownRows - 1) * Self.rowSpacing
@@ -4209,7 +4214,7 @@ struct TickerShimmerText: View {
 
     var body: some View {
         TimelineView(.animation(paused: !isActive)) { tl in
-            let t = tl.date.timeIntervalSinceReferenceDate
+            let t = Self.shimmerTime(tl.date)
             let p = CGFloat(t.truncatingRemainder(dividingBy: 2.2) / 2.2)
             // phase sweeps -0.1 → 1.1 so white peak enters from left and exits right
             let phase = p * 1.2 - 0.1
@@ -4223,6 +4228,14 @@ struct TickerShimmerText: View {
                     .init(color: Color(hex: "#7c818a"), location: min(1, phase + 0.3)),
                 ], startPoint: .leading, endPoint: .trailing))
         }
+    }
+
+    /// Seconds the shimmer's phase follows (a fixed instant in snapshot runs).
+    private static func shimmerTime(_ date: Date) -> TimeInterval {
+        #if DEBUG
+        if SnapshotMode.isActive { return 0.9 }
+        #endif
+        return date.timeIntervalSinceReferenceDate
     }
 }
 

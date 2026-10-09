@@ -83,7 +83,13 @@ enum KeychainRead: Equatable, Sendable {
 /// Any key works, there is no list to keep up to date. Nothing is read at launch: a key that
 /// is never used is never read, and never asks for Keychain access.
 final class KeychainStore: @unchecked Sendable {
-    static let shared = KeychainStore(backend: .system)
+    static let shared: KeychainStore = {
+        #if DEBUG
+        // A snapshot run never reads the user's keys: every key is unset.
+        if SnapshotMode.isActive { return KeychainStore(backend: .none) }
+        #endif
+        return KeychainStore(backend: .system)
+    }()
 
     /// Where values live: the real Keychain, or a fake in tests.
     struct Backend: Sendable {
@@ -94,6 +100,11 @@ final class KeychainStore: @unchecked Sendable {
         static let system = Backend(load: { Keychain.read(key: $0) },
                                     save: { Keychain.save(key: $0, value: $1) },
                                     delete: { Keychain.delete(key: $0) })
+
+        #if DEBUG
+        /// Holds nothing and keeps nothing (snapshot runs).
+        static let none = Backend(load: { _ in nil }, save: { _, _ in }, delete: { _ in })
+        #endif
     }
 
     /// One key's cached value. Its lock makes the first read happen once, even when several

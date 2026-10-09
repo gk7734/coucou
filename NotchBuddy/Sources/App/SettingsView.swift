@@ -1406,10 +1406,19 @@ struct SettingsView: View {
         do {
             pendingHookJSON = try HookServer.shared.previewClaudeHooks()
             showDiff = true
-            statusMessage = String(localized: "hooks.review-json")
+            statusMessage = Self.claudeHooksPreviewMessage()
         } catch {
             statusMessage = "❌ \(error.localizedDescription)"
         }
+    }
+
+    /// The status line under a Claude Code hooks preview: "review the JSON", except when the
+    /// install changes nothing (the card then says so, and there is no JSON to review).
+    private static func claudeHooksPreviewMessage() -> String {
+        let server = HookServer.shared
+        if server.pendingClaudeHooksInstall, let diff = server.pendingClaudeHooksDiff,
+           diff.added == 0, diff.removed == 0 { return "" }
+        return String(localized: "hooks.review-json")
     }
 
     private func confirmInstall() {
@@ -1961,6 +1970,20 @@ private struct PillColorPalette: View {
         .padding(.vertical, 10)
     }
 }
+
+#if DEBUG
+extension SettingsView {
+    /// Settings as a snapshot run shows it (SnapshotRunner): the Claude Code hooks' install
+    /// preview open, as after clicking Install. `previewJSON` comes from
+    /// HookServer.previewClaudeHooks, which also holds the diff the preview shows.
+    init(snapshotHookPreview previewJSON: String) {
+        self.init()
+        _showDiff = State(initialValue: true)
+        _pendingHookJSON = State(initialValue: previewJSON)
+        _statusMessage = State(initialValue: Self.claudeHooksPreviewMessage())
+    }
+}
+#endif
 
 // MARK: - Sidebar background (NSVisualEffectView .sidebar)
 

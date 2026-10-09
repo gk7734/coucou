@@ -314,8 +314,11 @@ final class AppState {
 
     // Selected app language ("" = System, else BCP-47 code e.g. "fr")
     var appLanguage: String = {
+        #if DEBUG
+        if SnapshotMode.isActive { return "" }   // the user's own domain stays unread
+        #endif
         let bundleId = Bundle.main.bundleIdentifier ?? "fr.louisraille.NotchBuddy"
-        let langs = UserDefaults.standard.persistentDomain(forName: bundleId)?["AppleLanguages"] as? [String]
+        let langs = AppDefaults.store.persistentDomain(forName: bundleId)?["AppleLanguages"] as? [String]
         return langs?.first ?? ""
     }()
 

@@ -14,6 +14,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        #if DEBUG
+        // `--snapshot <dir>`: render the snapshot catalogue offscreen and quit, before any
+        // window, status item, hook socket, poller, hotkey, audio listener or greeting.
+        if SnapshotMode.isActive {
+            SnapshotRunner.start()
+            return
+        }
+        #endif
         // Ignore SIGPIPE — prevents crash when nb-hook closes socket before we write response
         signal(SIGPIPE, SIG_IGN)
         // No Keychain warm-up: KeychainStore reads each key the first time it is needed.

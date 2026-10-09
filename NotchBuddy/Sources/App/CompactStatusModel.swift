@@ -232,6 +232,21 @@ final class CompactStatusModel {
         }
     }
 
+    #if DEBUG
+    // MARK: Snapshot runs
+
+    /// Puts a line, or the visualizer with fixed band levels, in the slot at once, measured as
+    /// applyLatest measures it (SnapshotRunner; the model is never started there).
+    func showForSnapshot(line: CompactStatusLine?, music: CompactMusicLine?, levels: [Float]?,
+                         hasMinis: Bool) {
+        self.line = line
+        self.music = line == nil ? music : nil
+        self.levels = levels ?? Array(repeating: 0, count: CompactVisualizer.barCount)
+        let width: CGFloat? = line.map(Self.contentWidth) ?? self.music.map(Self.musicContentWidth)
+        metrics = width.map { CompactStatusMetrics(statusWidth: $0, hasMinis: hasMinis) } ?? .none
+    }
+    #endif
+
     // MARK: Measure (same fonts and spacing as CompactStatusView)
 
     static let spacing: CGFloat = 4

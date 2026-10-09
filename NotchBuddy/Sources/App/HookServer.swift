@@ -1551,7 +1551,12 @@ final class HookServer: @unchecked Sendable {
         }
     }
 
-    private static var home: URL { FileManager.default.homeDirectoryForCurrentUser }
+    private static var home: URL {
+        #if DEBUG
+        if SnapshotMode.isActive { return SnapshotMode.home }   // fixtures, never the user's files
+        #endif
+        return FileManager.default.homeDirectoryForCurrentUser
+    }
 
     /// The error the Settings view shows as a plain status, not as a failure.
     private static func noop(_ message: String) -> NSError {

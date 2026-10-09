@@ -16,6 +16,7 @@ swiftc \
   NotchBuddy/Sources/CoucouKit/IslandScreenGeometry.swift \
   NotchBuddy/Sources/CoucouKit/IslandTypes.swift \
   NotchBuddy/Sources/CoucouKit/MochiWardrobe.swift \
+  NotchBuddy/Sources/CoucouKit/AppDefaults.swift \
   NotchBuddy/Sources/CoucouKit/BotEngine.swift \
   NotchBuddy/Sources/CoucouKit/MochiOutfitDrawing.swift \
   scripts/RenderOutfits.swift \

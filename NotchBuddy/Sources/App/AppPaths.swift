@@ -12,6 +12,11 @@ enum AppPaths {
     /// The support directory override, nil in Release or when unset.
     static let supportOverride: URL? = {
         #if DEBUG
+        // A snapshot run (`--snapshot`) reads agent settings and writes its socket under a
+        // fixture home, never the user's.
+        if SnapshotMode.isActive {
+            return SnapshotMode.home.appendingPathComponent("Library/Application Support/NotchBuddy")
+        }
         if let dir = ProcessInfo.processInfo.environment["COUCOU_SUPPORT_DIR"], !dir.isEmpty {
             return URL(fileURLWithPath: (dir as NSString).expandingTildeInPath, isDirectory: true)
         }

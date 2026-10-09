@@ -14,6 +14,10 @@ enum HostAppInfo {
     /// the bundle id when the app isn't installed.
     static func name(for bundleId: String) -> String {
         if let cached = names[bundleId] { return cached }
+        #if DEBUG
+        // Snapshots look the same on every Mac, whatever is installed.
+        if SnapshotMode.isActive { return HostResolver.fallbackName(bundleId: bundleId) }
+        #endif
         let name: String
         if let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleId) {
             let display = FileManager.default.displayName(atPath: url.path)
@@ -28,6 +32,9 @@ enum HostAppInfo {
     /// The app's icon, or nil when the app isn't installed.
     static func icon(for bundleId: String) -> NSImage? {
         if let cached = icons[bundleId] { return cached }
+        #if DEBUG
+        if SnapshotMode.isActive { return SnapshotFixtures.appIcon }
+        #endif
         guard let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleId) else { return nil }
         let icon = NSWorkspace.shared.icon(forFile: url.path)
         icons[bundleId] = icon

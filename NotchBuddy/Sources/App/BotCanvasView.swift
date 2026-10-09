@@ -18,6 +18,22 @@ struct BotCanvasView: View {
     @StateObject private var cadence = MochiCadence()
 
     var body: some View {
+        #if DEBUG
+        if SnapshotMode.isActive {
+            // One still frame, the same on every run (SnapshotRunner).
+            SnapshotMochi(state: state.effectiveState,
+                          bodyHex: state.focusTask?.isIntegration == true ? state.focusTask?.color : nil,
+                          particleOverhang: particleOverhang)
+                .opacity(isShown ? 1 : 0)
+        } else {
+            liveBody
+        }
+        #else
+        liveBody
+        #endif
+    }
+
+    private var liveBody: some View {
         // 30 fps while calm outside the expanded island, the display's rate otherwise
         // (MochiFrameRate).
         TimelineView(.animation(
@@ -224,6 +240,18 @@ struct MiniBotCanvasView: View {
     }
 
     var body: some View {
+        #if DEBUG
+        if SnapshotMode.isActive {
+            SnapshotMochi(state: task.state, bodyHex: task.color, mini: true)
+        } else {
+            liveBody
+        }
+        #else
+        liveBody
+        #endif
+    }
+
+    private var liveBody: some View {
         // 30 fps while calm, the display's rate during a hop or a head shake (MochiFrameRate).
         TimelineView(.animation(
             minimumInterval: MochiFrameRate.minimumInterval(fast: cadence.fast, alwaysFull: false),
