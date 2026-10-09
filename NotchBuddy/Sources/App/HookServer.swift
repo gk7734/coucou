@@ -48,6 +48,9 @@ final class HookServer: @unchecked Sendable {
         let sessionKey: String
         let cwd: String
         let projectName: String
+        /// Sent by scripts/coucou-replay.py (DEBUG host override): a fake session, which must
+        /// not move the Auto main pill (it is persisted across launches).
+        let isReplay: Bool
     }
 
     /// A PermissionRequest connection held open while the user decides.
@@ -546,7 +549,8 @@ final class HookServer: @unchecked Sendable {
         return HookContext(route: route, rawSessionId: rawSessionId,
                            sessionKey: HookRouting.sessionKey(rawSessionId: rawSessionId, pillId: route.pillId, cwd: cwd),
                            cwd: cwd,
-                           projectName: aliasProjectName(rawName.isEmpty ? "Session" : rawName))
+                           projectName: aliasProjectName(rawName.isEmpty ? "Session" : rawName),
+                           isReplay: payload[HookRouting.hostOverrideKey] != nil)
     }
 
     /// Third-party agents whose permission requests get a card (GitHub build only).
@@ -707,7 +711,8 @@ final class HookServer: @unchecked Sendable {
         let lead = plan.applyEvent
 
         // The Auto main pill follows the IDE the user works in (AutoMainPill).
-        if change != .none, change != .remove, let activity = AutoMainPill.activity(forEvent: name) {
+        if change != .none, change != .remove, payload[HookRouting.hostOverrideKey] == nil,
+           let activity = AutoMainPill.activity(forEvent: name) {
             state.noteWorkspaceActivity(pillId: agentId, hostBundleId: route.host?.bundleId, activity: activity)
         }
 
@@ -889,10 +894,17 @@ final class HookServer: @unchecked Sendable {
         mirror(pillId: pillId, resetState: leadAfter != leadBefore)
     }
 
-    /// Drops ended sessions past their retention (SessionBook.trim). An IDE pill goes with its
-    /// last session; other pills stay as they are. Called when something changed, never on a timer.
+    /// The one pending trim (main queue), armed for the earliest SessionBook expiry.
+    @MainActor private var trimWork: DispatchWorkItem?
+
+    /// Drops ended sessions past their retention and abandoned working ones (SessionBook.trim).
+    /// An IDE pill goes with its last session; other pills stay as they are. Runs when
+    /// something changed, and once more at the earliest expiry so a session whose agent
+    /// vanished without SessionEnd doesn't stay forever; nothing is scheduled when no book
+    /// can expire.
     @MainActor
     private func trimBooks(now: Date) {
+        defer { scheduleTrim() }
         let state = AppState.shared
         for (pillId, book) in state.sessionBooks {
             var trimmed = book
@@ -914,6 +926,21 @@ final class HookServer: @unchecked Sendable {
             let live = Set(state.sessionBooks.values.flatMap { $0.sessions.map(\.id) })
             sessionHosts = sessionHosts.filter { live.contains($0.key) }
         }
+    }
+
+    @MainActor
+    private func scheduleTrim() {
+        trimWork?.cancel()
+        trimWork = nil
+        guard let next = AppState.shared.sessionBooks.values.compactMap(\.nextExpiry).min() else { return }
+        let item = DispatchWorkItem { [weak self] in
+            MainActor.assumeIsolated {
+                self?.trimWork = nil
+                self?.trimBooks(now: Date())
+            }
+        }
+        trimWork = item
+        DispatchQueue.main.asyncAfter(deadline: .now() + max(1, next.timeIntervalSinceNow + 1), execute: item)
     }
 
     /// Copies a pill's lead session onto its task: steps, final line, and (for pills named after
@@ -1123,7 +1150,9 @@ final class HookServer: @unchecked Sendable {
         // The session waits on the user from now on, even while its card waits behind others.
         if !ctx.route.isExternalAgent { ensureTask(ctx, renameExternal: false) }
         recordWaiting(ctx, phase: .waitingApproval)
-        AppState.shared.noteWorkspaceActivity(pillId: pillId, hostBundleId: ctx.route.host?.bundleId, activity: .agent)
+        if !ctx.isReplay {
+            AppState.shared.noteWorkspaceActivity(pillId: pillId, hostBundleId: ctx.route.host?.bundleId, activity: .agent)
+        }
         DispatchQueue.main.asyncAfter(deadline: .now() + waitTimeout) { [weak self] in
             self?.expireApprovals()
         }
@@ -1192,8 +1221,10 @@ final class HookServer: @unchecked Sendable {
                                 payload: HeldQuestion(fd: fd, source: source, question: parsed, context: ctx)))
         ensureTask(ctx, renameExternal: false)
         recordWaiting(ctx, phase: .waitingAnswer)
-        AppState.shared.noteWorkspaceActivity(pillId: ctx.route.pillId, hostBundleId: ctx.route.host?.bundleId,
-                                              activity: .agent)
+        if !ctx.isReplay {
+            AppState.shared.noteWorkspaceActivity(pillId: ctx.route.pillId, hostBundleId: ctx.route.host?.bundleId,
+                                                  activity: .agent)
+        }
         DispatchQueue.main.asyncAfter(deadline: .now() + 120) { [weak self] in
             self?.expireQuestions()
         }

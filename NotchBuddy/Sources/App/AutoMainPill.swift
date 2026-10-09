@@ -55,13 +55,16 @@ enum AutoMainPill {
     /// - lastActive / lastActiveBundleId: the last active workspace pill. An `ide_` pill
     ///   needs its IDE's bundle id (its id can't be turned back into one) to be shown.
     /// - fallback: before anything was active (or when it no longer can be shown).
+    /// `isInstalled` answers for an IDE pill's app: a remembered IDE that has since been
+    /// uninstalled (or was never on this Mac) is not brought back as the main pill.
     static func resolve(explicit: String?, lastActive: String?, lastActiveBundleId: String?,
-                        catalogWorkspaceIds: Set<String>, fallback: String) -> String {
+                        catalogWorkspaceIds: Set<String>, fallback: String,
+                        isInstalled: (String) -> Bool = { _ in true }) -> String {
         if let explicit, catalogWorkspaceIds.contains(explicit) { return explicit }
         if let last = lastActive {
             if catalogWorkspaceIds.contains(last) { return last }
             if HostResolver.isIDEPill(last), let bundle = lastActiveBundleId, !bundle.isEmpty,
-               HostResolver.idePillId(bundleId: bundle) == last {
+               HostResolver.idePillId(bundleId: bundle) == last, isInstalled(bundle) {
                 return last
             }
         }

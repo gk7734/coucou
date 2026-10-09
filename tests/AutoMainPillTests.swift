@@ -96,6 +96,10 @@ enum AutoMainPillTests {
         check("unknown explicit value: auto", resolve(explicit: "integration_github", last: "agent_cursor") == "agent_cursor")
         check("auto: last catalog pill", resolve(last: "agent_codex") == "agent_codex")
         check("auto: last IDE pill with its bundle id", resolve(last: orca, bundle: orcaBundle) == orca)
+        check("auto: a remembered IDE that isn't installed is not brought back",
+              AutoMainPill.resolve(explicit: nil, lastActive: orca, lastActiveBundleId: orcaBundle,
+                                   catalogWorkspaceIds: workspace, fallback: "integration_claude",
+                                   isInstalled: { _ in false }) == "integration_claude")
         check("auto: IDE pill without a bundle id can't be shown",
               resolve(last: orca, bundle: nil) == "integration_claude")
         check("auto: IDE pill with another IDE's bundle id is stale",

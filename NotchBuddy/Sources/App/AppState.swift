@@ -781,7 +781,8 @@ final class AppState {
         AutoMainPill.resolve(
             explicit: mainPillChoice == PillCatalog.autoMainPillId ? nil : mainPillChoice,
             lastActive: lastActiveWorkspacePill, lastActiveBundleId: lastActiveWorkspaceBundleId,
-            catalogWorkspaceIds: PillCatalog.workspaceIds, fallback: PillCatalog.defaultMainPillId)
+            catalogWorkspaceIds: PillCatalog.workspaceIds, fallback: PillCatalog.defaultMainPillId,
+            isInstalled: { NSWorkspace.shared.urlForApplication(withBundleIdentifier: $0) != nil })
     }
 
     /// A session event on a pill (HookServer): makes it the last active workspace pill when

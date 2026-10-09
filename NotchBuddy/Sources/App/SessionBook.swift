@@ -54,6 +54,11 @@ struct SessionBook: Equatable, Sendable {
     /// Sessions that ended (finished / error / idle) are dropped after this long, so the list
     /// shows what is going on now rather than the whole day.
     static let endedRetention: TimeInterval = 10 * 60
+    /// A working session with no event for this long was abandoned (the agent crashed or was
+    /// killed without SessionEnd): it is dropped instead of showing "working" for good.
+    /// Long tool runs (a build, a test suite) stay well under it; the next event brings the
+    /// session back anyway.
+    static let abandonedAfter: TimeInterval = 60 * 60
     /// Hard cap per pill.
     static let maxSessions = 8
 
@@ -130,18 +135,31 @@ struct SessionBook: Equatable, Sendable {
         sessions.insert(sessions.remove(at: idx), at: 0)
     }
 
-    /// Drops ended sessions past their retention and keeps the newest `maxSessions`.
-    /// Sessions that wait on the user are never dropped.
+    /// Drops ended sessions past their retention, abandoned working ones, and keeps the
+    /// newest `maxSessions`. Sessions that wait on the user are never dropped.
     mutating func trim(now: Date) {
         sessions.removeAll { s in
-            let ended = s.phase == .finished || s.phase == .error || s.phase == .idle
-            return ended && now.timeIntervalSince(s.lastEventAt) > Self.endedRetention
+            guard let expiry = Self.expiry(of: s) else { return false }
+            return now > expiry
         }
         while sessions.count > Self.maxSessions,
               let idx = sessions.lastIndex(where: { !$0.phase.waitsOnUser }) {
             sessions.remove(at: idx)
         }
     }
+
+    /// When a session will be dropped by `trim`, nil for one waiting on the user.
+    static func expiry(of session: AgentSession) -> Date? {
+        switch session.phase {
+        case .finished, .error, .idle: session.lastEventAt.addingTimeInterval(endedRetention)
+        case .working:                 session.lastEventAt.addingTimeInterval(abandonedAfter)
+        case .waitingApproval, .waitingAnswer: nil
+        }
+    }
+
+    /// The next time `trim` would drop something, nil when nothing can expire
+    /// (the app schedules one check for it, and none at all for an empty book).
+    var nextExpiry: Date? { sessions.compactMap(Self.expiry(of:)).min() }
 
     // MARK: Stalls
 
