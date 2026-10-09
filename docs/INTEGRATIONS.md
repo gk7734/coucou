@@ -205,7 +205,7 @@ Priorité : failure > review demandée > success. Un seul badge/son par cycle.
 ## 2. n8n (workflows de Louis)
 
 - Réglages : URL de l'instance (probablement `https://n8nlouis.dcsys.tech`, **à confirmer avec Louis**) et clé API n8n (Trousseau). La clé se crée dans n8n : Settings → n8n API.
-- Le Mac joint n8n, pas l'inverse : **polling** toutes les 5 s de l'API publique :
+- Le Mac joint n8n, pas l'inverse : **polling** toutes les 15 s (premier appel 3 s après le lancement) de l'API publique, avec repli sur `/rest/executions` si `/api/v1/executions` échoue (règles communes : §2bis) :
   - noms des workflows : `GET /api/v1/workflows` (cache 10 min) ;
   - exécutions récentes : `GET /api/v1/executions` avec filtres de statut et `limit`.
 - Mapping :
@@ -216,6 +216,51 @@ Priorité : failure > review demandée > success. Un seul badge/son par cycle.
   - « Relancer » → endpoint de retry de l'API publique (vérifier sa présence et son chemin dans le playground de l'instance). S'il n'existe pas : ouvrir l'exécution dans n8n.
   - « Ouvrir dans n8n » → ouvrir `{URL}/workflow/{workflowId}/executions/{executionId}` dans le navigateur par défaut.
 - Réglage « workflows suivis » : tous par défaut, liste à cocher.
+
+---
+
+## 2bis. Services : règles communes
+
+Vercel, Stripe, Resend, Notion, Cal.com et n8n suivent les mêmes règles que GitHub (§1quater), réunies dans `ServicePollGate` :
+- **Aucun appel réseau** tant que la pastille du service n'est pas dans le notch, sauf si la synchronisation iPhone est activée (l'iPhone montre tous les services). Sans clé dans le Trousseau, rien n'est appelé non plus.
+- Une seule requête à la fois par service.
+- Activer la pastille ou enregistrer une nouvelle clé lance un appel tout de suite, sans attendre l'intervalle. Une réponse à une requête partie avec l'ancienne clé est ignorée.
+- Mode démo : aucun appel.
+- Les clés ne quittent jamais le Mac. L'iPhone reçoit seulement ce que les pastilles affichent déjà (`ServicePublisher`).
+
+## 2ter. Vercel
+
+- **Clé** : token Vercel (Trousseau : `vercel-token`), en-tête `Authorization: Bearer <token>`.
+- **Polling** : `GET https://api.vercel.com/v6/deployments?limit=5` toutes les 30 s, premier appel 5 s après le lancement. Seuls les déploiements terminés (`READY`, `ERROR`, `CANCELED`) sont gardés.
+- **Pastille** (`integration_vercel`) : la liste des derniers déploiements (projet, statut, branche, message du commit, ancienneté). Quand le dernier déploiement change (projets filtrés par le réglage « projets suivis », tous par défaut) : état `finished` (`READY`) ou `error`, ligne = nom du projet, badge, son `finish` ou `error`, l'île s'affiche en compact. L'état revient à `idle` après 60 s.
+- **Réglage « projets suivis »** : liste récupérée par `GET https://api.vercel.com/v9/projects?limit=100`.
+
+## 2quater. Stripe
+
+- **Clé** : clé secrète Stripe (`sk_live_…`, ou clé restreinte en lecture sur le solde et les paiements), Trousseau : `stripe-api-key`. Authentification Basic, la clé en nom d'utilisateur et un mot de passe vide.
+- **Polling** : `GET https://api.stripe.com/v1/balance` et `GET https://api.stripe.com/v1/charges?limit=3` toutes les 30 s, premier appel 6 s après le lancement.
+- **Pastille** (`integration_stripe`) : le solde (disponible + en attente, dans la devise du premier montant) et les 3 derniers paiements. Premier chargement silencieux. Ensuite, un nouveau paiement glisse en tête de liste, puis le solde défile jusqu'à sa nouvelle valeur ; état `finished`, ligne = description ou montant, badge, son `finish`, retour à `idle` après 60 s.
+- **Erreurs** affichées sur la pastille : `Invalid API key (401)`, `Use secret key (sk_live_… not pk_live_…)` (403), `No connection`, `API error <code>`.
+
+## 2quinquies. Resend
+
+- **Clé** : clé API Resend (Trousseau : `resend-api-key`), en-tête `Authorization: Bearer <clé>`. L'adresse d'expéditeur (`resend-from`) sert à envoyer un fichier par mail via Resend depuis la vue `mail` (§6) au lieu de l'app Mail.
+- **Polling** : `GET https://api.resend.com/emails?limit=100` toutes les 60 s, premier appel 6 s après le lancement.
+- **Pastille** (`integration_resend`) : les 5 derniers mails envoyés (destinataire, objet, dernier événement : `delivered`, `bounced`, `opened`…) et le total. Ni badge ni son. En cas d'erreur, la liste précédente reste affichée.
+
+## 2sexies. Notion
+
+- **Clé** : secret d'intégration interne Notion (Trousseau : `notion-api-key`), en-têtes `Authorization: Bearer <clé>` et `Notion-Version: 2022-06-28`.
+- **Polling** : `POST https://api.notion.com/v1/search` (tri `last_edited_time` décroissant, `page_size` 3) toutes les 5 min, premier appel 9 s après le lancement. Seules les pages partagées avec l'intégration sont visibles.
+- **Pastille** (`integration_notion`) : les 3 dernières pages ou bases modifiées (emoji, titre, ancienneté), un clic ouvre la page. Ni badge ni son.
+- **Erreurs** affichées : `Invalid API key (401)`, `No connection`, `API error <code>`.
+
+## 2septies. Cal.com
+
+- **Clé** : clé API Cal.com (Trousseau : `calcom-api-key`), en-têtes `Authorization: Bearer <clé>` et `cal-api-version: 2024-08-13`.
+- **Polling** : `GET https://api.cal.com/v2/bookings?status=upcoming&afterStart=<aujourd'hui 0 h>&beforeEnd=<+60 jours>&take=50` toutes les 5 min, premier appel 8 s après le lancement.
+- **Pastille** (`integration_calcom`) : les rendez-vous à venir par jour (heure, titre, invité, notes de l'invité). Ni badge ni son.
+- **Erreurs** affichées sur la pastille : `Invalid API key (401)`, `No connection`, `API error <code>`.
 
 ---
 
@@ -270,6 +315,8 @@ Clés dans Settings → Chat — other providers (Trousseau : `google-api-key`, 
 - **OpenAI** : `GET https://api.openai.com/v1/models` (en-tête `Authorization: Bearer <clé>`) — triés par champ `created` décroissant, on filtre les modèles dont l'identifiant contient `embed`, `tts`, `whisper`, `dall-e`, `audio`, `realtime`, `moderat`, `codex`, `computer-use`, `transcribe`, `image`, `sora`, `babbage`, `davinci` ou `instruct`. Dans le chat, si le modèle enregistré n'est pas dans la liste reçue, le premier dont l'identifiant contient « mini », sinon le premier de la liste. Endpoint du chat : `POST https://api.openai.com/v1/chat/completions`.
 
 Ce qui est envoyé au fournisseur lors d'un échange : le texte saisi et la conversation en cours. Si une fenêtre est attachée : nom de l'app, titre et URL. Si un fichier est attaché : son nom seulement (le contenu d'un fichier ne part que chez Anthropic).
+
+Changer de fournisseur en cours de conversation garde l'historique : chaque message envoyé à Claude est converti en texte (contexte de la fenêtre et question compris), une image ou un PDF devient « [attached image] » ou « [attached document] », et le contenu d'un fichier texte devient « [attached file] » (un modèle local le reçoit en entier, comme en §5ter).
 
 Voir le catalogue de pastilles dans `docs/SPEC.md` (section « Catalogue de pastilles ») pour les pastilles `ai_google` et `ai_openai`.
 

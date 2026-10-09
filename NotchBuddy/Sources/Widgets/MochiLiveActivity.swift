@@ -166,8 +166,9 @@ extension AnyTransition {
     }
 }
 
-/// Deny answers right away; Allow opens Coucou on the command, where Face ID
-/// confirms before anything is sent.
+/// Both buttons answer right where you are, without opening Coucou: iOS asks to
+/// unlock the iPhone (Face ID) first if it is locked, then the decision goes
+/// straight to the Mac, which applies it only to this exact command.
 struct ApprovalButtons: View {
     let fingerprint: String
     let pillId: String

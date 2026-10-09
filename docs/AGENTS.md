@@ -43,11 +43,24 @@ Send newline-terminated JSON to the socket:
 
 ## Supported events
 
-All standard Claude Code hook events are supported, **except `PermissionRequest`**:
-approval cards are not yet implemented for third-party agents (only Claude Code gets
-one). A `PermissionRequest` from an external agent is answered immediately with no
-decision, so the relay writes nothing and the agent re-asks in its terminal.
-Approval support for other agents will be added with Codex support.
+All standard Claude Code hook events are supported. `PermissionRequest` gets an Allow / Deny
+card in the notch for these sources only:
+
+| Source | Pill | Build |
+|---|---|---|
+| Claude Code in Cursor (Cursor's bundle ID) | `agent_cursor` | every build |
+| Claude Code in VS Code | `integration_claude` | every build |
+| Claude Code in a known terminal (Terminal, iTerm, Warp…) | `integration_claude` | every build, only when terminal cards are turned on in Settings |
+| Codex (`--agent codex`) | `agent_codex` | GitHub build |
+| GitHub Copilot CLI (`--agent copilot`) | `agent_copilot` | GitHub build |
+| Muse Code (`--agent muse`) | `agent_muse` | GitHub build |
+| Hermes (`--agent hermes`) | `agent_hermes` | GitHub build, only when its Approvals toggle is on and the plugin reports an approval transport (see Hermes below) |
+
+A `PermissionRequest` from any other agent (any other `coucou_agent`), or from a source
+above whose condition isn't met, is answered immediately with `ask`: the relay writes
+nothing (Copilot gets `{"permissionDecision":"ask"}`) and the agent asks again in its own
+terminal. The same happens when a card is left unanswered (115 s, 110 s for Copilot and
+Muse) or replaced by a newer request.
 
 The pill lifecycle:
 
@@ -72,12 +85,34 @@ A catalog pill that is not checked in Settings behaves like any other agent: it 
 The GitHub build exposes Gemini CLI (`agent_gemini`), Antigravity (`agent_antigravity`),
 GitHub Copilot CLI (`agent_copilot`), Muse Code (`agent_muse`), OpenCode (`agent_opencode`),
 Amp (`agent_amp`) and Hermes (`agent_hermes`) in Settings → Active pills. Cursor (`agent_cursor`) and Codex
-(`agent_codex`, GitHub build only) are there too — their pills can be declared and set as
-the main pill; session support is coming in a future version.
+(`agent_codex`, GitHub build only) are there too, and their pills can be set as the main pill.
+Claude Code sessions running in Cursor (recognised by Cursor's bundle ID) go to the Cursor pill;
+sessions in VS Code go to the Claude Code pill. Codex sessions go to the Codex pill once its hooks
+are installed (see Codex below).
 
 Claude Desktop (`agent_claude-desktop`, every build) is there as well. Claude Code sessions started from the Claude desktop app's Code tab carry `CLAUDE_CODE_ENTRYPOINT=claude-desktop`; the relay tags them `coucou_agent: claude-desktop` on its own (an explicit `--agent` still wins), so nothing extra is installed. Declare the pill to keep it after the session ends; the ↗ button opens the Claude app.
 
 ## Real-world examples
+
+### Codex (macOS, GitHub build)
+
+Coucou supports Codex out of the box via **Settings → Codex → Install hooks**.
+The installer writes to `~/.codex/hooks.json` (timeouts in seconds) and uses `--agent codex`.
+Codex uses the same event names and the same `PermissionRequest` answer format as Claude Code,
+so Coucou shows a real Allow / Deny card for Codex approval requests (no "always allow" rule is
+written for Codex), and answers its questions from the notch too.
+
+| Codex event | Canonical event |
+|---|---|
+| `SessionStart` | `SessionStart` |
+| `UserPromptSubmit` | `UserPromptSubmit` |
+| `PreToolUse` | `PreToolUse` |
+| `PermissionRequest` | `PermissionRequest` |
+| `PostToolUse` | `PostToolUse` |
+| `Stop` | `Stop` |
+| `SubagentStart` / `SubagentStop` | `SubagentStart` / `SubagentStop` |
+| `Interrupt` | `Interrupt` |
+| `SessionEnd` | `SessionEnd` |
 
 ### Gemini CLI (macOS)
 
