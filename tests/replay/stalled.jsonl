@@ -1,0 +1,10 @@
+{"_meta": {"description": "A session that starts working, then goes silent: stalled after the threshold (default 3 min), events resume at +200 s.", "host": "com.jetbrains.intellij", "relay": {"bundle_id": "com.jetbrains.intellij", "term_program": "", "terminal_emulator": "JetBrains-JediTerm"}}}
+# The stall is decided by the app (StallMonitor), from the last event of a *working* session and
+# Settings' stallThresholdMinutes (default 3). --speed does not shorten it: wait it out, or lower the
+# threshold in Settings. The resuming event uses _delay_fixed (200 s, not divided by --speed) so the
+# stall shows, then clears; press Ctrl-C before that to leave the session stalled.
+{"hook_event_name": "SessionStart", "session_id": "stall-${RUN}", "cwd": "${ROOT}/inventory-service", "source": "startup"}
+{"_delay": 1.0, "hook_event_name": "UserPromptSubmit", "session_id": "stall-${RUN}", "cwd": "${ROOT}/inventory-service", "prompt": "Upgrade Gradle to 9 and fix whatever breaks"}
+{"_delay": 1.5, "hook_event_name": "PreToolUse", "session_id": "stall-${RUN}", "cwd": "${ROOT}/inventory-service", "tool_name": "Bash", "tool_input": {"command": "./gradlew build --no-daemon"}}
+{"_delay_fixed": 200, "_comment": "200 s of silence: the session is working with no event, stalled after the threshold", "hook_event_name": "PostToolUse", "session_id": "stall-${RUN}", "cwd": "${ROOT}/inventory-service", "tool_name": "Bash", "tool_input": {"command": "./gradlew build --no-daemon"}}
+{"_delay": 1.0, "hook_event_name": "Stop", "session_id": "stall-${RUN}", "cwd": "${ROOT}/inventory-service", "last_assistant_message": "The build finished: Gradle 9 works after bumping the Kotlin plugin."}

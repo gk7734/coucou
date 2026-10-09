@@ -1,0 +1,12 @@
+{"_meta": {"description": "A Codex session in Zed's terminal: search, apply_patch, Allow/Deny for `cargo test`, finish.", "host": "dev.zed.Zed", "agent": "codex", "relay": {"bundle_id": "dev.zed.Zed", "term_program": "zed"}}}
+# Codex hooks call `nb-hook --agent codex`, so the relay tags every payload coucou_agent: "codex".
+{"hook_event_name": "SessionStart", "session_id": "codex-${RUN}", "cwd": "${ROOT}/tiny-http", "source": "startup"}
+{"_delay": 1.0, "hook_event_name": "UserPromptSubmit", "session_id": "codex-${RUN}", "cwd": "${ROOT}/tiny-http", "prompt": "Handle chunked request bodies in the parser"}
+{"_delay": 1.5, "hook_event_name": "PreToolUse", "session_id": "codex-${RUN}", "cwd": "${ROOT}/tiny-http", "tool_name": "Bash", "tool_input": {"command": "rg -n \"Transfer-Encoding\" src"}}
+{"_delay": 0.4, "hook_event_name": "PostToolUse", "session_id": "codex-${RUN}", "cwd": "${ROOT}/tiny-http", "tool_name": "Bash", "tool_input": {"command": "rg -n \"Transfer-Encoding\" src"}}
+{"_delay": 1.5, "hook_event_name": "PreToolUse", "session_id": "codex-${RUN}", "cwd": "${ROOT}/tiny-http", "tool_name": "apply_patch", "tool_input": {"command": "*** Begin Patch\n*** Update File: src/parser.rs\n@@\n-        return Err(Error::Unsupported(\"chunked\"));\n+        return self.read_chunked(buf);\n*** End Patch"}}
+{"_delay": 0.5, "hook_event_name": "PostToolUse", "session_id": "codex-${RUN}", "cwd": "${ROOT}/tiny-http", "tool_name": "apply_patch", "tool_input": {"command": "*** Begin Patch\n*** Update File: src/parser.rs\n@@\n-        return Err(Error::Unsupported(\"chunked\"));\n+        return self.read_chunked(buf);\n*** End Patch"}}
+{"_delay": 1.0, "hook_event_name": "PreToolUse", "session_id": "codex-${RUN}", "cwd": "${ROOT}/tiny-http", "tool_name": "Bash", "tool_input": {"command": "cargo test"}}
+{"_delay": 0.3, "_comment": "Held: Codex gets the same Allow/Deny card as Claude Code", "hook_event_name": "PermissionRequest", "session_id": "codex-${RUN}", "cwd": "${ROOT}/tiny-http", "tool_name": "Bash", "tool_input": {"command": "cargo test"}}
+{"_if_allowed": true, "_delay": 3.0, "hook_event_name": "PostToolUse", "session_id": "codex-${RUN}", "cwd": "${ROOT}/tiny-http", "tool_name": "Bash", "tool_input": {"command": "cargo test"}}
+{"_delay": 1.0, "hook_event_name": "Stop", "session_id": "codex-${RUN}", "cwd": "${ROOT}/tiny-http", "last_assistant_message": "Chunked bodies are parsed now (read_chunked), with 3 new tests; cargo test is green."}

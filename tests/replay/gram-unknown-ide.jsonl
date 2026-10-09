@@ -1,0 +1,10 @@
+{"_meta": {"description": "An IDE Coucou has never heard of (app.gram.Gram): detected dynamically, its own ide_app-gram-gram pill.", "host": "app.gram.Gram", "relay": {"bundle_id": "app.gram.Gram", "term_program": ""}}}
+# No list of IDEs: any bundle id that isn't VS Code, Cursor or a known terminal is an IDE (HostResolver).
+# The pill's name comes from the installed app, or from the bundle id ("Gram") when it isn't installed.
+{"hook_event_name": "SessionStart", "session_id": "gram-${RUN}", "cwd": "${ROOT}/notes-app", "source": "startup"}
+{"_delay": 1.0, "hook_event_name": "UserPromptSubmit", "session_id": "gram-${RUN}", "cwd": "${ROOT}/notes-app", "prompt": "Add a dark mode toggle to the settings screen"}
+{"_delay": 1.2, "hook_event_name": "PreToolUse", "session_id": "gram-${RUN}", "cwd": "${ROOT}/notes-app", "tool_name": "Read", "tool_input": {"file_path": "${ROOT}/notes-app/src/settings.tsx"}}
+{"_delay": 0.4, "hook_event_name": "PostToolUse", "session_id": "gram-${RUN}", "cwd": "${ROOT}/notes-app", "tool_name": "Read", "tool_input": {"file_path": "${ROOT}/notes-app/src/settings.tsx"}}
+{"_delay": 1.2, "hook_event_name": "PreToolUse", "session_id": "gram-${RUN}", "cwd": "${ROOT}/notes-app", "tool_name": "Write", "tool_input": {"file_path": "${ROOT}/notes-app/src/theme.ts", "content": "export type Theme = 'light' | 'dark'\n\nexport function systemTheme(): Theme {\n  return matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'\n}\n"}}
+{"_delay": 0.4, "hook_event_name": "PostToolUse", "session_id": "gram-${RUN}", "cwd": "${ROOT}/notes-app", "tool_name": "Write", "tool_input": {"file_path": "${ROOT}/notes-app/src/theme.ts", "content": "export type Theme = 'light' | 'dark'\n\nexport function systemTheme(): Theme {\n  return matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'\n}\n"}}
+{"_delay": 1.0, "hook_event_name": "Stop", "session_id": "gram-${RUN}", "cwd": "${ROOT}/notes-app", "last_assistant_message": "Added theme.ts and a Dark mode toggle in Settings, following the system by default."}
