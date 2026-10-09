@@ -40,6 +40,12 @@ final class IslandStateMachine {
     var openOnHover = false
     /// Grace period after the pointer leaves a hover-opened island (no flicker at the edge).
     var hoverCloseDelay: TimeInterval = 0.6
+    /// The pointer left an island the user opened (click, hotkey…): it folds after this,
+    /// unless `keepsOpenOnLeave` says the user is in the middle of something there (chat,
+    /// a question, a mail…), which keeps the normal auto-close (`homeToPetitDelay`).
+    /// Unset (nil): always the normal auto-close, as before.
+    var leaveCloseDelay: TimeInterval = 1.0
+    var keepsOpenOnLeave: (() -> Bool)?
     /// True while the island is open because of a hover, until the user clicks inside it.
     private(set) var openedByHover = false
 
@@ -94,7 +100,7 @@ final class IslandStateMachine {
         case .petit:
             schedulePetitHide()
         case .home:
-            if isHeldOpen?() != true { scheduleHomeCollapse() }
+            if isHeldOpen?() != true { scheduleHomeCollapse(afterLeave: true) }
         case .coucou:
             if isHeldOpen?() != true {
                 // Interrupt greeting immediately → compact (overrides 10s auto-collapse)
@@ -216,7 +222,7 @@ final class IslandStateMachine {
         DispatchQueue.main.asyncAfter(deadline: .now() + petitToHiddenDelay, execute: item)
     }
 
-    private func scheduleHomeCollapse() {
+    private func scheduleHomeCollapse(afterLeave: Bool = false) {
         homeCollapseWork?.cancel()
         let item = DispatchWorkItem { [weak self] in
             guard let self else { return }
@@ -227,9 +233,11 @@ final class IslandStateMachine {
             self.transition(to: .petit)
         }
         homeCollapseWork = item
-        let delay = openedByHover ? hoverCloseDelay : homeToPetitDelay
-        // The short grace after a hover-open is not an auto-close countdown: no bar.
-        setCountdown(openedByHover
+        let quickLeave = afterLeave && !openedByHover && keepsOpenOnLeave?() == false
+        let delay = openedByHover ? hoverCloseDelay : quickLeave ? leaveCloseDelay : homeToPetitDelay
+        // A short grace (hover-open, or leaving a view you were only looking at) is not an
+        // auto-close countdown: no bar.
+        setCountdown(openedByHover || quickLeave
                      ? nil : Countdown(deadline: Date().addingTimeInterval(delay), duration: delay))
         DispatchQueue.main.asyncAfter(deadline: .now() + delay, execute: item)
     }

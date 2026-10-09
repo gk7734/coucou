@@ -303,6 +303,14 @@ final class IslandWindowController: NSWindowController {
         }
 
         fsm.isHeldOpen = { AppState.shared.pendingApproval != nil }
+        // Views the user is busy in keep the normal auto-close when the pointer leaves;
+        // the others (overview, finished, error…) fold right away.
+        fsm.keepsOpenOnLeave = {
+            let s = AppState.shared
+            let busyViews: Set<IslandView> = [.prompt, .mail, .question, .upload, .uploading, .choose,
+                                              .searching, .result, .note, .settings, .wardrobe, .recap]
+            return busyViews.contains(s.view) || s.pendingQuestion != nil
+        }
     }
 
     // MARK: - Polling loop

@@ -12,7 +12,8 @@ enum IslandStateSyncTests {
         countdownMath()
         try await absence()
         try await alertAutoClose()
-        print("Island state sync: 6 groups passed")
+        try await leaveClose()
+        print("Island state sync: 7 groups passed")
     }
 
     // MARK: - displayed(_:pointerInside:)
@@ -124,6 +125,46 @@ enum IslandStateSyncTests {
         let hovered = IslandStateMachine()
         hovered.openedByAlert(pointerInside: true)
         precondition(hovered.state == .home && hovered.countdown == nil)
+    }
+
+    // MARK: - Leaving an island the user opened
+
+    @MainActor
+    static func leaveClose() async throws {
+        // Looking at the overview: the island folds about a second after the pointer leaves.
+        let quick = IslandStateMachine()
+        quick.leaveCloseDelay = 0.2
+        quick.homeToPetitDelay = 30
+        quick.keepsOpenOnLeave = { false }
+        quick.click()
+        precondition(quick.state == .home)
+        quick.mouseEntered()
+        quick.mouseLeft()
+        precondition(quick.countdown == nil, "a short leave grace shows no countdown bar")
+        try await Task.sleep(for: .milliseconds(700))
+        precondition(quick.state == .petit, "the island stayed open after the pointer left")
+
+        // Busy in the chat or a question: the normal auto-close, with its bar.
+        let busy = IslandStateMachine()
+        busy.leaveCloseDelay = 0.2
+        busy.homeToPetitDelay = 30
+        busy.keepsOpenOnLeave = { true }
+        busy.click()
+        busy.mouseEntered()
+        busy.mouseLeft()
+        try await Task.sleep(for: .milliseconds(500))
+        precondition(busy.state == .home && busy.countdown != nil, "a busy view folded too soon")
+
+        // An approval holds it open whatever the view.
+        let held = IslandStateMachine()
+        held.leaveCloseDelay = 0.2
+        held.isHeldOpen = { true }
+        held.keepsOpenOnLeave = { false }
+        held.click()
+        held.mouseEntered()
+        held.mouseLeft()
+        try await Task.sleep(for: .milliseconds(500))
+        precondition(held.state == .home, "an approval card folded")
     }
 
     // MARK: - Countdown
