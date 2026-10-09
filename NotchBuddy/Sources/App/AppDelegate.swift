@@ -22,6 +22,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // Before the island (and its hook server): banners for session alerts, stall watch.
         MacNotifier.shared.start()
         StallMonitor.shared.start()
+        // "Something plays" listeners, and the visualizer's capture while it is shown.
+        SystemAudioCapture.start()
         setupIsland()
         #if DEBUG
         let debugMenu = NSMenu(title: "Debug")
