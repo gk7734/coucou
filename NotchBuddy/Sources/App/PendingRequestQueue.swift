@@ -92,6 +92,38 @@ struct PendingRequestQueue<Payload> {
     }
 }
 
+// MARK: - A card that changed under the pointer
+
+/// When the approval card on screen is replaced by the next queued one in the same instant
+/// (answered in the editor, expired, or decided with a click that a second click follows),
+/// a click aimed at the old card must not answer the new one, which the user hasn't read.
+/// The card's buttons are ignored for `delay` after such a swap (never approve without an
+/// explicit click).
+struct CardSwapGuard: Equatable {
+    /// How long the buttons of a card that just swapped in ignore clicks.
+    static let delay: TimeInterval = 0.6
+    /// A card presented this soon after the previous one closed replaced it on screen.
+    static let sameInstant: TimeInterval = 0.1
+
+    private var closedAt: TimeInterval = -.infinity
+    private var swappedAt: TimeInterval = -.infinity
+
+    init() {}
+
+    /// The card on screen closed (monotonic seconds).
+    mutating func cardClosed(at now: TimeInterval) { closedAt = now }
+
+    /// A card was presented: a swap when the previous one closed just before.
+    mutating func cardPresented(at now: TimeInterval) {
+        if now - closedAt < Self.sameInstant { swappedAt = now }
+    }
+
+    /// True while a click on the card on screen must be ignored.
+    func blocksClick(at now: TimeInterval) -> Bool {
+        now - swappedAt < Self.delay
+    }
+}
+
 // MARK: - accept() failure recovery
 
 /// What the hook socket server does when accept() fails.

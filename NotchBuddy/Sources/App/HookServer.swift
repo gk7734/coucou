@@ -80,6 +80,10 @@ final class HookServer: @unchecked Sendable {
     @MainActor private var presentedApprovalId: UInt64? = nil   // queue entry on screen
     @MainActor private var presentedQuestionId: UInt64? = nil
     @MainActor private var nextRequestId: UInt64 = 1
+    /// Ignores the card's buttons right after the next approval replaced the one on screen.
+    @MainActor private var approvalSwapGuard = CardSwapGuard()
+    /// The same for the question card (a tap on an option answers at once).
+    @MainActor private var questionSwapGuard = CardSwapGuard()
 
     /// True when a real nb-hook connection is holding an approval open.
     @MainActor var hasRealPendingApproval: Bool { !approvals.isEmpty }
@@ -179,6 +183,7 @@ final class HookServer: @unchecked Sendable {
     private func presentApprovalHeadIfNeeded() {
         guard let head = approvals.head, head.id != presentedApprovalId else { return }
         presentedApprovalId = head.id
+        approvalSwapGuard.cardPresented(at: Self.monotonicNow())
         let state = AppState.shared
         let held = head.payload
         let pillId = head.pillId
@@ -203,6 +208,7 @@ final class HookServer: @unchecked Sendable {
     @MainActor
     private func closeApprovalCard(pillId: String, note: String?) {
         presentedApprovalId = nil
+        approvalSwapGuard.cardClosed(at: Self.monotonicNow())
         let state = AppState.shared
         state.pendingApproval = nil
         state.isPinned = false
@@ -263,6 +269,7 @@ final class HookServer: @unchecked Sendable {
     private func presentQuestionHeadIfNeeded() {
         guard let head = questions.head, head.id != presentedQuestionId else { return }
         presentedQuestionId = head.id
+        questionSwapGuard.cardPresented(at: Self.monotonicNow())
         let state = AppState.shared
         let held = head.payload
         let pillId = head.pillId
@@ -284,6 +291,7 @@ final class HookServer: @unchecked Sendable {
     @MainActor
     private func closeQuestionCard(pillId: String) {
         presentedQuestionId = nil
+        questionSwapGuard.cardClosed(at: Self.monotonicNow())
         let state = AppState.shared
         state.pendingQuestion = nil
         state.isPinned = false
@@ -328,9 +336,15 @@ final class HookServer: @unchecked Sendable {
         presentQuestionHeadIfNeeded()
     }
 
-    /// Called by QuestionView. Sends answers JSON and cleans up.
+    /// Called by QuestionView (`fromCard`) and QuestionRelay (the iPhone, which checks the
+    /// question's fingerprint itself). Sends answers JSON and cleans up.
     @MainActor
-    func sendQuestionAnswers(_ answers: [String: Any]) {
+    func sendQuestionAnswers(_ answers: [String: Any], fromCard: Bool = true) {
+        // The card on screen just replaced another one: the tap was aimed at that one.
+        if fromCard, questionSwapGuard.blocksClick(at: Self.monotonicNow()) {
+            nbLog("Question answer ignored: the card had just changed")
+            return
+        }
         // Only intercept a demo question — real questions always have a live fd.
         if DemoEngine.shared.isActive, questions.isEmpty {
             AppState.shared.pendingQuestion = nil
@@ -1161,9 +1175,11 @@ final class HookServer: @unchecked Sendable {
         presentApprovalHeadIfNeeded()
     }
 
-    /// Called by ApprovalView buttons. Writes the decision to the waiting nb-hook and cleans up.
+    /// Called by ApprovalView buttons (`fromCard`) and ApprovalRelay (the iPhone, which
+    /// checks the request's fingerprint itself). Writes the decision to the waiting nb-hook
+    /// and cleans up.
     @MainActor
-    func sendApprovalDecision(_ decision: String) {
+    func sendApprovalDecision(_ decision: String, fromCard: Bool = true) {
         // Only intercept a demo card — a real card always has a held connection.
         if DemoEngine.shared.isActive,
            AppState.shared.pendingApproval?.sessionId == "demo_session",
@@ -1173,6 +1189,12 @@ final class HookServer: @unchecked Sendable {
             s.isPinned = false
             s.view = s.tasks.isEmpty ? .empty : .overview
             DemoEngine.shared.handleApprovalDecision(decision)
+            return
+        }
+
+        // The card on screen just replaced another one: the click was aimed at that one.
+        if fromCard, approvalSwapGuard.blocksClick(at: Self.monotonicNow()) {
+            nbLog("Approval click ignored: the card had just changed")
             return
         }
 

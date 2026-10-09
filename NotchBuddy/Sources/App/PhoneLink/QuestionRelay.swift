@@ -111,7 +111,8 @@ final class QuestionRelay {
             return
         }
         log("answered from the iPhone")
-        HookServer.shared.sendQuestionAnswers(AskQuestion.buildAnswers(questions: pending.questions, selections: selections))
+        HookServer.shared.sendQuestionAnswers(AskQuestion.buildAnswers(questions: pending.questions, selections: selections),
+                                              fromCard: false)
     }
 
     private func log(_ message: String) {

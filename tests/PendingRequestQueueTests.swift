@@ -106,6 +106,20 @@ enum PendingRequestQueueTests {
               q.removeResolved(event: "PreToolUse", pillId: "integration_claude", sessionId: "b", tool: "Bash", inputKey: "").map(\.id), [])
         check("head left", ids(q), [2])
 
+        // ── A card swapped in under the pointer ─────────────────────────────────
+        print("card swap guard")
+        var swapGuard = CardSwapGuard()
+        check("nothing shown yet: clicks pass", swapGuard.blocksClick(at: 10), false)
+        swapGuard.cardPresented(at: 10)
+        check("first card (nothing closed before) is not a swap", swapGuard.blocksClick(at: 10.01), false)
+        swapGuard.cardClosed(at: 20)
+        swapGuard.cardPresented(at: 20)
+        check("next card in the same instant: click ignored", swapGuard.blocksClick(at: 20.2), true)
+        check("after the delay: click passes", swapGuard.blocksClick(at: 20 + CardSwapGuard.delay + 0.01), false)
+        swapGuard.cardClosed(at: 30)
+        swapGuard.cardPresented(at: 31)
+        check("card shown a second after the last closed is not a swap", swapGuard.blocksClick(at: 31.1), false)
+
         // ── accept() recovery ───────────────────────────────────────────────────
         print("accept() recovery")
         check("EINTR retries", AcceptRecovery.forErrno(EINTR, consecutiveFailures: 1), .retry)
